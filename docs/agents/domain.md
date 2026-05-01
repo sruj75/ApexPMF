@@ -4,7 +4,11 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-- **`CONTEXT.md`** at the repo root.
+- **`CONTEXT.md`** for domain language.
+- **`PRD.md`** for product requirements when behavior or scope is involved.
+- **`ARCHITECTURE.md`** for system shape, runtime boundaries, and stack assumptions.
+- **`SOFTWARE.md`** for module ownership, complexity rules, and implementation doctrine.
+- **`DESIGN.md`** for UI style and visual guidance when touching frontend surfaces.
 - **`docs/adr/`** for ADRs that touch the area you're about to work in.
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The producer skill (`/grill-with-docs`) creates them lazily when terms or decisions actually get resolved.
@@ -16,6 +20,10 @@ This is a single-context repo:
 ```text
 /
 ├── CONTEXT.md
+├── PRD.md
+├── ARCHITECTURE.md
+├── SOFTWARE.md
+├── DESIGN.md
 ├── docs/adr/
 └── src/
 ```

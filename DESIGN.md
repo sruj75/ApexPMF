@@ -3,7 +3,7 @@
 
 **Theme:** dark
 
-Bird's design system evokes a midnight command center atmosphere, characterized by a predominantly dark canvas and a restricted, achromatic color palette. High contrast between crisp white text and dark backgrounds ensures legibility, while muted grays provide subtle visual hierarchy. The system prioritizes functional, compact layouts with soft-cornered components and a clean, unobtrusive feel, reserving color for minimal functional accents.
+Our design system evokes a midnight command center atmosphere, characterized by a predominantly dark canvas and a restricted, achromatic color palette. High contrast between crisp white text and dark backgrounds ensures legibility, while muted grays provide subtle visual hierarchy. The system prioritizes functional, compact layouts with soft-cornered components and a clean, unobtrusive feel, reserving color for minimal functional accents.
 
 ## Tokens — Colors
 

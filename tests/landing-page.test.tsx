@@ -16,7 +16,7 @@ describe("Landing Page", () => {
   it("keeps The Mom Test relationship honest", () => {
     render(<Home />);
 
-    expect(screen.getAllByText(/not affiliated/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/not affiliated/i)).toHaveLength(2);
     expect(
       screen.queryByText(/official mom test product/i)
     ).not.toBeInTheDocument();
@@ -51,9 +51,11 @@ describe("Landing Page", () => {
     ).toBeVisible();
     expect(screen.getByText(/voice conversation/i)).toBeVisible();
     expect(
-      screen.getAllByText(/fresh customer personas/i).length
-    ).toBeGreaterThan(0);
-    expect(screen.getAllByText(/session report/i).length).toBeGreaterThan(0);
+      screen.getByRole("heading", { name: /meet fresh customer personas/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /review your session report/i })
+    ).toBeInTheDocument();
   });
 
   it("shows the placeholder pricing model", () => {

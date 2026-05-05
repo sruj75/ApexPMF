@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/src/infrastructure/supabase/server";
+import { safeNextPath } from "@/src/infrastructure/http/safe-next-path";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
-  const nextPath = requestUrl.searchParams.get("next") ?? "/dashboard";
+  const nextPath = safeNextPath(requestUrl.searchParams.get("next"));
   const host = request.headers.get("host") ?? requestUrl.host;
 
   if (host.startsWith("127.0.0.1")) {
@@ -25,6 +26,10 @@ export async function GET(request: NextRequest) {
   });
 
   if (error || !data.url) {
+    console.error(
+      "[auth/start] OAuth initiation failed:",
+      error?.message ?? "No redirect URL returned"
+    );
     return NextResponse.redirect(new URL("/login?error=oauth", requestUrl.origin));
   }
 

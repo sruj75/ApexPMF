@@ -10,7 +10,7 @@ export default function DashboardPage() {
           The Mom Test Simulator
         </Link>
         <nav className="site-nav" aria-label="Dashboard navigation">
-          <Link className="login-link" href="/dashboard">
+          <Link className="nav-link nav-link--active" href="/dashboard" aria-current="page">
             Practice Dashboard
           </Link>
           <StartPracticeForm

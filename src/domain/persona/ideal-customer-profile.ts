@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { ParseResult, Schema } from "effect";
 
 export type IdealCustomerProfile = {
   id: string;
@@ -30,7 +30,7 @@ export type IdealCustomerProfileInputResult =
 const UserCreatedIdealCustomerProfileInput = Schema.Struct({
   name: Schema.String,
   customerDescription: Schema.String,
-  notes: Schema.optional(Schema.String)
+  notes: Schema.optional(Schema.NullOr(Schema.String))
 });
 
 export function parseIdealCustomerProfileInput(
@@ -43,7 +43,7 @@ export function parseIdealCustomerProfileInput(
   if (decoded._tag === "Left") {
     return {
       ok: false,
-      errors: ["Ideal Customer Profile input is invalid."]
+      errors: [ParseResult.TreeFormatter.formatErrorSync(decoded.left)]
     };
   }
 

@@ -1,13 +1,15 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ProfileSettingsView } from "../app/profile/profile-settings-view";
-import { makeIdealCustomerProfile } from "./ideal-customer-profile.test";
+import { makeIdealCustomerProfile } from "./fixtures/ideal-customer-profile";
 
 const actions = {
   createIdealCustomerProfile() {},
   updateIdealCustomerProfile() {},
   selectActiveIdealCustomerProfile() {},
-  clearActiveIdealCustomerProfile() {}
+  clearActiveIdealCustomerProfile(_formData: FormData) {
+    void _formData;
+  }
 };
 
 describe("Profile Settings", () => {
@@ -33,6 +35,9 @@ describe("Profile Settings", () => {
     expect(
       screen.getByRole("button", { name: /create ideal customer profile/i })
     ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: /use broad practice pool/i })
+    ).toBeDisabled();
     expect(screen.queryByText(/startup idea/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/segmentation/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/fixed persona/i)).not.toBeInTheDocument();
@@ -86,6 +91,6 @@ describe("Profile Settings", () => {
     ).toHaveLength(2);
     expect(
       screen.getByRole("button", { name: /use broad practice pool/i })
-    ).toBeVisible();
+    ).toBeEnabled();
   });
 });

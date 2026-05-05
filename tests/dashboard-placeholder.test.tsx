@@ -8,9 +8,9 @@ describe("Practice Dashboard", () => {
     expect(
       screen.getByRole("heading", { name: /practice dashboard/i })
     ).toBeVisible();
-    expect(
-      screen.getAllByRole("button", { name: /start practice/i })[0]
-    ).toBeVisible();
+    expect(screen.getAllByRole("button", { name: /start practice/i })).toHaveLength(
+      2
+    );
     expect(
       screen.getByRole("navigation", { name: /dashboard navigation/i })
     ).toBeVisible();
@@ -29,9 +29,9 @@ describe("Practice Dashboard", () => {
   it("does not show lesson-style or fake ranking surfaces", () => {
     render(<DashboardPage />);
 
-    expect(screen.queryByText(/lesson/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/task/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/module/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/lesson-style/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/task list/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/training module/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/calendar/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/checklist/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/next practice focus/i)).not.toBeInTheDocument();

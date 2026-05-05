@@ -29,6 +29,9 @@ create table if not exists public.generated_session_cases (
   unique (learner_id, generation_nonce)
 );
 
+create index if not exists idx_generated_session_cases_learner_id
+  on public.generated_session_cases (learner_id);
+
 alter table public.generated_session_cases enable row level security;
 
 create policy "Learners can read their Generated Session Cases"

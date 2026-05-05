@@ -13,6 +13,7 @@ vi.mock("@/src/infrastructure/supabase/server", () => ({
 
 describe("Google OAuth start route", () => {
   beforeEach(() => {
+    vi.resetModules();
     signInWithOAuth.mockReset();
   });
 
@@ -27,6 +28,7 @@ describe("Google OAuth start route", () => {
     );
 
     expect(signInWithOAuth).not.toHaveBeenCalled();
+    expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/auth/start?next=%2Fdashboard"
     );
@@ -49,8 +51,64 @@ describe("Google OAuth start route", () => {
         redirectTo: "http://localhost:3000/auth/callback?next=%2Fdashboard"
       }
     });
+    expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(
       "https://accounts.google.example/oauth"
+    );
+  });
+
+  it("falls back to dashboard when next is unsafe", async () => {
+    signInWithOAuth.mockResolvedValue({
+      data: { url: "https://accounts.google.example/oauth" },
+      error: null
+    });
+
+    const { GET } = await import("../app/auth/start/route");
+    await GET(
+      new NextRequest(
+        "http://localhost:3000/auth/start?next=https://evil.example/phish"
+      )
+    );
+
+    expect(signInWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      options: {
+        redirectTo: "http://localhost:3000/auth/callback?next=%2Fdashboard"
+      }
+    });
+  });
+
+  it("keeps valid internal next paths", async () => {
+    signInWithOAuth.mockResolvedValue({
+      data: { url: "https://accounts.google.example/oauth" },
+      error: null
+    });
+
+    const { GET } = await import("../app/auth/start/route");
+    await GET(new NextRequest("http://localhost:3000/auth/start?next=/profile"));
+
+    expect(signInWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      options: {
+        redirectTo: "http://localhost:3000/auth/callback?next=%2Fprofile"
+      }
+    });
+  });
+
+  it("redirects to login when OAuth initiation fails", async () => {
+    signInWithOAuth.mockResolvedValue({
+      data: { url: null },
+      error: { message: "OAuth provider unavailable" }
+    });
+
+    const { GET } = await import("../app/auth/start/route");
+    const response = await GET(
+      new NextRequest("http://localhost:3000/auth/start?next=/dashboard")
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/login?error=oauth"
     );
   });
 });

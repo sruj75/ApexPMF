@@ -24,6 +24,7 @@ describe("Session start view", () => {
     expect(screen.getByText(/session timer/i)).toBeVisible();
     expect(screen.getByRole("button", { name: /end session/i })).toBeVisible();
 
+    // Ensure internal AI-generated session mechanics never appear in learner-facing UI.
     expect(screen.queryByText(/hidden backstory/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/customer fit/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/hidden test plan/i)).not.toBeInTheDocument();

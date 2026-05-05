@@ -1,7 +1,6 @@
 import { Schema } from "effect";
 import type { OpenRouterChatClient } from "@/src/infrastructure/llm/openrouter";
 import type {
-  GeneratedSessionCaseDraft,
   PersonaGenerationInput,
   PersonaGenerator
 } from "./persona-generation";
@@ -94,41 +93,52 @@ function buildMessages(input: PersonaGenerationInput) {
 
 function decodePersonaGenerationResponse(
   content: string
-): GeneratedSessionCaseDraft {
+): PersonaGenerationResponse {
   let parsed: unknown;
 
   try {
     parsed = JSON.parse(content);
   } catch {
-    throw new Error("Persona Generation response is invalid.");
+    throw new Error("Persona Generation response is not valid JSON.");
   }
 
   const decoded = Schema.decodeUnknownEither(
     PersonaGenerationResponseSchema
   )(parsed);
 
-  if (decoded._tag === "Left" || !passesQualityGate(decoded.right)) {
-    throw new Error("Persona Generation response is invalid.");
+  if (decoded._tag === "Left") {
+    throw new Error("Persona Generation response failed schema validation.");
   }
 
-  return {
-    ...decoded.right,
-    generationAudit: {
-      provider: "openrouter",
-      model: "unknown"
-    }
-  };
+  if (!passesQualityGate(decoded.right)) {
+    throw new Error("Persona Generation response failed quality gate.");
+  }
+
+  return decoded.right;
 }
 
 function passesQualityGate(response: PersonaGenerationResponse): boolean {
   return (
     response.openingContext.trim().length > 0 &&
     response.customerPersona.lightPersonaLabel.trim().length > 0 &&
+    response.customerPersona.interviewRole.trim().length > 0 &&
+    response.customerPersona.publicContext.trim().length > 0 &&
+    response.customerPersona.privateConstraints.length > 0 &&
+    response.customerPersona.privateConstraints.every(
+      (constraint) => constraint.trim().length > 0
+    ) &&
     response.hiddenBackstory.trim().length > 0 &&
     response.hiddenTestPlan.focusAreas.length > 0 &&
     response.hiddenTestPlan.successSignals.length > 0 &&
     response.hiddenTestPlan.failureSignals.length > 0 &&
-    response.traps.length > 0
+    response.traps.length > 0 &&
+    response.traps.every(
+      (trap) =>
+        trap.id.trim().length > 0 &&
+        trap.label.trim().length > 0 &&
+        trap.setup.trim().length > 0 &&
+        trap.weakBehavior.trim().length > 0
+    )
   );
 }
 

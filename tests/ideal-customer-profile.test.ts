@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  parseIdealCustomerProfileInput,
-  type IdealCustomerProfile
+  parseIdealCustomerProfileInput
 } from "../src/domain/persona/ideal-customer-profile";
 import {
   createInMemoryIdealCustomerProfileRepository,
   type IdealCustomerProfileRepository
 } from "../src/domain/persona/ideal-customer-profile-repository";
+import { makeIdealCustomerProfile } from "./fixtures/ideal-customer-profile";
 
 const learnerId = "learner-1";
 
@@ -102,22 +102,46 @@ describe("Ideal Customer Profiles", () => {
     expect(await repository.getActiveForLearner(learnerId)).toBeNull();
     expect(await repository.listForLearner(learnerId)).toHaveLength(1);
   });
+
+  it("keeps Active flags for other learners when selecting a profile", async () => {
+    const repository = createInMemoryIdealCustomerProfileRepository([
+      makeIdealCustomerProfile({
+        id: "profile-10",
+        learnerId: "learner-1",
+        isActive: true
+      }),
+      makeIdealCustomerProfile({
+        id: "profile-20",
+        learnerId: "learner-2",
+        isActive: true
+      })
+    ]);
+
+    const created = await repository.create("learner-1", {
+      name: "Logistics operators",
+      customerDescription: "Ops leads at mid-sized distributors",
+      notes: null
+    });
+    await repository.selectActive("learner-1", created.id);
+
+    const learnerOneActive = await repository.getActiveForLearner("learner-1");
+    const learnerTwoActive = await repository.getActiveForLearner("learner-2");
+
+    expect(learnerOneActive?.id).toBe(created.id);
+    expect(learnerTwoActive?.id).toBe("profile-20");
+  });
+
+  it("continues ID sequencing from the highest existing profile ID", async () => {
+    const repository = createInMemoryIdealCustomerProfileRepository([
+      makeIdealCustomerProfile({ id: "profile-100" })
+    ]);
+
+    const created = await repository.create(learnerId, {
+      name: "Finance directors",
+      customerDescription: "Directors running forecasting and close",
+      notes: null
+    });
+
+    expect(created.id).toBe("profile-101");
+  });
 });
-
-export function makeIdealCustomerProfile(
-  overrides: Partial<IdealCustomerProfile> = {}
-): IdealCustomerProfile {
-  const now = new Date("2026-05-02T00:00:00.000Z");
-
-  return {
-    id: "profile-1",
-    learnerId,
-    name: "Finance operators",
-    customerDescription: "Controllers at growing SaaS companies",
-    notes: null,
-    isActive: false,
-    createdAt: now,
-    updatedAt: now,
-    ...overrides
-  };
-}

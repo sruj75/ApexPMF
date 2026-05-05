@@ -1,5 +1,5 @@
 export type OpenRouterChatMessage = {
-  role: "system" | "user";
+  role: "system" | "user" | "assistant";
   content: string;
 };
 
@@ -71,7 +71,10 @@ export function createOpenRouterChatClient({
       );
 
       if (!response.ok) {
-        throw new Error("OpenRouter request failed.");
+        const errorBody = await response.text().catch(() => "");
+        throw new Error(
+          `OpenRouter request failed: ${response.status} ${response.statusText}${errorBody ? ` - ${errorBody}` : ""}`
+        );
       }
 
       const body = (await response.json()) as OpenRouterCompletionResponse;

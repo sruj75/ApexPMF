@@ -10,7 +10,8 @@ import { createSupabaseServerClient } from "@/src/infrastructure/supabase/server
 
 const defaultOpenRouterModel = "openrouter/free";
 
-export async function startPracticeAction() {
+export async function startPracticeAction(_formData: FormData) {
+  void _formData;
   const supabase = await createSupabaseServerClient();
   const {
     data: { user }
@@ -20,13 +21,19 @@ export async function startPracticeAction() {
     redirect("/login");
   }
 
-  const startedSession = await startPracticeForLearner(user.id, {
-    idealCustomerProfileRepository:
-      createSupabaseIdealCustomerProfileRepository(supabase),
-    generatedSessionCaseRepository:
-      createSupabaseGeneratedSessionCaseRepository(supabase),
-    personaGenerator: createProductionPersonaGenerator()
-  });
+  let startedSession: Awaited<ReturnType<typeof startPracticeForLearner>>;
+  try {
+    startedSession = await startPracticeForLearner(user.id, {
+      idealCustomerProfileRepository:
+        createSupabaseIdealCustomerProfileRepository(supabase),
+      generatedSessionCaseRepository:
+        createSupabaseGeneratedSessionCaseRepository(supabase),
+      personaGenerator: createProductionPersonaGenerator()
+    });
+  } catch (error) {
+    console.error("[practice/start] Failed to create practice session:", error);
+    redirect("/practice?error=session_creation_failed");
+  }
 
   redirect(`/practice/${startedSession.sessionId}`);
 }

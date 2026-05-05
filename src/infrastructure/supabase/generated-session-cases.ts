@@ -112,13 +112,17 @@ function sourceColumns(sessionSource: SessionSource) {
     };
   }
 
-  return {
-    source_kind: sessionSource.kind,
-    source_profile_id: null,
-    source_snapshot: {
-      label: sessionSource.label
-    }
-  };
+  if (sessionSource.kind === "broad-practice-pool") {
+    return {
+      source_kind: sessionSource.kind,
+      source_profile_id: null,
+      source_snapshot: {
+        label: sessionSource.label
+      }
+    };
+  }
+
+  return assertNeverSessionSource(sessionSource);
 }
 
 function toGeneratedSessionCase(
@@ -153,8 +157,21 @@ function toSessionSource(row: GeneratedSessionCaseRow): SessionSource {
     };
   }
 
+  const snapshot =
+    typeof row.source_snapshot === "object" && row.source_snapshot !== null
+      ? (row.source_snapshot as Record<string, unknown>)
+      : null;
+  const label =
+    typeof snapshot?.label === "string" && snapshot.label.trim().length > 0
+      ? snapshot.label
+      : "Broad Practice Pool";
+
   return {
     kind: "broad-practice-pool",
-    label: "Broad Practice Pool"
+    label
   };
+}
+
+function assertNeverSessionSource(sessionSource: never): never {
+  throw new Error(`Unknown Session source kind: ${String(sessionSource)}`);
 }

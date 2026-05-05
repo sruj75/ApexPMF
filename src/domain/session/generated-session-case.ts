@@ -34,9 +34,16 @@ export function toStartedSession(
 }
 
 export function sessionSourceLabel(sessionSource: SessionSource): string {
-  if (sessionSource.kind === "active-ideal-customer-profile") {
-    return sessionSource.idealCustomerProfile.name;
+  switch (sessionSource.kind) {
+    case "active-ideal-customer-profile":
+      return sessionSource.idealCustomerProfile.name;
+    case "broad-practice-pool":
+      return sessionSource.label;
+    default:
+      return assertNever(sessionSource);
   }
+}
 
-  return sessionSource.label;
+function assertNever(value: never): never {
+  throw new Error(`Unknown Session source kind: ${String(value)}`);
 }

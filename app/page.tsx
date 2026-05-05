@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function Home() {
   return (
     <div className="landing-shell">
-      <aside className="landing-sidebar" aria-label="Product">
+      <aside className="landing-sidebar" aria-label="Site sidebar">
         <Link className="brand-link" href="/">
           The Mom Test Simulator
         </Link>
@@ -34,7 +34,7 @@ export default function Home() {
               hidden Traps, and post-session feedback that rewards Learning
               Signal instead of pitch validation.
             </p>
-            <div className="hero-actions" aria-label="Landing page actions">
+            <div className="hero-actions" role="group" aria-label="Primary actions">
               <Link className="primary-action" href="/signup">
                 Get Started for free
               </Link>
@@ -113,21 +113,21 @@ export default function Home() {
           </div>
           <div className="report-grid">
             <article className="report-card">
-              <span>Learning Signal</span>
+              <h3>Learning Signal</h3>
               <p>
                 Did you uncover Concrete History, existing workarounds, decision
                 process, or non-customer fit?
               </p>
             </article>
             <article className="report-card">
-              <span>Interview Behavior</span>
+              <h3>Interview Behavior</h3>
               <p>
                 See where you pitched, led, accepted vague praise, or followed
                 up with useful questions.
               </p>
             </article>
             <article className="report-card">
-              <span>Expandable Evidence</span>
+              <h3>Expandable Evidence</h3>
               <p>
                 Open transcript excerpts inside the Session Report without
                 digging through raw notes.
@@ -145,7 +145,7 @@ export default function Home() {
           <h2 id="pricing-title">Pricing that follows practice.</h2>
           <div className="pricing-grid">
             <article className="pricing-card">
-              <p className="pricing-label">Free Trial Session</p>
+              <h3 className="pricing-label">Free Trial Session</h3>
               <p className="pricing-value">$0</p>
               <p>
                 Try one voice-first Session and get a real Session Report before
@@ -153,7 +153,7 @@ export default function Home() {
               </p>
             </article>
             <article className="pricing-card pricing-card-featured">
-              <p className="pricing-label">Subscription Credits</p>
+              <h3 className="pricing-label">Subscription Credits</h3>
               <p className="pricing-value">$9/month</p>
               <p>
                 Monthly practice capacity for founders who want repeated
@@ -161,7 +161,7 @@ export default function Home() {
               </p>
             </article>
             <article className="pricing-card">
-              <p className="pricing-label">Top-ups</p>
+              <h3 className="pricing-label">Top-ups</h3>
               <p className="pricing-value">Pay as needed</p>
               <p>
                 Add extra usage when you need more Sessions beyond the monthly
@@ -171,11 +171,12 @@ export default function Home() {
           </div>
         </section>
 
-        <footer className="site-footer">
-          <span>The Mom Test Simulator</span>
-          <span>Independent customer discovery practice. Not affiliated with The Mom Test.</span>
-        </footer>
       </main>
+
+      <footer className="site-footer">
+        <span>The Mom Test Simulator</span>
+        <span>Independent customer discovery practice. Not affiliated with The Mom Test.</span>
+      </footer>
     </div>
   );
 }

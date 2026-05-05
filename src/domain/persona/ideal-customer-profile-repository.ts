@@ -23,7 +23,10 @@ export function createInMemoryIdealCustomerProfileRepository(
   initialProfiles: IdealCustomerProfile[] = []
 ): IdealCustomerProfileRepository {
   let profiles = [...initialProfiles];
-  let nextId = profiles.length + 1;
+  let nextId = profiles.reduce((max, profile) => {
+    const match = /^profile-(\d+)$/.exec(profile.id);
+    return match ? Math.max(max, Number.parseInt(match[1] ?? "0", 10) + 1) : max;
+  }, 1);
 
   return {
     async listForLearner(learnerId) {
@@ -92,10 +95,14 @@ export function createInMemoryIdealCustomerProfileRepository(
         throw new Error("Ideal Customer Profile not found.");
       }
 
-      profiles = profiles.map((profile) => ({
-        ...profile,
-        isActive: profile.learnerId === learnerId && profile.id === profileId
-      }));
+      profiles = profiles.map((profile) =>
+        profile.learnerId === learnerId
+          ? {
+              ...profile,
+              isActive: profile.id === profileId
+            }
+          : profile
+      );
     },
 
     async clearActive(learnerId) {

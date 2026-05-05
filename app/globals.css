@@ -25,6 +25,12 @@ html {
   scroll-behavior: smooth;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 body {
   min-height: 100vh;
   margin: 0;
@@ -112,10 +118,12 @@ a {
 .nav-action:hover,
 .nav-action:focus-visible {
   color: var(--color-ghost-white);
-  outline: none;
+  outline: 2px solid var(--color-ghost-white);
+  outline-offset: 2px;
 }
 
-.site-nav .login-link {
+.site-nav .login-link,
+.site-nav .nav-link--active {
   color: var(--color-ghost-white);
 }
 
@@ -345,7 +353,8 @@ h2 {
   padding: 12px;
 }
 
-.report-card span {
+.report-card h3 {
+  margin: 0;
   color: var(--color-ghost-white);
   font-size: 14px;
   font-weight: 600;
@@ -412,6 +421,7 @@ h2 {
 }
 
 .site-footer {
+  grid-column: 1 / -1;
   display: flex;
   justify-content: space-between;
   gap: 24px;
@@ -685,8 +695,9 @@ h2 {
 
 .profile-form input:focus,
 .profile-form textarea:focus {
-  border-color: rgb(247 247 247 / 32%);
-  outline: none;
+  border-color: var(--color-ghost-white);
+  outline: 2px solid var(--color-ghost-white);
+  outline-offset: -2px;
 }
 
 .session-shell {
@@ -720,7 +731,7 @@ h2 {
   padding: 24px;
 }
 
-.session-context-strip div {
+.session-context-card {
   display: grid;
   gap: 12px;
   border: 1px solid rgb(247 247 247 / 7%);

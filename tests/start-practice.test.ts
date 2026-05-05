@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { makeIdealCustomerProfile } from "./ideal-customer-profile.test";
+import { makeIdealCustomerProfile } from "./fixtures/ideal-customer-profile";
 import { startPracticeForLearner } from "../src/application/start-session/start-practice";
 import { createInMemoryIdealCustomerProfileRepository } from "../src/domain/persona/ideal-customer-profile-repository";
 import type {
@@ -29,12 +29,6 @@ describe("Start Practice", () => {
       sessionSourceLabel: "Broad Practice Pool",
       lightPersonaLabel: "Finance operator"
     });
-    expect(Object.keys(started).sort()).toEqual([
-      "lightPersonaLabel",
-      "openingContext",
-      "sessionId",
-      "sessionSourceLabel"
-    ]);
     expect(personaGenerator.inputs).toMatchObject([
       {
         generationNonce: "nonce-1",

@@ -14,7 +14,7 @@ export type ProfileSettingsActions = {
   selectActiveIdealCustomerProfile: (
     formData: FormData
   ) => void | Promise<void>;
-  clearActiveIdealCustomerProfile: () => void | Promise<void>;
+  clearActiveIdealCustomerProfile: (formData: FormData) => void | Promise<void>;
 };
 
 export function ProfileSettingsView({
@@ -43,7 +43,11 @@ export function ProfileSettingsView({
           <p>{sourceDescription(sessionSource)}</p>
         </div>
         <form action={actions.clearActiveIdealCustomerProfile}>
-          <button className="secondary-action" type="submit">
+          <button
+            className="secondary-action"
+            type="submit"
+            disabled={sessionSource.kind !== "active-ideal-customer-profile"}
+          >
             Use Broad Practice Pool
           </button>
         </form>

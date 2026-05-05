@@ -13,6 +13,8 @@ import {
 } from "./actions";
 import { ProfileSettingsView } from "./profile-settings-view";
 
+export const dynamic = "force-dynamic";
+
 type ProfilePageProps = {
   searchParams?: Promise<{
     error?: string | string[];
@@ -49,7 +51,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             action={startPracticeAction}
             buttonClassName="nav-action"
           />
-          <Link className="login-link" href="/profile">
+          <Link className="nav-link nav-link--active" href="/profile" aria-current="page">
             Profile Settings
           </Link>
         </nav>

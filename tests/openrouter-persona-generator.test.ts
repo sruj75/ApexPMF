@@ -80,8 +80,11 @@ describe("OpenRouter Persona Generation", () => {
           {
             message: {
               content: JSON.stringify({
-                ...validPersonaGenerationResponse,
-                hiddenBackstory: undefined
+                ...(() => {
+                  const invalidResponse = { ...validPersonaGenerationResponse };
+                  delete invalidResponse.hiddenBackstory;
+                  return invalidResponse;
+                })()
               })
             }
           }
@@ -109,7 +112,7 @@ describe("OpenRouter Persona Generation", () => {
           }
         }
       })
-    ).rejects.toThrow("Persona Generation response is invalid.");
+    ).rejects.toThrow("Persona Generation response failed schema validation.");
   });
 });
 

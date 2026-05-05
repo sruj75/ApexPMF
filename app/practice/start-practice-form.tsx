@@ -1,5 +1,5 @@
 type StartPracticeFormProps = {
-  action: () => void | Promise<void>;
+  action: (formData: FormData) => void | Promise<void>;
   className?: string;
   buttonClassName?: string;
 };

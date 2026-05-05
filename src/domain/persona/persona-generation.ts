@@ -35,6 +35,7 @@ export type GenerationAudit = {
 
 export type PersonaGenerationInput = {
   sessionSource: SessionSource;
+  // Uniquely identifies one generation attempt; used for persistence idempotency.
   generationNonce: string;
 };
 
@@ -48,8 +49,8 @@ export type GeneratedSessionCaseDraft = {
   generationAudit: GenerationAudit;
 };
 
-export type PersonaGenerator = {
+export interface PersonaGenerator {
   generateSessionCase(
     input: PersonaGenerationInput
   ): Promise<GeneratedSessionCaseDraft>;
-};
+}

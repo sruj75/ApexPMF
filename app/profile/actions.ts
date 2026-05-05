@@ -47,7 +47,8 @@ export async function selectActiveIdealCustomerProfileAction(formData: FormData)
   revalidatePath("/profile");
 }
 
-export async function clearActiveIdealCustomerProfileAction() {
+export async function clearActiveIdealCustomerProfileAction(_formData: FormData) {
+  void _formData;
   const { learnerId, repository } = await getProfileSettingsContext();
   await repository.clearActive(learnerId);
   revalidatePath("/profile");

@@ -13,6 +13,9 @@ create unique index if not exists ideal_customer_profiles_one_active_per_learner
   on public.ideal_customer_profiles (learner_id)
   where is_active;
 
+create index if not exists ideal_customer_profiles_learner_id_idx
+  on public.ideal_customer_profiles (learner_id);
+
 alter table public.ideal_customer_profiles enable row level security;
 
 create policy "Learners can read their Ideal Customer Profiles"
@@ -72,14 +75,9 @@ begin
   end if;
 
   update public.ideal_customer_profiles
-  set is_active = false
+  set is_active = (id = profile_id)
   where learner_id = current_learner_id
-    and is_active = true;
-
-  update public.ideal_customer_profiles
-  set is_active = true
-  where learner_id = current_learner_id
-    and id = profile_id;
+    and (is_active = true or id = profile_id);
 end;
 $$;
 

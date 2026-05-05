@@ -3,17 +3,15 @@ import type { IdealCustomerProfileRepository } from "./ideal-customer-profile-re
 
 export type BroadPracticePoolSessionSource = {
   kind: "broad-practice-pool";
-  label: "Broad Practice Pool";
+  label: string;
 };
 
 export type ActiveIdealCustomerProfileSessionSource = {
   kind: "active-ideal-customer-profile";
-  idealCustomerProfile: {
-    id: string;
-    name: string;
-    customerDescription: string;
-    notes: string | null;
-  };
+  idealCustomerProfile: Pick<
+    IdealCustomerProfile,
+    "id" | "name" | "customerDescription" | "notes"
+  >;
 };
 
 export type SessionSource =
@@ -39,7 +37,9 @@ export async function resolveNextSessionSource(
   };
 }
 
-function toSessionSourceSnapshot(profile: IdealCustomerProfile) {
+function toSessionSourceSnapshot(
+  profile: IdealCustomerProfile
+): ActiveIdealCustomerProfileSessionSource["idealCustomerProfile"] {
   return {
     id: profile.id,
     name: profile.name,

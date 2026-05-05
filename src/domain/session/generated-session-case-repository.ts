@@ -18,7 +18,10 @@ export function createInMemoryGeneratedSessionCaseRepository(
   initialCases: GeneratedSessionCase[] = []
 ): GeneratedSessionCaseRepository {
   let generatedSessionCases = [...initialCases];
-  let nextId = generatedSessionCases.length + 1;
+  let nextId = generatedSessionCases.reduce((max, sessionCase) => {
+    const match = /^session-case-(\d+)$/.exec(sessionCase.id);
+    return match ? Math.max(max, Number.parseInt(match[1] ?? "0", 10) + 1) : max;
+  }, 1);
 
   return {
     async create(learnerId, input) {

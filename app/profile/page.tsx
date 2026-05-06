@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import {
+  createProfileSettingsRepository,
+  getLearnerEntryContext
+} from "@/src/application/start-session/practice-entry-seam";
 import { resolveNextSessionSource } from "@/src/domain/persona/session-source";
-import { createSupabaseIdealCustomerProfileRepository } from "@/src/infrastructure/supabase/ideal-customer-profiles";
-import { createSupabaseServerClient } from "@/src/infrastructure/supabase/server";
 import { startPracticeAction } from "../practice/actions";
 import { StartPracticeForm } from "../practice/start-practice-form";
 import {
@@ -22,19 +24,15 @@ type ProfilePageProps = {
 };
 
 export default async function ProfilePage({ searchParams }: ProfilePageProps) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const context = await getLearnerEntryContext();
+  if (!context.ok) {
     redirect("/login");
   }
 
-  const repository = createSupabaseIdealCustomerProfileRepository(supabase);
+  const repository = createProfileSettingsRepository(context.supabase);
   const [profiles, sessionSource, params] = await Promise.all([
-    repository.listForLearner(user.id),
-    resolveNextSessionSource(user.id, repository),
+    repository.listForLearner(context.learnerId),
+    resolveNextSessionSource(context.learnerId, repository),
     searchParams
   ]);
   const error = Array.isArray(params?.error) ? params.error[0] : params?.error;

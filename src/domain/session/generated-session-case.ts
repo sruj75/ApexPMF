@@ -1,5 +1,8 @@
 import type { GeneratedSessionCaseDraft } from "../persona/persona-generation";
-import type { SessionSource } from "../persona/session-source";
+import {
+  presentSessionSource,
+  type SessionSource
+} from "../persona/session-source";
 
 export type GeneratedSessionCase = GeneratedSessionCaseDraft & {
   id: string;
@@ -34,16 +37,5 @@ export function toStartedSession(
 }
 
 export function sessionSourceLabel(sessionSource: SessionSource): string {
-  switch (sessionSource.kind) {
-    case "active-ideal-customer-profile":
-      return sessionSource.idealCustomerProfile.name;
-    case "broad-practice-pool":
-      return sessionSource.label;
-    default:
-      return assertNever(sessionSource);
-  }
-}
-
-function assertNever(value: never): never {
-  throw new Error(`Unknown Session source kind: ${String(value)}`);
+  return presentSessionSource(sessionSource).label;
 }

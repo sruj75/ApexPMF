@@ -1,5 +1,8 @@
 import type { IdealCustomerProfile } from "@/src/domain/persona/ideal-customer-profile";
-import type { SessionSource } from "@/src/domain/persona/session-source";
+import {
+  presentSessionSource,
+  type SessionSource
+} from "@/src/domain/persona/session-source";
 
 type ProfileSettingsViewProps = {
   profiles: IdealCustomerProfile[];
@@ -23,6 +26,8 @@ export function ProfileSettingsView({
   actions,
   error
 }: ProfileSettingsViewProps) {
+  const presentedSource = presentSessionSource(sessionSource);
+
   return (
     <main className="dashboard-main profile-main">
       <section className="dashboard-hero" aria-labelledby="profile-title">
@@ -39,8 +44,8 @@ export function ProfileSettingsView({
       <section className="profile-source-strip" aria-label="Next Session source">
         <div>
           <p className="dashboard-card-label">Next Session source</p>
-          <h2>{sourceTitle(sessionSource)}</h2>
-          <p>{sourceDescription(sessionSource)}</p>
+          <h2>{presentedSource.title}</h2>
+          <p>{presentedSource.description}</p>
         </div>
         <form action={actions.clearActiveIdealCustomerProfile}>
           <button
@@ -173,20 +178,4 @@ function ProfileForm({ action, submitLabel, profile }: ProfileFormProps) {
       </button>
     </form>
   );
-}
-
-function sourceTitle(source: SessionSource) {
-  if (source.kind === "active-ideal-customer-profile") {
-    return source.idealCustomerProfile.name;
-  }
-
-  return source.label;
-}
-
-function sourceDescription(source: SessionSource) {
-  if (source.kind === "active-ideal-customer-profile") {
-    return source.idealCustomerProfile.customerDescription;
-  }
-
-  return "No Active Ideal Customer Profile is selected.";
 }

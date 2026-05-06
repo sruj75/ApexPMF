@@ -20,6 +20,9 @@ describe("Practice Dashboard", () => {
     expect(
       screen.getByRole("heading", { name: /global ranking/i })
     ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: /broad practice pool/i })
+    ).toBeVisible();
     expect(screen.getByText(/insufficient data state/i)).toBeVisible();
     expect(
       screen.getByRole("heading", { name: /recent session reports/i })

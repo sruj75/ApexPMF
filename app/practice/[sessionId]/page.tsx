@@ -1,7 +1,9 @@
 import { notFound, redirect } from "next/navigation";
+import {
+  createPracticeSessionCaseRepository,
+  getLearnerEntryContext
+} from "@/src/application/start-session/practice-entry-seam";
 import { toStartedSession } from "@/src/domain/session/generated-session-case";
-import { createSupabaseGeneratedSessionCaseRepository } from "@/src/infrastructure/supabase/generated-session-cases";
-import { createSupabaseServerClient } from "@/src/infrastructure/supabase/server";
 import { SessionStartView } from "./session-start-view";
 
 export const dynamic = "force-dynamic";
@@ -24,18 +26,14 @@ export default async function PracticeSessionPage({
     notFound();
   }
 
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const context = await getLearnerEntryContext();
+  if (!context.ok) {
     redirect("/login");
   }
 
-  const repository = createSupabaseGeneratedSessionCaseRepository(supabase);
+  const repository = createPracticeSessionCaseRepository(context.supabase);
   const generatedSessionCase = await repository.getForLearner(
-    user.id,
+    context.learnerId,
     sessionId
   );
 

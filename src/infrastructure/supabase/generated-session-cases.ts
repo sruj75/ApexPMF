@@ -1,33 +1,88 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Schema } from "effect";
 import type {
   CreateGeneratedSessionCaseInput,
   GeneratedSessionCase
 } from "@/src/domain/session/generated-session-case";
 import type { GeneratedSessionCaseRepository } from "@/src/domain/session/generated-session-case-repository";
-import type { SessionSource } from "@/src/domain/persona/session-source";
+import {
+  createBroadPracticePoolSessionSource,
+  type SessionSource
+} from "@/src/domain/persona/session-source";
+import {
+  formatParseErrorDetails,
+  SupabaseRowDecodeError
+} from "./supabase-row-decode-error";
 
-type GeneratedSessionCaseRow = {
-  id: string;
-  learner_id: string;
-  source_kind: "active-ideal-customer-profile" | "broad-practice-pool";
-  source_profile_id: string | null;
-  source_snapshot: unknown;
-  opening_context: string;
-  light_persona_label: string;
-  customer_persona: unknown;
-  hidden_backstory: string;
-  customer_fit:
-    | "strong-fit"
-    | "weak-fit"
-    | "bad-fit"
-    | "buyer-user-mismatch"
-    | "influencer";
-  hidden_test_plan: unknown;
-  traps: unknown;
-  generation_nonce: string;
-  generation_audit: unknown;
-  created_at: string;
-};
+const adapterName = "generated_session_cases";
+
+const SourceKindSchema = Schema.Literal(
+  "active-ideal-customer-profile",
+  "broad-practice-pool"
+);
+
+const CustomerFitSchema = Schema.Literal(
+  "strong-fit",
+  "weak-fit",
+  "bad-fit",
+  "buyer-user-mismatch",
+  "influencer"
+);
+
+const CustomerPersonaSchema = Schema.Struct({
+  lightPersonaLabel: Schema.String,
+  interviewRole: Schema.String,
+  publicContext: Schema.String,
+  privateConstraints: Schema.Array(Schema.String)
+});
+
+const HiddenTestPlanSchema = Schema.Struct({
+  focusAreas: Schema.Array(Schema.String),
+  successSignals: Schema.Array(Schema.String),
+  failureSignals: Schema.Array(Schema.String)
+});
+
+const TrapSchema = Schema.Struct({
+  id: Schema.String,
+  label: Schema.String,
+  setup: Schema.String,
+  weakBehavior: Schema.String
+});
+
+const GenerationAuditSchema = Schema.Struct({
+  provider: Schema.String,
+  model: Schema.String,
+  responseId: Schema.optional(Schema.String)
+});
+
+const ActiveIdealCustomerProfileSourceSnapshotSchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  customerDescription: Schema.String,
+  notes: Schema.NullOr(Schema.String)
+});
+
+const GeneratedSessionCaseRowSchema = Schema.Struct({
+  id: Schema.String,
+  learner_id: Schema.String,
+  source_kind: SourceKindSchema,
+  source_profile_id: Schema.NullOr(Schema.String),
+  source_snapshot: Schema.Unknown,
+  opening_context: Schema.String,
+  light_persona_label: Schema.String,
+  customer_persona: CustomerPersonaSchema,
+  hidden_backstory: Schema.String,
+  customer_fit: CustomerFitSchema,
+  hidden_test_plan: HiddenTestPlanSchema,
+  traps: Schema.Array(TrapSchema),
+  generation_nonce: Schema.String,
+  generation_audit: GenerationAuditSchema,
+  created_at: Schema.Date
+});
+
+type GeneratedSessionCaseRow = Schema.Schema.Type<
+  typeof GeneratedSessionCaseRowSchema
+>;
 
 const generatedSessionCaseColumns = [
   "id",
@@ -62,7 +117,7 @@ export function createSupabaseGeneratedSessionCaseRepository(
         throw new Error(error.message);
       }
 
-      return toGeneratedSessionCase(data as unknown as GeneratedSessionCaseRow);
+      return decodeGeneratedSessionCaseRowOrThrow(data, "create");
     },
 
     async getForLearner(learnerId, sessionCaseId) {
@@ -77,9 +132,7 @@ export function createSupabaseGeneratedSessionCaseRepository(
         throw new Error(error.message);
       }
 
-      return data
-        ? toGeneratedSessionCase(data as unknown as GeneratedSessionCaseRow)
-        : null;
+      return data ? decodeGeneratedSessionCaseRowOrThrow(data, "getForLearner") : null;
     }
   };
 }
@@ -125,51 +178,84 @@ function sourceColumns(sessionSource: SessionSource) {
   return assertNeverSessionSource(sessionSource);
 }
 
-function toGeneratedSessionCase(
-  row: GeneratedSessionCaseRow
+function decodeGeneratedSessionCaseRowOrThrow(
+  row: unknown,
+  operation: "create" | "getForLearner"
 ): GeneratedSessionCase {
+  const decodedRow = decodeWithSchemaOrThrow(
+    GeneratedSessionCaseRowSchema,
+    row,
+    operation
+  );
+
   return {
-    id: row.id,
-    learnerId: row.learner_id,
-    sessionSource: toSessionSource(row),
-    openingContext: row.opening_context,
-    customerPersona: row.customer_persona as GeneratedSessionCase["customerPersona"],
-    hiddenBackstory: row.hidden_backstory,
-    customerFit: row.customer_fit,
-    hiddenTestPlan: row.hidden_test_plan as GeneratedSessionCase["hiddenTestPlan"],
-    traps: row.traps as GeneratedSessionCase["traps"],
-    generationNonce: row.generation_nonce,
-    generationAudit:
-      row.generation_audit as GeneratedSessionCase["generationAudit"],
-    createdAt: new Date(row.created_at)
+    id: decodedRow.id,
+    learnerId: decodedRow.learner_id,
+    sessionSource: decodeSessionSourceOrThrow(decodedRow, operation),
+    openingContext: decodedRow.opening_context,
+    customerPersona: decodedRow.customer_persona,
+    hiddenBackstory: decodedRow.hidden_backstory,
+    customerFit: decodedRow.customer_fit,
+    hiddenTestPlan: decodedRow.hidden_test_plan,
+    traps: decodedRow.traps,
+    generationNonce: decodedRow.generation_nonce,
+    generationAudit: decodedRow.generation_audit,
+    createdAt: decodedRow.created_at
   };
 }
 
-function toSessionSource(row: GeneratedSessionCaseRow): SessionSource {
+function decodeSessionSourceOrThrow(
+  row: GeneratedSessionCaseRow,
+  operation: "create" | "getForLearner"
+): SessionSource {
   if (row.source_kind === "active-ideal-customer-profile") {
+    const decodedSnapshot = decodeWithSchemaOrThrow(
+      ActiveIdealCustomerProfileSourceSnapshotSchema,
+      row.source_snapshot,
+      operation
+    );
+
     return {
       kind: "active-ideal-customer-profile",
-      idealCustomerProfile:
-        row.source_snapshot as Extract<
-          SessionSource,
-          { kind: "active-ideal-customer-profile" }
-        >["idealCustomerProfile"]
+      idealCustomerProfile: decodedSnapshot
     };
   }
 
-  const snapshot =
-    typeof row.source_snapshot === "object" && row.source_snapshot !== null
-      ? (row.source_snapshot as Record<string, unknown>)
-      : null;
-  const label =
-    typeof snapshot?.label === "string" && snapshot.label.trim().length > 0
-      ? snapshot.label
-      : "Broad Practice Pool";
+  const label = readBroadPracticeLabel(row.source_snapshot);
 
-  return {
-    kind: "broad-practice-pool",
+  return createBroadPracticePoolSessionSource({
     label
-  };
+  });
+}
+
+function readBroadPracticeLabel(sourceSnapshot: unknown): unknown {
+  if (
+    typeof sourceSnapshot === "object" &&
+    sourceSnapshot !== null &&
+    "label" in sourceSnapshot
+  ) {
+    return sourceSnapshot.label;
+  }
+
+  return undefined;
+}
+
+function decodeWithSchemaOrThrow<T, I>(
+  schema: Schema.Schema<T, I, never>,
+  value: unknown,
+  operation: "create" | "getForLearner"
+): T {
+  const decoded = Schema.decodeUnknownEither(schema)(value);
+
+  if (decoded._tag === "Left") {
+    throw new SupabaseRowDecodeError({
+      adapter: adapterName,
+      operation,
+      details: formatParseErrorDetails(decoded.left)
+    });
+  }
+
+  return decoded.right;
 }
 
 function assertNeverSessionSource(sessionSource: never): never {

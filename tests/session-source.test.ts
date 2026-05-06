@@ -1,9 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { makeIdealCustomerProfile } from "./fixtures/ideal-customer-profile";
 import { createInMemoryIdealCustomerProfileRepository } from "../src/domain/persona/ideal-customer-profile-repository";
-import { resolveNextSessionSource } from "../src/domain/persona/session-source";
+import {
+  createBroadPracticePoolSessionSource,
+  presentSessionSource,
+  resolveNextSessionSource
+} from "../src/domain/persona/session-source";
 
 describe("Session source", () => {
+  it("defaults Broad Practice Pool label in the domain constructor when label is missing or invalid", () => {
+    expect(createBroadPracticePoolSessionSource()).toEqual({
+      kind: "broad-practice-pool",
+      label: "Broad Practice Pool"
+    });
+    expect(
+      createBroadPracticePoolSessionSource({
+        label: 123
+      })
+    ).toEqual({
+      kind: "broad-practice-pool",
+      label: "Broad Practice Pool"
+    });
+  });
+
   it("uses the Broad Practice Pool when no Active Ideal Customer Profile exists", async () => {
     const source = await resolveNextSessionSource(
       "learner-1",
@@ -38,6 +57,32 @@ describe("Session source", () => {
         customerDescription: "Controllers at growing SaaS companies",
         notes: "Probe budget owner workarounds."
       }
+    });
+  });
+
+  it("presents Session Source policy for Active Ideal Customer Profile and Broad Practice Pool", async () => {
+    const activeSource = await resolveNextSessionSource(
+      "learner-1",
+      createInMemoryIdealCustomerProfileRepository([
+        makeIdealCustomerProfile({
+          id: "profile-99",
+          isActive: true,
+          name: "Clinical operators",
+          customerDescription: "Practice managers in small clinics"
+        })
+      ])
+    );
+    const broadSource = createBroadPracticePoolSessionSource();
+
+    expect(presentSessionSource(activeSource)).toEqual({
+      label: "Clinical operators",
+      title: "Clinical operators",
+      description: "Practice managers in small clinics"
+    });
+    expect(presentSessionSource(broadSource)).toEqual({
+      label: "Broad Practice Pool",
+      title: "Broad Practice Pool",
+      description: "No Active Ideal Customer Profile is selected."
     });
   });
 });

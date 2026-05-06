@@ -61,7 +61,8 @@ describe("Start Practice action", () => {
     getLearnerEntryContext.mockResolvedValue({
       ok: true,
       learnerId: "learner-1",
-      supabase: {}
+      idealCustomerProfileRepository: {},
+      generatedSessionCaseRepository: {}
     });
     startPracticeFromEntryContext.mockResolvedValue({
       ok: false,
@@ -80,7 +81,8 @@ describe("Start Practice action", () => {
     getLearnerEntryContext.mockResolvedValue({
       ok: true,
       learnerId: "learner-1",
-      supabase: {}
+      idealCustomerProfileRepository: {},
+      generatedSessionCaseRepository: {}
     });
     startPracticeFromEntryContext.mockResolvedValue({
       ok: true,
@@ -99,7 +101,8 @@ describe("Start Practice action", () => {
     getLearnerEntryContext.mockResolvedValue({
       ok: true,
       learnerId: "learner-1",
-      supabase: {}
+      idealCustomerProfileRepository: {},
+      generatedSessionCaseRepository: {}
     });
     startPracticeFromEntryContext.mockResolvedValue({
       ok: true,

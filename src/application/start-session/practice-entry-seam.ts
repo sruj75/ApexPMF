@@ -1,17 +1,15 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   classifyEntryFailure,
   createEntryFailure,
   type EntryFailure
 } from "@/src/application/start-session/entry-failure";
-import type { IdealCustomerProfileRepository } from "@/src/domain/persona/ideal-customer-profile-repository";
 import { createOpenRouterPersonaGenerator } from "@/src/domain/persona/openrouter-persona-generator";
 import { startPracticeForLearner } from "@/src/application/start-session/start-practice";
-import type { GeneratedSessionCaseRepository } from "@/src/domain/session/generated-session-case-repository";
 import { createOpenRouterChatClient } from "@/src/infrastructure/llm/openrouter";
-import { createSupabaseGeneratedSessionCaseRepository } from "@/src/infrastructure/supabase/generated-session-cases";
-import { createSupabaseIdealCustomerProfileRepository } from "@/src/infrastructure/supabase/ideal-customer-profiles";
-import { createSupabaseServerClient } from "@/src/infrastructure/supabase/server";
+import {
+  getSupabaseLearnerEntryContext,
+  type SupabaseLearnerEntryContextResult
+} from "@/src/infrastructure/supabase/learner-entry-context";
 
 const defaultOpenRouterModel = "openrouter/free";
 
@@ -19,7 +17,14 @@ export type LearnerEntryContextResult =
   | {
       ok: true;
       learnerId: string;
-      supabase: SupabaseClient;
+      idealCustomerProfileRepository: Extract<
+        SupabaseLearnerEntryContextResult,
+        { ok: true }
+      >["idealCustomerProfileRepository"];
+      generatedSessionCaseRepository: Extract<
+        SupabaseLearnerEntryContextResult,
+        { ok: true }
+      >["generatedSessionCaseRepository"];
     }
   | {
       ok: false;
@@ -37,35 +42,24 @@ export type StartPracticeSeamResult =
     };
 
 export async function getLearnerEntryContext(): Promise<LearnerEntryContextResult> {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return {
-      ok: false,
-      reason: "unauthenticated"
-    };
-  }
-
-  return {
-    ok: true,
-    learnerId: user.id,
-    supabase
-  };
+  return getSupabaseLearnerEntryContext();
 }
 
 export async function startPracticeFromEntryContext(context: {
   learnerId: string;
-  supabase: SupabaseClient;
+  idealCustomerProfileRepository: Extract<
+    LearnerEntryContextResult,
+    { ok: true }
+  >["idealCustomerProfileRepository"];
+  generatedSessionCaseRepository: Extract<
+    LearnerEntryContextResult,
+    { ok: true }
+  >["generatedSessionCaseRepository"];
 }): Promise<StartPracticeSeamResult> {
   try {
     const startedSession = await startPracticeForLearner(context.learnerId, {
-      idealCustomerProfileRepository:
-        createProfileSettingsRepository(context.supabase),
-      generatedSessionCaseRepository:
-        createPracticeSessionCaseRepository(context.supabase),
+      idealCustomerProfileRepository: context.idealCustomerProfileRepository,
+      generatedSessionCaseRepository: context.generatedSessionCaseRepository,
       personaGenerator: createProductionPersonaGenerator()
     });
 
@@ -79,18 +73,6 @@ export async function startPracticeFromEntryContext(context: {
       failure: classifyEntryFailure(cause)
     };
   }
-}
-
-export function createProfileSettingsRepository(
-  supabase: SupabaseClient
-): IdealCustomerProfileRepository {
-  return createSupabaseIdealCustomerProfileRepository(supabase);
-}
-
-export function createPracticeSessionCaseRepository(
-  supabase: SupabaseClient
-): GeneratedSessionCaseRepository {
-  return createSupabaseGeneratedSessionCaseRepository(supabase);
 }
 
 function createProductionPersonaGenerator() {

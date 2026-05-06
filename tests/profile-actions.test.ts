@@ -7,15 +7,13 @@ import {
 const {
   redirect,
   revalidatePath,
-  getLearnerEntryContext,
-  createProfileSettingsRepository
+  getLearnerEntryContext
 } = vi.hoisted(() => ({
   redirect: vi.fn((location: string) => {
     throw new Error(`REDIRECT:${location}`);
   }),
   revalidatePath: vi.fn(),
-  getLearnerEntryContext: vi.fn(),
-  createProfileSettingsRepository: vi.fn()
+  getLearnerEntryContext: vi.fn()
 }));
 
 vi.mock("next/navigation", () => ({
@@ -27,8 +25,7 @@ vi.mock("next/cache", () => ({
 }));
 
 vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
-  getLearnerEntryContext,
-  createProfileSettingsRepository
+  getLearnerEntryContext
 }));
 
 describe("Profile Settings actions", () => {
@@ -44,9 +41,9 @@ describe("Profile Settings actions", () => {
     getLearnerEntryContext.mockResolvedValue({
       ok: true,
       learnerId: "learner-1",
-      supabase: {}
+      idealCustomerProfileRepository: repository,
+      generatedSessionCaseRepository: {}
     });
-    createProfileSettingsRepository.mockReturnValue(repository);
     repository.create.mockResolvedValue(undefined);
     repository.clearActive.mockResolvedValue(undefined);
   });

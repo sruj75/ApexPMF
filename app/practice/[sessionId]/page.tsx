@@ -1,8 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import {
-  createPracticeSessionCaseRepository,
-  getLearnerEntryContext
-} from "@/src/application/start-session/practice-entry-seam";
+import { getLearnerEntryContext } from "@/src/application/start-session/practice-entry-seam";
 import { toStartedSession } from "@/src/domain/session/generated-session-case";
 import { SessionStartView } from "./session-start-view";
 
@@ -31,8 +28,7 @@ export default async function PracticeSessionPage({
     redirect("/login");
   }
 
-  const repository = createPracticeSessionCaseRepository(context.supabase);
-  const generatedSessionCase = await repository.getForLearner(
+  const generatedSessionCase = await context.generatedSessionCaseRepository.getForLearner(
     context.learnerId,
     sessionId
   );

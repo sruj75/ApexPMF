@@ -1,12 +1,10 @@
 import type { IdealCustomerProfile } from "@/src/domain/persona/ideal-customer-profile";
-import {
-  presentSessionSource,
-  type SessionSource
-} from "@/src/domain/persona/session-source";
+import type { PresentedSessionSource } from "@/src/application/start-session/session-source-presentation";
 
 type ProfileSettingsViewProps = {
   profiles: IdealCustomerProfile[];
-  sessionSource: SessionSource;
+  presentedSessionSource: PresentedSessionSource;
+  canClearActiveSource: boolean;
   actions: ProfileSettingsActions;
   error?: string;
 };
@@ -22,12 +20,11 @@ export type ProfileSettingsActions = {
 
 export function ProfileSettingsView({
   profiles,
-  sessionSource,
+  presentedSessionSource,
+  canClearActiveSource,
   actions,
   error
 }: ProfileSettingsViewProps) {
-  const presentedSource = presentSessionSource(sessionSource);
-
   return (
     <main className="dashboard-main profile-main">
       <section className="dashboard-hero" aria-labelledby="profile-title">
@@ -44,14 +41,14 @@ export function ProfileSettingsView({
       <section className="profile-source-strip" aria-label="Next Session source">
         <div>
           <p className="dashboard-card-label">Next Session source</p>
-          <h2>{presentedSource.title}</h2>
-          <p>{presentedSource.description}</p>
+          <h2>{presentedSessionSource.title}</h2>
+          <p>{presentedSessionSource.description}</p>
         </div>
         <form action={actions.clearActiveIdealCustomerProfile}>
           <button
             className="secondary-action"
             type="submit"
-            disabled={sessionSource.kind !== "active-ideal-customer-profile"}
+            disabled={!canClearActiveSource}
           >
             Use Broad Practice Pool
           </button>

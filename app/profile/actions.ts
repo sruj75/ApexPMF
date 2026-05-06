@@ -7,7 +7,6 @@ import {
   mapProfileFailureToRedirectPath
 } from "@/src/application/start-session/entry-failure";
 import {
-  createProfileSettingsRepository,
   getLearnerEntryContext
 } from "@/src/application/start-session/practice-entry-seam";
 import { parseIdealCustomerProfileInput } from "@/src/domain/persona/ideal-customer-profile";
@@ -92,7 +91,7 @@ async function getProfileSettingsContext() {
 
   return {
     learnerId: context.learnerId,
-    repository: createProfileSettingsRepository(context.supabase)
+    repository: context.idealCustomerProfileRepository
   };
 }
 

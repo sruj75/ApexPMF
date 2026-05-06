@@ -1,14 +1,9 @@
 import Link from "next/link";
-import {
-  createBroadPracticePoolSessionSource,
-  presentSessionSource
-} from "@/src/domain/persona/session-source";
+import { presentDefaultSessionSourceForDashboard } from "@/src/application/start-session/session-source-presentation";
 import { startPracticeAction } from "../practice/actions";
 import { StartPracticeForm } from "../practice/start-practice-form";
 
-const nextSessionSource = presentSessionSource(
-  createBroadPracticePoolSessionSource()
-);
+const nextSessionSource = presentDefaultSessionSourceForDashboard();
 
 export default function DashboardPage() {
   return (

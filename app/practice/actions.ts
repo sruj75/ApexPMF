@@ -23,7 +23,8 @@ export async function startPracticeAction(_formData: FormData) {
 
   const startedSession = await startPracticeFromEntryContext({
     learnerId: context.learnerId,
-    supabase: context.supabase
+    idealCustomerProfileRepository: context.idealCustomerProfileRepository,
+    generatedSessionCaseRepository: context.generatedSessionCaseRepository
   });
   if (!startedSession.ok) {
     console.error(

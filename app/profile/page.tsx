@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  createProfileSettingsRepository,
-  getLearnerEntryContext
-} from "@/src/application/start-session/practice-entry-seam";
+import { getLearnerEntryContext } from "@/src/application/start-session/practice-entry-seam";
+import { presentSessionSourceForUi } from "@/src/application/start-session/session-source-presentation";
 import { resolveNextSessionSource } from "@/src/domain/persona/session-source";
 import { startPracticeAction } from "../practice/actions";
 import { StartPracticeForm } from "../practice/start-practice-form";
@@ -29,13 +27,16 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
     redirect("/login");
   }
 
-  const repository = createProfileSettingsRepository(context.supabase);
+  const repository = context.idealCustomerProfileRepository;
   const [profiles, sessionSource, params] = await Promise.all([
     repository.listForLearner(context.learnerId),
     resolveNextSessionSource(context.learnerId, repository),
     searchParams
   ]);
   const error = Array.isArray(params?.error) ? params.error[0] : params?.error;
+  const presentedSessionSource = presentSessionSourceForUi(sessionSource);
+  const canClearActiveSource =
+    sessionSource.kind === "active-ideal-customer-profile";
 
   return (
     <div className="dashboard-shell">
@@ -60,7 +61,8 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
       <ProfileSettingsView
         profiles={profiles}
-        sessionSource={sessionSource}
+        presentedSessionSource={presentedSessionSource}
+        canClearActiveSource={canClearActiveSource}
         actions={{
           createIdealCustomerProfile: createIdealCustomerProfileAction,
           updateIdealCustomerProfile: updateIdealCustomerProfileAction,

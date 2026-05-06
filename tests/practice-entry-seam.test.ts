@@ -1,19 +1,18 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getLearnerEntryContext,
   startPracticeFromEntryContext
 } from "../src/application/start-session/practice-entry-seam";
 
-const { createSupabaseServerClient, startPracticeForLearner } = vi.hoisted(
+const { getSupabaseLearnerEntryContext, startPracticeForLearner } = vi.hoisted(
   () => ({
-    createSupabaseServerClient: vi.fn(),
+    getSupabaseLearnerEntryContext: vi.fn(),
     startPracticeForLearner: vi.fn()
   })
 );
 
-vi.mock("@/src/infrastructure/supabase/server", () => ({
-  createSupabaseServerClient
+vi.mock("@/src/infrastructure/supabase/learner-entry-context", () => ({
+  getSupabaseLearnerEntryContext
 }));
 
 vi.mock("@/src/application/start-session/start-practice", () => ({
@@ -33,12 +32,9 @@ describe("Practice entry seam", () => {
   });
 
   it("returns an unauthenticated context result when no Learner is signed in", async () => {
-    createSupabaseServerClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: null }
-        })
-      }
+    getSupabaseLearnerEntryContext.mockResolvedValue({
+      ok: false,
+      reason: "unauthenticated"
     });
 
     await expect(getLearnerEntryContext()).resolves.toEqual({
@@ -55,7 +51,8 @@ describe("Practice entry seam", () => {
 
     const result = await startPracticeFromEntryContext({
       learnerId: "learner-1",
-      supabase: {} as SupabaseClient
+      idealCustomerProfileRepository: {} as never,
+      generatedSessionCaseRepository: {} as never
     });
 
     expect(result).toEqual({
@@ -75,7 +72,8 @@ describe("Practice entry seam", () => {
   it("maps Persona Generator env misconfiguration to provider_failure", async () => {
     const result = await startPracticeFromEntryContext({
       learnerId: "learner-2",
-      supabase: {} as SupabaseClient
+      idealCustomerProfileRepository: {} as never,
+      generatedSessionCaseRepository: {} as never
     });
 
     expect(result.ok).toBe(false);
@@ -92,7 +90,8 @@ describe("Practice entry seam", () => {
 
     const result = await startPracticeFromEntryContext({
       learnerId: "learner-3",
-      supabase: {} as SupabaseClient
+      idealCustomerProfileRepository: {} as never,
+      generatedSessionCaseRepository: {} as never
     });
 
     expect(result.ok).toBe(false);

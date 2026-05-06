@@ -1,51 +1,35 @@
-import { Schema } from "effect";
 import type { OpenRouterChatClient } from "@/src/infrastructure/llm/openrouter";
+import {
+  decodeGeneratedSessionCaseResponse,
+  type GeneratedSessionCaseContractFailureReason,
+  generatedSessionCaseResponseJsonSchema,
+  generatedSessionCaseResponseSchemaName
+} from "./generated-session-case-contract";
 import type {
   PersonaGenerationInput,
   PersonaGenerator
 } from "./persona-generation";
 import type { SessionSource } from "./session-source";
 
-const CustomerFitSchema = Schema.Literal(
-  "strong-fit",
-  "weak-fit",
-  "bad-fit",
-  "buyer-user-mismatch",
-  "influencer"
-);
-
-const PersonaGenerationResponseSchema = Schema.Struct({
-  openingContext: Schema.String,
-  customerPersona: Schema.Struct({
-    lightPersonaLabel: Schema.String,
-    interviewRole: Schema.String,
-    publicContext: Schema.String,
-    privateConstraints: Schema.Array(Schema.String)
-  }),
-  hiddenBackstory: Schema.String,
-  customerFit: CustomerFitSchema,
-  hiddenTestPlan: Schema.Struct({
-    focusAreas: Schema.Array(Schema.String),
-    successSignals: Schema.Array(Schema.String),
-    failureSignals: Schema.Array(Schema.String)
-  }),
-  traps: Schema.Array(
-    Schema.Struct({
-      id: Schema.String,
-      label: Schema.String,
-      setup: Schema.String,
-      weakBehavior: Schema.String
-    })
-  )
-});
-
-type PersonaGenerationResponse = Schema.Schema.Type<
-  typeof PersonaGenerationResponseSchema
->;
-
 type OpenRouterPersonaGeneratorOptions = {
   chatClient: OpenRouterChatClient;
 };
+
+export class PersonaGenerationDecodeError extends Error {
+  readonly name = "PersonaGenerationDecodeError";
+  readonly reason: GeneratedSessionCaseContractFailureReason;
+  readonly cause?: unknown;
+
+  constructor(input: {
+    reason: GeneratedSessionCaseContractFailureReason;
+    message: string;
+    cause?: unknown;
+  }) {
+    super(input.message);
+    this.reason = input.reason;
+    this.cause = input.cause;
+  }
+}
 
 export function createOpenRouterPersonaGenerator({
   chatClient
@@ -54,8 +38,8 @@ export function createOpenRouterPersonaGenerator({
     async generateSessionCase(input) {
       const completion = await chatClient.createStructuredJsonCompletion({
         messages: buildMessages(input),
-        responseSchemaName: "generated_session_case",
-        responseJsonSchema: personaGenerationJsonSchema
+        responseSchemaName: generatedSessionCaseResponseSchemaName,
+        responseJsonSchema: generatedSessionCaseResponseJsonSchema
       });
       const generated = decodePersonaGenerationResponse(completion.content);
 
@@ -93,53 +77,32 @@ function buildMessages(input: PersonaGenerationInput) {
 
 function decodePersonaGenerationResponse(
   content: string
-): PersonaGenerationResponse {
-  let parsed: unknown;
+){
+  const decoded = decodeGeneratedSessionCaseResponse(content);
 
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    throw new Error("Persona Generation response is not valid JSON.");
+  if (decoded.ok) {
+    return decoded.value;
   }
 
-  const decoded = Schema.decodeUnknownEither(
-    PersonaGenerationResponseSchema
-  )(parsed);
-
-  if (decoded._tag === "Left") {
-    throw new Error("Persona Generation response failed schema validation.");
+  switch (decoded.reason) {
+    case "invalid_json":
+      throw new PersonaGenerationDecodeError({
+        reason: "invalid_json",
+        message: "Persona Generation response is not valid JSON."
+      });
+    case "schema_validation_failed":
+      throw new PersonaGenerationDecodeError({
+        reason: "schema_validation_failed",
+        message: "Persona Generation response failed schema validation."
+      });
+    case "quality_gate_failed":
+      throw new PersonaGenerationDecodeError({
+        reason: "quality_gate_failed",
+        message: "Persona Generation response failed quality gate."
+      });
+    default:
+      return assertNever(decoded.reason);
   }
-
-  if (!passesQualityGate(decoded.right)) {
-    throw new Error("Persona Generation response failed quality gate.");
-  }
-
-  return decoded.right;
-}
-
-function passesQualityGate(response: PersonaGenerationResponse): boolean {
-  return (
-    response.openingContext.trim().length > 0 &&
-    response.customerPersona.lightPersonaLabel.trim().length > 0 &&
-    response.customerPersona.interviewRole.trim().length > 0 &&
-    response.customerPersona.publicContext.trim().length > 0 &&
-    response.customerPersona.privateConstraints.length > 0 &&
-    response.customerPersona.privateConstraints.every(
-      (constraint) => constraint.trim().length > 0
-    ) &&
-    response.hiddenBackstory.trim().length > 0 &&
-    response.hiddenTestPlan.focusAreas.length > 0 &&
-    response.hiddenTestPlan.successSignals.length > 0 &&
-    response.hiddenTestPlan.failureSignals.length > 0 &&
-    response.traps.length > 0 &&
-    response.traps.every(
-      (trap) =>
-        trap.id.trim().length > 0 &&
-        trap.label.trim().length > 0 &&
-        trap.setup.trim().length > 0 &&
-        trap.weakBehavior.trim().length > 0
-    )
-  );
 }
 
 function describeSessionSource(sessionSource: SessionSource): string {
@@ -154,81 +117,6 @@ function describeSessionSource(sessionSource: SessionSource): string {
   return "Broad Practice Pool";
 }
 
-const personaGenerationJsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: [
-    "openingContext",
-    "customerPersona",
-    "hiddenBackstory",
-    "customerFit",
-    "hiddenTestPlan",
-    "traps"
-  ],
-  properties: {
-    openingContext: { type: "string" },
-    customerPersona: {
-      type: "object",
-      additionalProperties: false,
-      required: [
-        "lightPersonaLabel",
-        "interviewRole",
-        "publicContext",
-        "privateConstraints"
-      ],
-      properties: {
-        lightPersonaLabel: { type: "string" },
-        interviewRole: { type: "string" },
-        publicContext: { type: "string" },
-        privateConstraints: {
-          type: "array",
-          items: { type: "string" }
-        }
-      }
-    },
-    hiddenBackstory: { type: "string" },
-    customerFit: {
-      type: "string",
-      enum: [
-        "strong-fit",
-        "weak-fit",
-        "bad-fit",
-        "buyer-user-mismatch",
-        "influencer"
-      ]
-    },
-    hiddenTestPlan: {
-      type: "object",
-      additionalProperties: false,
-      required: ["focusAreas", "successSignals", "failureSignals"],
-      properties: {
-        focusAreas: {
-          type: "array",
-          items: { type: "string" }
-        },
-        successSignals: {
-          type: "array",
-          items: { type: "string" }
-        },
-        failureSignals: {
-          type: "array",
-          items: { type: "string" }
-        }
-      }
-    },
-    traps: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["id", "label", "setup", "weakBehavior"],
-        properties: {
-          id: { type: "string" },
-          label: { type: "string" },
-          setup: { type: "string" },
-          weakBehavior: { type: "string" }
-        }
-      }
-    }
-  }
-};
+function assertNever(value: never): never {
+  throw new Error(`Unknown Persona Generation contract error: ${String(value)}`);
+}

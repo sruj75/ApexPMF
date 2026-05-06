@@ -1,9 +1,10 @@
 import type { IdealCustomerProfile } from "@/src/domain/persona/ideal-customer-profile";
-import type { SessionSource } from "@/src/domain/persona/session-source";
+import type { PresentedSessionSource } from "@/src/application/start-session/session-source-presentation";
 
 type ProfileSettingsViewProps = {
   profiles: IdealCustomerProfile[];
-  sessionSource: SessionSource;
+  presentedSessionSource: PresentedSessionSource;
+  canClearActiveSource: boolean;
   actions: ProfileSettingsActions;
   error?: string;
 };
@@ -19,7 +20,8 @@ export type ProfileSettingsActions = {
 
 export function ProfileSettingsView({
   profiles,
-  sessionSource,
+  presentedSessionSource,
+  canClearActiveSource,
   actions,
   error
 }: ProfileSettingsViewProps) {
@@ -39,14 +41,14 @@ export function ProfileSettingsView({
       <section className="profile-source-strip" aria-label="Next Session source">
         <div>
           <p className="dashboard-card-label">Next Session source</p>
-          <h2>{sourceTitle(sessionSource)}</h2>
-          <p>{sourceDescription(sessionSource)}</p>
+          <h2>{presentedSessionSource.title}</h2>
+          <p>{presentedSessionSource.description}</p>
         </div>
         <form action={actions.clearActiveIdealCustomerProfile}>
           <button
             className="secondary-action"
             type="submit"
-            disabled={sessionSource.kind !== "active-ideal-customer-profile"}
+            disabled={!canClearActiveSource}
           >
             Use Broad Practice Pool
           </button>
@@ -173,20 +175,4 @@ function ProfileForm({ action, submitLabel, profile }: ProfileFormProps) {
       </button>
     </form>
   );
-}
-
-function sourceTitle(source: SessionSource) {
-  if (source.kind === "active-ideal-customer-profile") {
-    return source.idealCustomerProfile.name;
-  }
-
-  return source.label;
-}
-
-function sourceDescription(source: SessionSource) {
-  if (source.kind === "active-ideal-customer-profile") {
-    return source.idealCustomerProfile.customerDescription;
-  }
-
-  return "No Active Ideal Customer Profile is selected.";
 }

@@ -18,6 +18,9 @@ blob-report/
 # Tool scratch output
 .playwright-mcp/
 
+# Local Cursor state
+.cursor/hooks/state/
+
 # Environment and secrets
 .env
 .env.*

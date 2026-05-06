@@ -21,6 +21,28 @@ export type OpenRouterStructuredJsonCompletion = {
   content: string;
 };
 
+export class OpenRouterProviderError extends Error {
+  readonly name = "OpenRouterProviderError";
+  readonly phase: "request_failed" | "invalid_response";
+  readonly status?: number;
+  readonly statusText?: string;
+  readonly cause?: unknown;
+
+  constructor(input: {
+    message: string;
+    phase: "request_failed" | "invalid_response";
+    status?: number;
+    statusText?: string;
+    cause?: unknown;
+  }) {
+    super(input.message);
+    this.phase = input.phase;
+    this.status = input.status;
+    this.statusText = input.statusText;
+    this.cause = input.cause;
+  }
+}
+
 type FetchLike = (
   input: string,
   init: RequestInit
@@ -49,35 +71,58 @@ export function createOpenRouterChatClient({
 }: OpenRouterChatClientOptions): OpenRouterChatClient {
   return {
     async createStructuredJsonCompletion(request) {
-      const response = await fetchImplementation(
-        "https://openrouter.ai/api/v1/chat/completions",
-        {
-          method: "POST",
-          headers: headersForRequest({ apiKey, appTitle, siteUrl }),
-          body: JSON.stringify({
-            model,
-            messages: request.messages,
-            stream: false,
-            response_format: {
-              type: "json_schema",
-              json_schema: {
-                name: request.responseSchemaName,
-                strict: true,
-                schema: request.responseJsonSchema
+      let response: Response;
+
+      try {
+        response = await fetchImplementation(
+          "https://openrouter.ai/api/v1/chat/completions",
+          {
+            method: "POST",
+            headers: headersForRequest({ apiKey, appTitle, siteUrl }),
+            body: JSON.stringify({
+              model,
+              messages: request.messages,
+              stream: false,
+              response_format: {
+                type: "json_schema",
+                json_schema: {
+                  name: request.responseSchemaName,
+                  strict: true,
+                  schema: request.responseJsonSchema
+                }
               }
-            }
-          })
-        }
-      );
+            })
+          }
+        );
+      } catch (cause) {
+        throw new OpenRouterProviderError({
+          phase: "request_failed",
+          message: "OpenRouter request failed before receiving a response.",
+          cause
+        });
+      }
 
       if (!response.ok) {
         const errorBody = await response.text().catch(() => "");
-        throw new Error(
-          `OpenRouter request failed: ${response.status} ${response.statusText}${errorBody ? ` - ${errorBody}` : ""}`
-        );
+        throw new OpenRouterProviderError({
+          phase: "request_failed",
+          status: response.status,
+          statusText: response.statusText,
+          message: `OpenRouter request failed: ${response.status} ${response.statusText}${errorBody ? ` - ${errorBody}` : ""}`
+        });
       }
 
-      const body = (await response.json()) as OpenRouterCompletionResponse;
+      let body: OpenRouterCompletionResponse;
+      try {
+        body = (await response.json()) as OpenRouterCompletionResponse;
+      } catch (cause) {
+        throw new OpenRouterProviderError({
+          phase: "invalid_response",
+          message: "OpenRouter response is not valid JSON.",
+          cause
+        });
+      }
+
       return parseCompletionResponse(body);
     }
   };
@@ -128,7 +173,10 @@ function parseCompletionResponse(
     typeof body.model !== "string" ||
     typeof content !== "string"
   ) {
-    throw new Error("OpenRouter response is invalid.");
+    throw new OpenRouterProviderError({
+      phase: "invalid_response",
+      message: "OpenRouter response is invalid."
+    });
   }
 
   return {

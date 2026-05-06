@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { presentDefaultSessionSourceForDashboard } from "@/src/application/start-session/session-source-presentation";
 import { startPracticeAction } from "../practice/actions";
 import { StartPracticeForm } from "../practice/start-practice-form";
+
+const nextSessionSource = presentDefaultSessionSourceForDashboard();
 
 export default function DashboardPage() {
   return (
@@ -45,7 +48,7 @@ export default function DashboardPage() {
         <section className="dashboard-command" aria-label="Practice status">
           <article className="dashboard-card dashboard-primary-card">
             <p className="dashboard-card-label">Next Session source</p>
-            <h2>Broad Practice Pool</h2>
+            <h2>{nextSessionSource.title}</h2>
             <p>
               Until an Active Ideal Customer Profile exists, generated Customer
               Personas come from broad realistic customer contexts.

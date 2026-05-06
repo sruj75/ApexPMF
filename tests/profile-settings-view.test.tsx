@@ -17,10 +17,12 @@ describe("Profile Settings", () => {
     render(
       <ProfileSettingsView
         profiles={[]}
-        sessionSource={{
-          kind: "broad-practice-pool",
-          label: "Broad Practice Pool"
+        presentedSessionSource={{
+          label: "Broad Practice Pool",
+          title: "Broad Practice Pool",
+          description: "No Active Ideal Customer Profile is selected."
         }}
+        canClearActiveSource={false}
         actions={actions}
       />
     );
@@ -60,15 +62,12 @@ describe("Profile Settings", () => {
             isActive: false
           })
         ]}
-        sessionSource={{
-          kind: "active-ideal-customer-profile",
-          idealCustomerProfile: {
-            id: "profile-1",
-            name: "Finance operators",
-            customerDescription: "Controllers at growing SaaS companies",
-            notes: null
-          }
+        presentedSessionSource={{
+          label: "Finance operators",
+          title: "Finance operators",
+          description: "Controllers at growing SaaS companies"
         }}
+        canClearActiveSource
         actions={actions}
       />
     );

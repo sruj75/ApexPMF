@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { createOpenRouterPersonaGenerator } from "../src/domain/persona/openrouter-persona-generator";
+import {
+  createOpenRouterPersonaGenerator,
+  PersonaGenerationDecodeError
+} from "../src/domain/persona/openrouter-persona-generator";
 import { createOpenRouterChatClient } from "../src/infrastructure/llm/openrouter";
 
 describe("OpenRouter Persona Generation", () => {
@@ -112,7 +115,114 @@ describe("OpenRouter Persona Generation", () => {
           }
         }
       })
-    ).rejects.toThrow("Persona Generation response failed schema validation.");
+    ).rejects.toBeInstanceOf(PersonaGenerationDecodeError);
+    await expect(
+      personaGenerator.generateSessionCase({
+        generationNonce: "nonce-2",
+        sessionSource: {
+          kind: "active-ideal-customer-profile",
+          idealCustomerProfile: {
+            id: "profile-1",
+            name: "Finance operators",
+            customerDescription: "Controllers at growing SaaS companies",
+            notes: null
+          }
+        }
+      })
+    ).rejects.toMatchObject({
+      reason: "schema_validation_failed"
+    });
+  });
+
+  it("rejects invalid JSON responses before schema validation", async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({
+        id: "completion-3",
+        model: "openai/gpt-5.2",
+        choices: [
+          {
+            message: {
+              content: "{this is not valid json"
+            }
+          }
+        ]
+      })
+    );
+    const personaGenerator = createOpenRouterPersonaGenerator({
+      chatClient: createOpenRouterChatClient({
+        apiKey: "openrouter-key",
+        model: "openai/gpt-5.2",
+        fetch
+      })
+    });
+
+    await expect(
+      personaGenerator.generateSessionCase({
+        generationNonce: "nonce-3",
+        sessionSource: {
+          kind: "broad-practice-pool",
+          label: "Broad Practice Pool"
+        }
+      })
+    ).rejects.toBeInstanceOf(PersonaGenerationDecodeError);
+    await expect(
+      personaGenerator.generateSessionCase({
+        generationNonce: "nonce-3",
+        sessionSource: {
+          kind: "broad-practice-pool",
+          label: "Broad Practice Pool"
+        }
+      })
+    ).rejects.toMatchObject({
+      reason: "invalid_json"
+    });
+  });
+
+  it("rejects quality-gate failures before the domain consumes the response", async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({
+        id: "completion-4",
+        model: "openai/gpt-5.2",
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                ...validPersonaGenerationResponse,
+                traps: []
+              })
+            }
+          }
+        ]
+      })
+    );
+    const personaGenerator = createOpenRouterPersonaGenerator({
+      chatClient: createOpenRouterChatClient({
+        apiKey: "openrouter-key",
+        model: "openai/gpt-5.2",
+        fetch
+      })
+    });
+
+    await expect(
+      personaGenerator.generateSessionCase({
+        generationNonce: "nonce-4",
+        sessionSource: {
+          kind: "broad-practice-pool",
+          label: "Broad Practice Pool"
+        }
+      })
+    ).rejects.toBeInstanceOf(PersonaGenerationDecodeError);
+    await expect(
+      personaGenerator.generateSessionCase({
+        generationNonce: "nonce-4",
+        sessionSource: {
+          kind: "broad-practice-pool",
+          label: "Broad Practice Pool"
+        }
+      })
+    ).rejects.toMatchObject({
+      reason: "quality_gate_failed"
+    });
   });
 });
 

@@ -203,6 +203,177 @@ describe("Generated Session Case Supabase mapping", () => {
     ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
   });
 
+  it("accepts null evidence fields in persisted evaluation artifacts", async () => {
+    const repository = createRepositoryForGetForLearner({
+      data: {
+        ...validGeneratedSessionCaseRow,
+        session_status: "ended",
+        ended_reason: "natural-conclusion",
+        ended_at: "2026-05-08T09:00:00.000Z",
+        report_status: "ready",
+        report_ready_at: "2026-05-08T09:30:00.000Z",
+        session_report: {
+          outcome: {
+            summary: "Session ended with reason: natural-conclusion."
+          },
+          missedSignals: [],
+          badQuestions: [],
+          strongQuestions: [],
+          trapResults: [
+            {
+              trapLabel: "Compliment Trap",
+              outcome: "partial",
+              detail: "Learner partially recovered from praise bait.",
+              evidence: [
+                {
+                  sequence: 2,
+                  turnId: null,
+                  snippet: null,
+                  title: "Trap response",
+                  detail: "Evidence with null optional fields."
+                }
+              ]
+            }
+          ],
+          skillMovement: [],
+          nextPracticeFocus: {
+            title: "Ask behavior-first follow-ups",
+            description:
+              "After social signals, ask about past behavior before solutions."
+          },
+          sourceContext: "Broad Practice Pool",
+          lightPersonaLabel: "Finance operator",
+          expandableEvidence: [
+            {
+              sequence: 2,
+              turnId: null,
+              snippet: null,
+              title: "Expandable evidence",
+              detail: "Evidence with null optional fields."
+            }
+          ]
+        },
+        session_transcript: [
+          {
+            sequence: 1,
+            speaker: "learner",
+            text: "What did you try recently?"
+          },
+          {
+            sequence: 2,
+            speaker: "persona",
+            text: "We tried a paid consultant last quarter."
+          }
+        ],
+        session_evaluation: {
+          interviewBehavior: {
+            avoidingPitching: {
+              outcome: "missed",
+              note: "Pitch-first opener detected.",
+              evidence: [
+                {
+                  sequence: 1,
+                  turnId: null,
+                  snippet: null,
+                  title: "Pitch turn",
+                  detail: "Pitch language present."
+                }
+              ]
+            },
+            askingConcreteHistory: {
+              outcome: "met",
+              note: "Concrete history detected.",
+              evidence: [
+                {
+                  sequence: 2,
+                  turnId: null,
+                  snippet: null,
+                  title: "History turn",
+                  detail: "Specific attempt described."
+                }
+              ]
+            },
+            followingUpOnVagueAnswers: {
+              outcome: "partial",
+              note: "Follow-up was delayed.",
+              evidence: []
+            },
+            resistingCompliments: {
+              outcome: "partial",
+              note: "Mixed response to praise.",
+              evidence: []
+            },
+            identifyingBadFitPersonas: {
+              outcome: "partial",
+              note: "Not central in this fit context.",
+              evidence: []
+            },
+            uncoveringWorkaroundsOrDecisionProcess: {
+              outcome: "met",
+              note: "Workaround/decision probe detected.",
+              evidence: [
+                {
+                  sequence: 2,
+                  turnId: null,
+                  snippet: null,
+                  title: "Workaround turn",
+                  detail: "Decision process surfaced."
+                }
+              ]
+            }
+          },
+          learningSignal: {
+            quality: "medium",
+            summary: "Useful discovery evidence appeared.",
+            evidence: [
+              {
+                sequence: 2,
+                turnId: null,
+                snippet: null,
+                title: "Learning evidence",
+                detail: "Concrete evidence present."
+              }
+            ]
+          },
+          trapResults: [
+            {
+              trapId: "trap-1",
+              trapLabel: "Compliment Trap",
+              outcome: "partial",
+              detail: "Learner partially recovered from praise bait.",
+              evidence: [
+                {
+                  sequence: 2,
+                  turnId: null,
+                  snippet: null,
+                  title: "Trap evidence",
+                  detail: "Recovered after trap."
+                }
+              ]
+            }
+          ],
+          excludedDimensions: {
+            accent: "not-scored",
+            charisma: "not-scored",
+            vocalPolish: "not-scored",
+            soundingConfident: "not-scored"
+          }
+        }
+      }
+    });
+
+    await expect(
+      repository.getForLearner(
+        "learner-1",
+        "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
+      )
+    ).resolves.toMatchObject({
+      sessionLifecycle: {
+        reportStatus: "ready"
+      }
+    });
+  });
+
   it("still throws Supabase query errors as plain Error", async () => {
     const repository = createRepositoryForGetForLearner({
       data: null,

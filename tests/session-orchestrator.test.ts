@@ -310,6 +310,63 @@ describe("Session Orchestrator", () => {
       nextPath: "/dashboard"
     });
   });
+
+  it("does not clobber an already-ready report when report-generating route is revisited", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    let generationCount = 0;
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        async generateForEndedSession() {
+          generationCount += 1;
+          if (generationCount === 1) {
+            return makeReadyReportGenerationResult();
+          }
+          return {
+            status: "insufficient-evidence",
+            reason: "provider-failure"
+          };
+        }
+      }
+    });
+
+    await orchestrator.endSessionForLearner({
+      learnerId,
+      sessionId: sessionIds.naturalConclusion,
+      reason: "natural-conclusion"
+    });
+
+    await expect(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion
+      })
+    ).resolves.toEqual({
+      reportStatus: "ready",
+      nextPath: `/practice/${sessionIds.naturalConclusion}/report`
+    });
+
+    await expect(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion
+      })
+    ).resolves.toEqual({
+      reportStatus: "ready",
+      nextPath: `/practice/${sessionIds.naturalConclusion}/report`
+    });
+
+    const persisted = await repository.getForLearner(
+      learnerId,
+      sessionIds.naturalConclusion
+    );
+
+    expect(generationCount).toBe(1);
+    expect(persisted?.sessionLifecycle.reportStatus).toBe("ready");
+    expect(persisted?.sessionReport).not.toBeNull();
+    expect(persisted?.sessionTranscript).not.toBeNull();
+    expect(persisted?.sessionEvaluation).not.toBeNull();
+  });
 });
 
 async function createRepositoryWithEndedSessionFixtures(): Promise<{

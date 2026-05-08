@@ -111,6 +111,39 @@ export function createSessionOrchestrator(input: {
         throw new Error(`Session not found: ${sessionId}`);
       }
 
+      if (generatedSessionCase.sessionLifecycle.reportStatus === "ready") {
+        if (
+          generatedSessionCase.sessionReport &&
+          generatedSessionCase.sessionTranscript &&
+          generatedSessionCase.sessionEvaluation
+        ) {
+          return {
+            reportStatus: "ready" as const,
+            nextPath: `/practice/${sessionId}/report`
+          };
+        }
+      }
+
+      if (
+        generatedSessionCase.sessionLifecycle.sessionStatus !== "ended" ||
+        generatedSessionCase.sessionLifecycle.endedReason === "user-quit" ||
+        generatedSessionCase.sessionLifecycle.reportStatus ===
+          "insufficient-evidence" ||
+        generatedSessionCase.sessionLifecycle.reportStatus === "not-requested"
+      ) {
+        return {
+          reportStatus: "insufficient-evidence" as const,
+          nextPath: "/dashboard"
+        };
+      }
+
+      if (generatedSessionCase.sessionLifecycle.reportStatus !== "generating") {
+        return {
+          reportStatus: "insufficient-evidence" as const,
+          nextPath: "/dashboard"
+        };
+      }
+
       const result = await reportGenerationCoordinator.generateForEndedSession({
         generatedSessionCase
       });

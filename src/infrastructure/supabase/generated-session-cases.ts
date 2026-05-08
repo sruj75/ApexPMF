@@ -112,8 +112,8 @@ const ReportStatusSchema = Schema.Literal(
 
 const EvidenceRefSchema = Schema.Struct({
   sequence: Schema.Number,
-  turnId: Schema.optional(Schema.String),
-  snippet: Schema.optional(Schema.String),
+  turnId: Schema.optional(Schema.NullOr(Schema.String)),
+  snippet: Schema.optional(Schema.NullOr(Schema.String)),
   title: Schema.String,
   detail: Schema.String
 });

@@ -202,7 +202,7 @@ describe("Generated Session Case repository", () => {
       updater: (current) => ({
         ...current,
         sessionStatus: "ended",
-        endedReason: "time-cap",
+        endedReason: "60-minute cap",
         endedAt: new Date("2026-05-08T08:00:00.000Z"),
         reportStatus: "generating",
         reportReadyAt: null
@@ -211,7 +211,7 @@ describe("Generated Session Case repository", () => {
 
     expect(updated?.sessionLifecycle).toMatchObject({
       sessionStatus: "ended",
-      endedReason: "time-cap",
+      endedReason: "60-minute cap",
       reportStatus: "generating"
     });
   });

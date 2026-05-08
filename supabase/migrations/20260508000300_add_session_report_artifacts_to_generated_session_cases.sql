@@ -2,7 +2,16 @@ alter table public.generated_session_cases
   add column if not exists session_report jsonb null,
   add column if not exists session_transcript jsonb null;
 
-grant update on table public.generated_session_cases to authenticated;
+revoke update on table public.generated_session_cases from authenticated;
+grant update (
+  session_status,
+  ended_reason,
+  ended_at,
+  report_status,
+  report_ready_at,
+  session_report,
+  session_transcript
+) on table public.generated_session_cases to authenticated;
 
 do $$
 begin

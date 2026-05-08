@@ -46,12 +46,12 @@ describe("Session Orchestrator", () => {
       orchestrator.endSessionForLearner({
         learnerId,
         sessionId: sessionIds.timeCap,
-        reason: "time-cap"
+        reason: "60-minute cap"
       })
     ).resolves.toMatchObject({
       nextPath: `/practice/${sessionIds.timeCap}/report-generating`,
       sessionStatus: "ended",
-      endedReason: "time-cap",
+      endedReason: "60-minute cap",
       reportStatus: "generating"
     });
 

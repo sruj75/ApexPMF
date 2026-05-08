@@ -6,7 +6,7 @@ alter table public.generated_session_cases
     ended_reason in (
       'user-quit',
       'natural-conclusion',
-      'time-cap',
+      '60-minute cap',
       'credit-exhaustion',
       'voice-failure'
     )

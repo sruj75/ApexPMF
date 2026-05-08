@@ -1,7 +1,7 @@
 export type SessionEndReason =
   | "user-quit"
   | "natural-conclusion"
-  | "time-cap"
+  | "60-minute cap"
   | "credit-exhaustion"
   | "voice-failure";
 

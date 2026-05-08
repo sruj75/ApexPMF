@@ -102,9 +102,39 @@ describe("Session report page", () => {
     });
     expect(transcriptLinks.length).toBe(0);
   });
+
+  it("renders partial trap outcomes with an explicit Partial label", async () => {
+    getLearnerEntryContext.mockResolvedValue({
+      ok: true,
+      learnerId: "learner-1",
+      idealCustomerProfileRepository: {},
+      generatedSessionCaseRepository: {
+        getForLearner: vi.fn(async () => makeEndedReadySessionCase("partial"))
+      }
+    });
+
+    render(
+      await SessionReportPage({
+        params: Promise.resolve({
+          sessionId: "123e4567-e89b-12d3-a456-426614174000"
+        })
+      })
+    );
+
+    expect(
+      screen.getByText(/partial: learner accepted praise then recovered with follow-up\./i)
+    ).toBeVisible();
+  });
 });
 
-function makeEndedReadySessionCase() {
+function makeEndedReadySessionCase(
+  trapOutcome: "triggered" | "avoided" | "partial" = "triggered"
+) {
+  const trapDetail =
+    trapOutcome === "partial"
+      ? "Learner accepted praise then recovered with follow-up."
+      : "Learner accepted praise as validation.";
+
   return {
     id: "123e4567-e89b-12d3-a456-426614174000",
     learnerId: "learner-1",
@@ -204,8 +234,8 @@ function makeEndedReadySessionCase() {
       trapResults: [
         {
           trapLabel: "Compliment Trap",
-          outcome: "triggered",
-          detail: "Learner accepted praise as validation.",
+          outcome: trapOutcome,
+          detail: trapDetail,
           evidence: []
         }
       ],

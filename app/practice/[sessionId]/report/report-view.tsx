@@ -11,6 +11,18 @@ type SessionReportViewProps = {
   transcript: SessionTranscriptTurn[];
 };
 
+function formatTrapOutcomeLabel(outcome: SessionReport["trapResults"][number]["outcome"]) {
+  if (outcome === "triggered") {
+    return "Triggered";
+  }
+
+  if (outcome === "partial") {
+    return "Partial";
+  }
+
+  return "Avoided";
+}
+
 export function SessionReportView({
   report,
   transcript
@@ -101,7 +113,7 @@ export function SessionReportView({
                 <li key={item.trapLabel}>
                   <strong>{item.trapLabel}</strong>
                   <p>
-                    {item.outcome === "triggered" ? "Triggered" : "Avoided"}: {item.detail}
+                    {formatTrapOutcomeLabel(item.outcome)}: {item.detail}
                   </p>
                 </li>
               ))}

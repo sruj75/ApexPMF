@@ -401,7 +401,7 @@ describe("Generated Session Case Supabase mapping", () => {
       updater: (current) => ({
         ...current,
         sessionStatus: "ended",
-        endedReason: "time-cap",
+        endedReason: "60-minute cap",
         endedAt: new Date("2026-05-08T09:00:00.000Z"),
         reportStatus: "generating",
         reportReadyAt: null
@@ -411,7 +411,7 @@ describe("Generated Session Case Supabase mapping", () => {
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
         session_status: "ended",
-        ended_reason: "time-cap",
+        ended_reason: "60-minute cap",
         ended_at: "2026-05-08T09:00:00.000Z",
         report_status: "generating",
         report_ready_at: null
@@ -565,7 +565,7 @@ function createRepositoryForLifecycleUpdate(input: { existing: unknown }) {
     data: {
       ...validGeneratedSessionCaseRow,
       session_status: "ended",
-      ended_reason: "time-cap",
+      ended_reason: "60-minute cap",
       ended_at: "2026-05-08T09:00:00.000Z",
       report_status: "generating",
       report_ready_at: null

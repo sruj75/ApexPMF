@@ -66,7 +66,9 @@ describe("Generated Session Case repository", () => {
           endedAt: null,
           reportStatus: "not-requested",
           reportReadyAt: null
-        }
+        },
+        sessionReport: null,
+        sessionTranscript: null
       }
     ]);
 
@@ -211,5 +213,109 @@ describe("Generated Session Case repository", () => {
       endedReason: "time-cap",
       reportStatus: "generating"
     });
+  });
+
+  it("persists report artifacts with report lifecycle state in one update call", async () => {
+    const repository = createInMemoryGeneratedSessionCaseRepository();
+    const created = await repository.create("learner-1", {
+      sessionSource: {
+        kind: "broad-practice-pool",
+        label: "Broad Practice Pool"
+      },
+      openingContext: "Opening context",
+      customerPersona: {
+        lightPersonaLabel: "Finance operator",
+        interviewRole: "Controller",
+        publicContext: "Owns reporting",
+        privateConstraints: ["Budget owner is VP Finance"]
+      },
+      hiddenBackstory: "Hidden backstory",
+      customerFit: "strong-fit",
+      hiddenTestPlan: {
+        focusAreas: ["Concrete History"],
+        successSignals: ["Asked about recent attempts"],
+        failureSignals: ["Accepted vague praise"]
+      },
+      personaBehavior: {
+        conversationalFriction: [
+          "hesitation",
+          "rambling",
+          "vague-answers",
+          "mild-discomfort",
+          "interruption",
+          "questions-back"
+        ],
+        weakQuestionSocialSignals: [
+          "politeness",
+          "praise",
+          "speculation",
+          "vague-interest"
+        ],
+        strongQuestionTruthAnchors: [
+          "paid-consultant-attempt",
+          "manual-rebuild-weekend"
+        ],
+        trapDelivery: "natural-hidden"
+      },
+      traps: [
+        {
+          id: "trap-1",
+          label: "Compliment Trap",
+          setup: "Persona praises the pitch.",
+          weakBehavior: "Learner accepts praise as validation."
+        }
+      ],
+      generationNonce: "nonce-2",
+      generationAudit: {
+        provider: "test",
+        model: "test-model"
+      }
+    });
+
+    const updated = await repository.updateReportArtifactsForLearner({
+      learnerId: "learner-1",
+      sessionCaseId: created.id,
+      reportStatus: "ready",
+      reportReadyAt: new Date("2026-05-08T11:00:00.000Z"),
+      sessionReport: {
+        outcome: {
+          summary: "Session ended with reason: natural-conclusion."
+        },
+        missedSignals: [],
+        badQuestions: [],
+        strongQuestions: [],
+        trapResults: [],
+        skillMovement: [],
+        nextPracticeFocus: {
+          title: "Ask behavior-first follow-ups",
+          description:
+            "After social signals, ask about past behavior before solutions."
+        },
+        sourceContext: "Broad Practice Pool",
+        lightPersonaLabel: "Finance operator",
+        expandableEvidence: []
+      },
+      sessionTranscript: [
+        {
+          sequence: 1,
+          speaker: "learner",
+          text: "What did you try recently?"
+        }
+      ]
+    });
+
+    expect(updated?.sessionLifecycle).toMatchObject({
+      reportStatus: "ready"
+    });
+    expect(updated?.sessionReport?.outcome.summary).toBe(
+      "Session ended with reason: natural-conclusion."
+    );
+    expect(updated?.sessionTranscript).toEqual([
+      {
+        sequence: 1,
+        speaker: "learner",
+        text: "What did you try recently?"
+      }
+    ]);
   });
 });

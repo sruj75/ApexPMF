@@ -155,6 +155,38 @@ describe("Generated Session Case Supabase mapping", () => {
     ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
   });
 
+  it("throws typed decode errors when session_report payload is malformed", async () => {
+    const repository = createRepositoryForGetForLearner({
+      data: {
+        ...validGeneratedSessionCaseRow,
+        session_report: "not-a-report"
+      }
+    });
+
+    await expect(
+      repository.getForLearner(
+        "learner-1",
+        "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
+      )
+    ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
+  });
+
+  it("throws typed decode errors when session_transcript payload is malformed", async () => {
+    const repository = createRepositoryForGetForLearner({
+      data: {
+        ...validGeneratedSessionCaseRow,
+        session_transcript: "not-a-transcript"
+      }
+    });
+
+    await expect(
+      repository.getForLearner(
+        "learner-1",
+        "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
+      )
+    ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
+  });
+
   it("still throws Supabase query errors as plain Error", async () => {
     const repository = createRepositoryForGetForLearner({
       data: null,
@@ -196,6 +228,61 @@ describe("Generated Session Case Supabase mapping", () => {
         ended_at: "2026-05-08T09:00:00.000Z",
         report_status: "generating",
         report_ready_at: null
+      })
+    );
+  });
+
+  it("encodes report artifacts update with JSON report and transcript payloads", async () => {
+    const { repository, update } = createRepositoryForReportArtifactsUpdate();
+
+    await repository.updateReportArtifactsForLearner({
+      learnerId: "learner-1",
+      sessionCaseId: "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec",
+      reportStatus: "ready",
+      reportReadyAt: new Date("2026-05-08T09:30:00.000Z"),
+      sessionReport: {
+        outcome: {
+          summary: "Session ended with reason: natural-conclusion."
+        },
+        missedSignals: [],
+        badQuestions: [],
+        strongQuestions: [],
+        trapResults: [],
+        skillMovement: [],
+        nextPracticeFocus: {
+          title: "Ask behavior-first follow-ups",
+          description:
+            "After social signals, ask about past behavior before solutions."
+        },
+        sourceContext: "Broad Practice Pool",
+        lightPersonaLabel: "Finance operator",
+        expandableEvidence: []
+      },
+      sessionTranscript: [
+        {
+          sequence: 1,
+          speaker: "learner",
+          text: "What did you try recently?"
+        }
+      ]
+    });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        report_status: "ready",
+        report_ready_at: "2026-05-08T09:30:00.000Z",
+        session_report: expect.objectContaining({
+          outcome: {
+            summary: "Session ended with reason: natural-conclusion."
+          }
+        }),
+        session_transcript: [
+          {
+            sequence: 1,
+            speaker: "learner",
+            text: "What did you try recently?"
+          }
+        ]
       })
     );
   });
@@ -254,6 +341,73 @@ function createRepositoryForLifecycleUpdate(input: { existing: unknown }) {
     select: vi.fn(() => queryBuilder),
     eq: vi.fn(() => queryBuilder),
     maybeSingle
+  };
+
+  const supabase = {
+    from: vi.fn(() => ({
+      ...queryBuilder,
+      update
+    }))
+  };
+
+  return {
+    repository: createSupabaseGeneratedSessionCaseRepository(supabase as never),
+    update
+  };
+}
+
+function createRepositoryForReportArtifactsUpdate() {
+  const updateMaybeSingle = vi.fn(async () => ({
+    data: {
+      ...validGeneratedSessionCaseRow,
+      report_status: "ready",
+      report_ready_at: "2026-05-08T09:30:00.000Z",
+      session_report: {
+        outcome: {
+          summary: "Session ended with reason: natural-conclusion."
+        },
+        missedSignals: [],
+        badQuestions: [],
+        strongQuestions: [],
+        trapResults: [],
+        skillMovement: [],
+        nextPracticeFocus: {
+          title: "Ask behavior-first follow-ups",
+          description:
+            "After social signals, ask about past behavior before solutions."
+        },
+        sourceContext: "Broad Practice Pool",
+        lightPersonaLabel: "Finance operator",
+        expandableEvidence: []
+      },
+      session_transcript: [
+        {
+          sequence: 1,
+          speaker: "learner",
+          text: "What did you try recently?"
+        }
+      ]
+    },
+    error: null
+  }));
+
+  const update = vi.fn(() => ({
+    eq: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        select: vi.fn(() => ({
+          maybeSingle: updateMaybeSingle
+        }))
+      }))
+    }))
+  }));
+
+  const queryBuilder = {
+    select: vi.fn(() => queryBuilder),
+    eq: vi.fn(() => queryBuilder),
+    maybeSingle: vi.fn(async () => ({
+      data: validGeneratedSessionCaseRow,
+      error: null
+    }))
   };
 
   const supabase = {
@@ -334,5 +488,7 @@ const validGeneratedSessionCaseRow = {
   ended_reason: null,
   ended_at: null,
   report_status: "not-requested",
-  report_ready_at: null
+  report_ready_at: null,
+  session_report: null,
+  session_transcript: null
 };

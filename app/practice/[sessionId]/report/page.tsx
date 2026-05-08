@@ -1,27 +1,64 @@
-import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { getLearnerEntryContext } from "@/src/application/start-session/practice-entry-seam";
+import { SessionReportView } from "./report-view";
 
-export default function SessionReportPlaceholderPage() {
+export const dynamic = "force-dynamic";
+
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+type SessionReportPageProps = {
+  params: Promise<{
+    sessionId: string;
+  }>;
+};
+
+export default async function SessionReportPage({
+  params
+}: SessionReportPageProps) {
+  const { sessionId } = await params;
+
+  if (!uuidPattern.test(sessionId)) {
+    notFound();
+  }
+
+  const context = await getLearnerEntryContext();
+  if (!context.ok) {
+    redirect("/login");
+  }
+
+  const generatedSessionCase = await context.generatedSessionCaseRepository.getForLearner(
+    context.learnerId,
+    sessionId
+  );
+
+  if (!generatedSessionCase) {
+    notFound();
+  }
+
+  if (generatedSessionCase.sessionLifecycle.endedReason === "user-quit") {
+    redirect("/dashboard");
+  }
+
+  if (
+    generatedSessionCase.sessionLifecycle.reportStatus ===
+    "insufficient-evidence"
+  ) {
+    redirect("/dashboard");
+  }
+
+  if (generatedSessionCase.sessionLifecycle.reportStatus !== "ready") {
+    redirect(`/practice/${sessionId}/report-generating`);
+  }
+
+  if (!generatedSessionCase.sessionReport || !generatedSessionCase.sessionTranscript) {
+    redirect(`/practice/${sessionId}/report-generating`);
+  }
+
   return (
-    <div className="dashboard-shell">
-      <main className="dashboard-main">
-        <section className="dashboard-hero" aria-labelledby="session-report-title">
-          <div className="dashboard-hero-copy">
-            <p className="eyebrow">Session Report</p>
-            <h1 id="session-report-title">Session Report ready</h1>
-            <p>
-              Full report sections ship in issue #9. This placeholder confirms
-              report routing after Report Generating State.
-            </p>
-          </div>
-        </section>
-
-        <section className="dashboard-card" aria-label="Session report navigation">
-          <p className="dashboard-card-label">Navigation</p>
-          <p>
-            <Link href="/dashboard">Return to Practice Dashboard</Link>
-          </p>
-        </section>
-      </main>
-    </div>
+    <SessionReportView
+      report={generatedSessionCase.sessionReport}
+      transcript={generatedSessionCase.sessionTranscript}
+    />
   );
 }

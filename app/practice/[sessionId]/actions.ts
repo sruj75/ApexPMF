@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createSessionOrchestrator } from "@/src/application/end-session/session-orchestrator";
-import { createPlaceholderReportGenerationCoordinator } from "@/src/application/generate-report/report-generation-coordinator";
+import { createReportGenerationCoordinator } from "@/src/application/generate-report/report-generation-coordinator";
 import { getLearnerEntryContext } from "@/src/application/start-session/practice-entry-seam";
 
 export async function endSessionAction(formData: FormData) {
@@ -18,7 +18,7 @@ export async function endSessionAction(formData: FormData) {
 
   const orchestrator = createSessionOrchestrator({
     generatedSessionCaseRepository: context.generatedSessionCaseRepository,
-    reportGenerationCoordinator: createPlaceholderReportGenerationCoordinator()
+    reportGenerationCoordinator: createReportGenerationCoordinator()
   });
 
   const outcome = await orchestrator.endSessionForLearner({

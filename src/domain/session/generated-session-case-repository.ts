@@ -3,6 +3,8 @@ import type {
   GeneratedSessionCase
 } from "./generated-session-case";
 import { withDefaultSessionLifecycle } from "./generated-session-case";
+import type { ReportStatus } from "./session-lifecycle";
+import type { SessionReport, SessionTranscriptTurn } from "./session-report";
 import type { SessionLifecycleState } from "./session-lifecycle";
 
 export type GeneratedSessionCaseRepository = {
@@ -18,6 +20,14 @@ export type GeneratedSessionCaseRepository = {
     learnerId: string;
     sessionCaseId: string;
     updater: (current: SessionLifecycleState) => SessionLifecycleState;
+  }): Promise<GeneratedSessionCase | null>;
+  updateReportArtifactsForLearner(input: {
+    learnerId: string;
+    sessionCaseId: string;
+    reportStatus: Extract<ReportStatus, "ready" | "insufficient-evidence">;
+    reportReadyAt: Date | null;
+    sessionReport: SessionReport | null;
+    sessionTranscript: SessionTranscriptTurn[] | null;
   }): Promise<GeneratedSessionCase | null>;
 };
 
@@ -68,6 +78,35 @@ export function createInMemoryGeneratedSessionCaseRepository(
       const next: GeneratedSessionCase = {
         ...current,
         sessionLifecycle: input.updater(current.sessionLifecycle)
+      };
+
+      generatedSessionCases = generatedSessionCases.map((sessionCase, rowIndex) =>
+        rowIndex === index ? next : sessionCase
+      );
+
+      return next;
+    },
+
+    async updateReportArtifactsForLearner(input) {
+      const index = generatedSessionCases.findIndex(
+        (generatedSessionCase) =>
+          generatedSessionCase.learnerId === input.learnerId &&
+          generatedSessionCase.id === input.sessionCaseId
+      );
+      if (index < 0) {
+        return null;
+      }
+
+      const current = generatedSessionCases[index];
+      const next: GeneratedSessionCase = {
+        ...current,
+        sessionLifecycle: {
+          ...current.sessionLifecycle,
+          reportStatus: input.reportStatus,
+          reportReadyAt: input.reportReadyAt
+        },
+        sessionReport: input.sessionReport,
+        sessionTranscript: input.sessionTranscript
       };
 
       generatedSessionCases = generatedSessionCases.map((sessionCase, rowIndex) =>

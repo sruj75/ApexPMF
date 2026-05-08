@@ -12,9 +12,7 @@ describe("Session Orchestrator", () => {
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
         async generateForEndedSession() {
-          return {
-            status: "ready"
-          };
+          return makeReadyReportGenerationResult();
         }
       }
     });
@@ -90,9 +88,7 @@ describe("Session Orchestrator", () => {
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
         async generateForEndedSession() {
-          return {
-            status: "ready"
-          };
+          return makeReadyReportGenerationResult();
         }
       }
     });
@@ -116,9 +112,7 @@ describe("Session Orchestrator", () => {
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
         async generateForEndedSession() {
-          return {
-            status: "ready"
-          };
+          return makeReadyReportGenerationResult();
         }
       }
     });
@@ -141,9 +135,7 @@ describe("Session Orchestrator", () => {
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
         async generateForEndedSession() {
-          return {
-            status: "ready"
-          };
+          return makeReadyReportGenerationResult();
         }
       }
     });
@@ -163,6 +155,74 @@ describe("Session Orchestrator", () => {
       reportStatus: "ready",
       nextPath: `/practice/${sessionIds.naturalConclusion}/report`
     });
+  });
+
+  it("persists structured report artifacts when report output is ready", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        async generateForEndedSession() {
+          return {
+            status: "ready",
+            report: {
+              outcome: {
+                summary: "Session ended with reason: natural-conclusion."
+              },
+              missedSignals: [],
+              badQuestions: [],
+              strongQuestions: [],
+              trapResults: [],
+              skillMovement: [],
+              nextPracticeFocus: {
+                title: "Ask behavior-first follow-ups",
+                description:
+                  "After any social signal, ask about past actions before discussing solutions."
+              },
+              sourceContext: "Broad Practice Pool",
+              lightPersonaLabel: "Finance operator",
+              expandableEvidence: []
+            },
+            transcript: [
+              {
+                sequence: 1,
+                turnId: "turn-1",
+                speaker: "learner",
+                text: "What did you try recently?"
+              }
+            ]
+          };
+        }
+      }
+    });
+
+    await orchestrator.endSessionForLearner({
+      learnerId,
+      sessionId: sessionIds.naturalConclusion,
+      reason: "natural-conclusion"
+    });
+
+    await orchestrator.runReportGeneratingFlowForLearner({
+      learnerId,
+      sessionId: sessionIds.naturalConclusion
+    });
+
+    const persisted = await repository.getForLearner(
+      learnerId,
+      sessionIds.naturalConclusion
+    );
+
+    expect(persisted?.sessionReport?.outcome.summary).toBe(
+      "Session ended with reason: natural-conclusion."
+    );
+    expect(persisted?.sessionTranscript).toEqual([
+      {
+        sequence: 1,
+        turnId: "turn-1",
+        speaker: "learner",
+        text: "What did you try recently?"
+      }
+    ]);
   });
 
   it("routes report-generating flow to Practice Dashboard when evidence is insufficient", async () => {
@@ -284,4 +344,35 @@ async function createSessionCase(
       model: "test-model"
     }
   });
+}
+
+function makeReadyReportGenerationResult() {
+  return {
+    status: "ready" as const,
+    report: {
+      outcome: {
+        summary: "Session ended with reason: natural-conclusion."
+      },
+      missedSignals: [],
+      badQuestions: [],
+      strongQuestions: [],
+      trapResults: [],
+      skillMovement: [],
+      nextPracticeFocus: {
+        title: "Ask behavior-first follow-ups",
+        description:
+          "After social signals, ask about past behavior before solutions."
+      },
+      sourceContext: "Broad Practice Pool",
+      lightPersonaLabel: "Finance operator",
+      expandableEvidence: []
+    },
+    transcript: [
+      {
+        sequence: 1,
+        speaker: "learner" as const,
+        text: "What did you try recently?"
+      }
+    ]
+  };
 }

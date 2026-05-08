@@ -116,14 +116,13 @@ export function createSessionOrchestrator(input: {
       });
 
       if (result.status === "ready") {
-        await generatedSessionCaseRepository.updateSessionLifecycleForLearner({
+        await generatedSessionCaseRepository.updateReportArtifactsForLearner({
           learnerId,
           sessionCaseId: sessionId,
-          updater: (current) => ({
-            ...current,
-            reportStatus: "ready",
-            reportReadyAt: new Date()
-          })
+          reportStatus: "ready",
+          reportReadyAt: new Date(),
+          sessionReport: result.report,
+          sessionTranscript: result.transcript
         });
 
         return {
@@ -132,14 +131,13 @@ export function createSessionOrchestrator(input: {
         };
       }
 
-      await generatedSessionCaseRepository.updateSessionLifecycleForLearner({
+      await generatedSessionCaseRepository.updateReportArtifactsForLearner({
         learnerId,
         sessionCaseId: sessionId,
-        updater: (current) => ({
-          ...current,
-          reportStatus: "insufficient-evidence",
-          reportReadyAt: null
-        })
+        reportStatus: "insufficient-evidence",
+        reportReadyAt: null,
+        sessionReport: null,
+        sessionTranscript: null
       });
 
       return {

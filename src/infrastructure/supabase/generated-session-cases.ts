@@ -5,6 +5,10 @@ import type {
   GeneratedSessionCase
 } from "@/src/domain/session/generated-session-case";
 import type { GeneratedSessionCaseRepository } from "@/src/domain/session/generated-session-case-repository";
+import type {
+  SessionReport,
+  SessionTranscriptTurn
+} from "@/src/domain/session/session-report";
 import {
   createBroadPracticePoolSessionSource,
   type SessionSource
@@ -105,6 +109,76 @@ const ReportStatusSchema = Schema.Literal(
   "insufficient-evidence"
 );
 
+const EvidenceRefSchema = Schema.Struct({
+  sequence: Schema.Number,
+  turnId: Schema.optional(Schema.String),
+  snippet: Schema.optional(Schema.String),
+  title: Schema.String,
+  detail: Schema.String
+});
+
+const SessionReportSchema = Schema.Struct({
+  outcome: Schema.Struct({
+    summary: Schema.String
+  }),
+  missedSignals: Schema.Array(
+    Schema.Struct({
+      title: Schema.String,
+      detail: Schema.String,
+      evidence: Schema.Array(EvidenceRefSchema)
+    })
+  ),
+  badQuestions: Schema.Array(
+    Schema.Struct({
+      question: Schema.String,
+      whyItMissed: Schema.String,
+      evidence: Schema.Array(EvidenceRefSchema)
+    })
+  ),
+  strongQuestions: Schema.Array(
+    Schema.Struct({
+      question: Schema.String,
+      whyItWorked: Schema.String,
+      evidence: Schema.Array(EvidenceRefSchema)
+    })
+  ),
+  trapResults: Schema.Array(
+    Schema.Struct({
+      trapLabel: Schema.String,
+      outcome: Schema.Literal("triggered", "avoided"),
+      detail: Schema.String,
+      evidence: Schema.Array(EvidenceRefSchema)
+    })
+  ),
+  skillMovement: Schema.Array(
+    Schema.Struct({
+      skill: Schema.String,
+      movement: Schema.Literal("up", "flat", "down"),
+      rationale: Schema.String
+    })
+  ),
+  nextPracticeFocus: Schema.Struct({
+    title: Schema.String,
+    description: Schema.String
+  }),
+  sourceContext: Schema.String,
+  lightPersonaLabel: Schema.String,
+  expandableEvidence: Schema.Array(EvidenceRefSchema)
+});
+
+const SessionTranscriptTurnSchema = Schema.Struct({
+  sequence: Schema.Number,
+  turnId: Schema.optional(Schema.String),
+  speaker: Schema.Literal("learner", "persona"),
+  text: Schema.String,
+  metadata: Schema.optional(
+    Schema.Struct({
+      cue: Schema.optional(Schema.String),
+      latencyMs: Schema.optional(Schema.Number)
+    })
+  )
+});
+
 const GeneratedSessionCaseRowSchema = Schema.Struct({
   id: Schema.String,
   learner_id: Schema.String,
@@ -126,7 +200,9 @@ const GeneratedSessionCaseRowSchema = Schema.Struct({
   ended_reason: SessionEndReasonSchema,
   ended_at: Schema.NullOr(Schema.Date),
   report_status: ReportStatusSchema,
-  report_ready_at: Schema.NullOr(Schema.Date)
+  report_ready_at: Schema.NullOr(Schema.Date),
+  session_report: Schema.NullOr(SessionReportSchema),
+  session_transcript: Schema.NullOr(Schema.Array(SessionTranscriptTurnSchema))
 });
 
 type GeneratedSessionCaseRow = Schema.Schema.Type<
@@ -154,7 +230,9 @@ const generatedSessionCaseColumns = [
   "ended_reason",
   "ended_at",
   "report_status",
-  "report_ready_at"
+  "report_ready_at",
+  "session_report",
+  "session_transcript"
 ].join(", ");
 
 export function createSupabaseGeneratedSessionCaseRepository(
@@ -222,6 +300,27 @@ export function createSupabaseGeneratedSessionCaseRepository(
       }
 
       return decodeGeneratedSessionCaseRowOrThrow(data, "getForLearner");
+    },
+
+    async updateReportArtifactsForLearner(input) {
+      const { data, error } = await supabase
+        .from("generated_session_cases")
+        .update({
+          report_status: input.reportStatus,
+          report_ready_at: input.reportReadyAt?.toISOString() ?? null,
+          session_report: input.sessionReport,
+          session_transcript: input.sessionTranscript
+        })
+        .eq("learner_id", input.learnerId)
+        .eq("id", input.sessionCaseId)
+        .select(generatedSessionCaseColumns)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return data ? decodeGeneratedSessionCaseRowOrThrow(data, "getForLearner") : null;
     }
   };
 }
@@ -247,7 +346,9 @@ function toInsertRow(
     ended_reason: null,
     ended_at: null,
     report_status: "not-requested",
-    report_ready_at: null
+    report_ready_at: null,
+    session_report: null,
+    session_transcript: null
   };
 }
 
@@ -313,7 +414,10 @@ function decodeGeneratedSessionCaseRowOrThrow(
       endedAt: decodedRow.ended_at,
       reportStatus: decodedRow.report_status,
       reportReadyAt: decodedRow.report_ready_at
-    }
+    },
+    sessionReport: decodedRow.session_report as SessionReport | null,
+    sessionTranscript:
+      decodedRow.session_transcript as SessionTranscriptTurn[] | null
   };
 }
 

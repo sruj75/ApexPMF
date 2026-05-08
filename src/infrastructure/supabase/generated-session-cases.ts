@@ -9,6 +9,7 @@ import {
   createBroadPracticePoolSessionSource,
   type SessionSource
 } from "@/src/domain/persona/session-source";
+import type { SessionLifecycleState } from "@/src/domain/session/session-lifecycle";
 import {
   formatParseErrorDetails,
   SupabaseRowDecodeError
@@ -85,6 +86,25 @@ const ActiveIdealCustomerProfileSourceSnapshotSchema = Schema.Struct({
   notes: Schema.NullOr(Schema.String)
 });
 
+const SessionStatusSchema = Schema.Literal("voice-conversation", "ended");
+
+const SessionEndReasonSchema = Schema.NullOr(
+  Schema.Literal(
+    "user-quit",
+    "natural-conclusion",
+    "time-cap",
+    "credit-exhaustion",
+    "voice-failure"
+  )
+);
+
+const ReportStatusSchema = Schema.Literal(
+  "not-requested",
+  "generating",
+  "ready",
+  "insufficient-evidence"
+);
+
 const GeneratedSessionCaseRowSchema = Schema.Struct({
   id: Schema.String,
   learner_id: Schema.String,
@@ -101,7 +121,12 @@ const GeneratedSessionCaseRowSchema = Schema.Struct({
   traps: Schema.Array(TrapSchema),
   generation_nonce: Schema.String,
   generation_audit: GenerationAuditSchema,
-  created_at: Schema.Date
+  created_at: Schema.Date,
+  session_status: SessionStatusSchema,
+  ended_reason: SessionEndReasonSchema,
+  ended_at: Schema.NullOr(Schema.Date),
+  report_status: ReportStatusSchema,
+  report_ready_at: Schema.NullOr(Schema.Date)
 });
 
 type GeneratedSessionCaseRow = Schema.Schema.Type<
@@ -124,7 +149,12 @@ const generatedSessionCaseColumns = [
   "traps",
   "generation_nonce",
   "generation_audit",
-  "created_at"
+  "created_at",
+  "session_status",
+  "ended_reason",
+  "ended_at",
+  "report_status",
+  "report_ready_at"
 ].join(", ");
 
 export function createSupabaseGeneratedSessionCaseRepository(
@@ -158,6 +188,40 @@ export function createSupabaseGeneratedSessionCaseRepository(
       }
 
       return data ? decodeGeneratedSessionCaseRowOrThrow(data, "getForLearner") : null;
+    },
+
+    async updateSessionLifecycleForLearner(input) {
+      const { data: existingRow, error: getError } = await supabase
+        .from("generated_session_cases")
+        .select(generatedSessionCaseColumns)
+        .eq("learner_id", input.learnerId)
+        .eq("id", input.sessionCaseId)
+        .maybeSingle();
+
+      if (getError) {
+        throw new Error(getError.message);
+      }
+
+      if (!existingRow) {
+        return null;
+      }
+
+      const current = decodeGeneratedSessionCaseRowOrThrow(existingRow, "getForLearner");
+      const nextLifecycle = input.updater(current.sessionLifecycle);
+
+      const { data, error } = await supabase
+        .from("generated_session_cases")
+        .update(toLifecycleUpdateRow(nextLifecycle))
+        .eq("learner_id", input.learnerId)
+        .eq("id", input.sessionCaseId)
+        .select(generatedSessionCaseColumns)
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return decodeGeneratedSessionCaseRowOrThrow(data, "getForLearner");
     }
   };
 }
@@ -178,7 +242,22 @@ function toInsertRow(
     persona_behavior: input.personaBehavior,
     traps: input.traps,
     generation_nonce: input.generationNonce,
-    generation_audit: input.generationAudit
+    generation_audit: input.generationAudit,
+    session_status: "voice-conversation",
+    ended_reason: null,
+    ended_at: null,
+    report_status: "not-requested",
+    report_ready_at: null
+  };
+}
+
+function toLifecycleUpdateRow(state: SessionLifecycleState) {
+  return {
+    session_status: state.sessionStatus,
+    ended_reason: state.endedReason,
+    ended_at: state.endedAt?.toISOString() ?? null,
+    report_status: state.reportStatus,
+    report_ready_at: state.reportReadyAt?.toISOString() ?? null
   };
 }
 
@@ -227,7 +306,14 @@ function decodeGeneratedSessionCaseRowOrThrow(
     traps: decodedRow.traps,
     generationNonce: decodedRow.generation_nonce,
     generationAudit: decodedRow.generation_audit,
-    createdAt: decodedRow.created_at
+    createdAt: decodedRow.created_at,
+    sessionLifecycle: {
+      sessionStatus: decodedRow.session_status,
+      endedReason: decodedRow.ended_reason,
+      endedAt: decodedRow.ended_at,
+      reportStatus: decodedRow.report_status,
+      reportReadyAt: decodedRow.report_ready_at
+    }
   };
 }
 

@@ -1,15 +1,20 @@
-"use server";
-
 import { redirect } from "next/navigation";
 import { createSessionOrchestrator } from "@/src/application/end-session/session-orchestrator";
 import { createPlaceholderReportGenerationCoordinator } from "@/src/application/generate-report/report-generation-coordinator";
 import { getLearnerEntryContext } from "@/src/application/start-session/practice-entry-seam";
 
-export async function endSessionAction(formData: FormData) {
-  const sessionId = stringFromFormData(formData, "sessionId");
-  if (!sessionId) {
-    throw new Error("Missing sessionId for endSessionAction.");
-  }
+export const dynamic = "force-dynamic";
+
+type ReportGeneratingPageProps = {
+  params: Promise<{
+    sessionId: string;
+  }>;
+};
+
+export default async function ReportGeneratingPage({
+  params
+}: ReportGeneratingPageProps) {
+  const { sessionId } = await params;
 
   const context = await getLearnerEntryContext();
   if (!context.ok) {
@@ -21,16 +26,10 @@ export async function endSessionAction(formData: FormData) {
     reportGenerationCoordinator: createPlaceholderReportGenerationCoordinator()
   });
 
-  const outcome = await orchestrator.endSessionForLearner({
+  const outcome = await orchestrator.runReportGeneratingFlowForLearner({
     learnerId: context.learnerId,
-    sessionId,
-    reason: "user-quit"
+    sessionId
   });
 
   redirect(outcome.nextPath);
-}
-
-function stringFromFormData(formData: FormData, key: string) {
-  const value = formData.get(key);
-  return typeof value === "string" ? value : "";
 }

@@ -122,6 +122,39 @@ describe("Generated Session Case Supabase mapping", () => {
     ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
   });
 
+  it("throws typed decode errors when session lifecycle status is invalid", async () => {
+    const repository = createRepositoryForGetForLearner({
+      data: {
+        ...validGeneratedSessionCaseRow,
+        session_status: "invalid-status"
+      }
+    });
+
+    await expect(
+      repository.getForLearner(
+        "learner-1",
+        "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
+      )
+    ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
+  });
+
+  it("throws typed decode errors when ended reason is invalid", async () => {
+    const repository = createRepositoryForGetForLearner({
+      data: {
+        ...validGeneratedSessionCaseRow,
+        session_status: "ended",
+        ended_reason: "not-a-real-reason"
+      }
+    });
+
+    await expect(
+      repository.getForLearner(
+        "learner-1",
+        "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
+      )
+    ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
+  });
+
   it("still throws Supabase query errors as plain Error", async () => {
     const repository = createRepositoryForGetForLearner({
       data: null,
@@ -136,6 +169,35 @@ describe("Generated Session Case Supabase mapping", () => {
         "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
       )
     ).rejects.toThrow("database is unavailable");
+  });
+
+  it("encodes lifecycle status updates with persisted session/report fields", async () => {
+    const { repository, update } = createRepositoryForLifecycleUpdate({
+      existing: validGeneratedSessionCaseRow
+    });
+
+    await repository.updateSessionLifecycleForLearner({
+      learnerId: "learner-1",
+      sessionCaseId: "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec",
+      updater: (current) => ({
+        ...current,
+        sessionStatus: "ended",
+        endedReason: "time-cap",
+        endedAt: new Date("2026-05-08T09:00:00.000Z"),
+        reportStatus: "generating",
+        reportReadyAt: null
+      })
+    });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        session_status: "ended",
+        ended_reason: "time-cap",
+        ended_at: "2026-05-08T09:00:00.000Z",
+        report_status: "generating",
+        report_ready_at: null
+      })
+    );
   });
 });
 
@@ -159,6 +221,52 @@ function createRepositoryForGetForLearner(input: {
   };
 
   return createSupabaseGeneratedSessionCaseRepository(supabase as never);
+}
+
+function createRepositoryForLifecycleUpdate(input: { existing: unknown }) {
+  const maybeSingle = vi.fn(async () => ({
+    data: input.existing,
+    error: null
+  }));
+  const updateSingle = vi.fn(async () => ({
+    data: {
+      ...validGeneratedSessionCaseRow,
+      session_status: "ended",
+      ended_reason: "time-cap",
+      ended_at: "2026-05-08T09:00:00.000Z",
+      report_status: "generating",
+      report_ready_at: null
+    },
+    error: null
+  }));
+
+  const update = vi.fn(() => ({
+    eq: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        select: vi.fn(() => ({
+          single: updateSingle
+        }))
+      }))
+    }))
+  }));
+
+  const queryBuilder = {
+    select: vi.fn(() => queryBuilder),
+    eq: vi.fn(() => queryBuilder),
+    maybeSingle
+  };
+
+  const supabase = {
+    from: vi.fn(() => ({
+      ...queryBuilder,
+      update
+    }))
+  };
+
+  return {
+    repository: createSupabaseGeneratedSessionCaseRepository(supabase as never),
+    update
+  };
 }
 
 const validGeneratedSessionCaseRow = {
@@ -221,5 +329,10 @@ const validGeneratedSessionCaseRow = {
     provider: "test",
     model: "test-model"
   },
-  created_at: "2026-05-05T00:00:00.000Z"
+  created_at: "2026-05-05T00:00:00.000Z",
+  session_status: "voice-conversation",
+  ended_reason: null,
+  ended_at: null,
+  report_status: "not-requested",
+  report_ready_at: null
 };

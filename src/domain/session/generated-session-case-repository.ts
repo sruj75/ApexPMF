@@ -2,6 +2,8 @@ import type {
   CreateGeneratedSessionCaseInput,
   GeneratedSessionCase
 } from "./generated-session-case";
+import { withDefaultSessionLifecycle } from "./generated-session-case";
+import type { SessionLifecycleState } from "./session-lifecycle";
 
 export type GeneratedSessionCaseRepository = {
   create(
@@ -12,6 +14,11 @@ export type GeneratedSessionCaseRepository = {
     learnerId: string,
     sessionCaseId: string
   ): Promise<GeneratedSessionCase | null>;
+  updateSessionLifecycleForLearner(input: {
+    learnerId: string;
+    sessionCaseId: string;
+    updater: (current: SessionLifecycleState) => SessionLifecycleState;
+  }): Promise<GeneratedSessionCase | null>;
 };
 
 export function createInMemoryGeneratedSessionCaseRepository(
@@ -25,12 +32,12 @@ export function createInMemoryGeneratedSessionCaseRepository(
 
   return {
     async create(learnerId, input) {
-      const generatedSessionCase: GeneratedSessionCase = {
+      const generatedSessionCase = withDefaultSessionLifecycle({
         ...input,
         id: `session-case-${nextId}`,
         learnerId,
         createdAt: new Date()
-      };
+      });
 
       nextId += 1;
       generatedSessionCases = [...generatedSessionCases, generatedSessionCase];
@@ -45,6 +52,29 @@ export function createInMemoryGeneratedSessionCaseRepository(
             generatedSessionCase.id === sessionCaseId
         ) ?? null
       );
+    },
+
+    async updateSessionLifecycleForLearner(input) {
+      const index = generatedSessionCases.findIndex(
+        (generatedSessionCase) =>
+          generatedSessionCase.learnerId === input.learnerId &&
+          generatedSessionCase.id === input.sessionCaseId
+      );
+      if (index < 0) {
+        return null;
+      }
+
+      const current = generatedSessionCases[index];
+      const next: GeneratedSessionCase = {
+        ...current,
+        sessionLifecycle: input.updater(current.sessionLifecycle)
+      };
+
+      generatedSessionCases = generatedSessionCases.map((sessionCase, rowIndex) =>
+        rowIndex === index ? next : sessionCase
+      );
+
+      return next;
     }
   };
 }

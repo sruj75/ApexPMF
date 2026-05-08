@@ -3,6 +3,10 @@ import {
   presentSessionSource,
   type SessionSource
 } from "../persona/session-source";
+import {
+  createInitialSessionLifecycleState,
+  type SessionLifecycleState
+} from "./session-lifecycle";
 
 export type GeneratedSessionCase = GeneratedSessionCaseDraft & {
   id: string;
@@ -10,6 +14,7 @@ export type GeneratedSessionCase = GeneratedSessionCaseDraft & {
   sessionSource: SessionSource;
   generationNonce: string;
   createdAt: Date;
+  sessionLifecycle: SessionLifecycleState;
 };
 
 export type CreateGeneratedSessionCaseInput = GeneratedSessionCaseDraft & {
@@ -38,4 +43,17 @@ export function toStartedSession(
 
 export function sessionSourceLabel(sessionSource: SessionSource): string {
   return presentSessionSource(sessionSource).label;
+}
+
+export function withDefaultSessionLifecycle(
+  generatedSessionCase: Omit<GeneratedSessionCase, "sessionLifecycle"> & {
+    sessionLifecycle?: SessionLifecycleState;
+  }
+): GeneratedSessionCase {
+  return {
+    ...generatedSessionCase,
+    sessionLifecycle:
+      generatedSessionCase.sessionLifecycle ??
+      createInitialSessionLifecycleState()
+  };
 }

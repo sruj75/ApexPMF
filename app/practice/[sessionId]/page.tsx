@@ -37,6 +37,25 @@ export default async function PracticeSessionPage({
     notFound();
   }
 
+  if (generatedSessionCase.sessionLifecycle.sessionStatus === "ended") {
+    if (generatedSessionCase.sessionLifecycle.endedReason === "user-quit") {
+      redirect("/dashboard");
+    }
+
+    if (generatedSessionCase.sessionLifecycle.reportStatus === "ready") {
+      redirect(`/practice/${sessionId}/report`);
+    }
+
+    if (
+      generatedSessionCase.sessionLifecycle.reportStatus ===
+      "insufficient-evidence"
+    ) {
+      redirect("/dashboard");
+    }
+
+    redirect(`/practice/${sessionId}/report-generating`);
+  }
+
   return (
     <SessionStartView
       startedSession={toStartedSession(generatedSessionCase)}

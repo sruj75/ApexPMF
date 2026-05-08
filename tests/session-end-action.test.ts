@@ -1,19 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { endSessionAction } from "../app/practice/[sessionId]/actions";
 
-const { redirect, recordUserQuitIntent } = vi.hoisted(() => ({
-  redirect: vi.fn((location: string) => {
-    throw new Error(`REDIRECT:${location}`);
-  }),
-  recordUserQuitIntent: vi.fn()
-}));
+const { redirect, getLearnerEntryContext, createSessionOrchestrator } = vi.hoisted(
+  () => ({
+    redirect: vi.fn((location: string) => {
+      throw new Error(`REDIRECT:${location}`);
+    }),
+    getLearnerEntryContext: vi.fn(),
+    createSessionOrchestrator: vi.fn()
+  })
+);
 
 vi.mock("next/navigation", () => ({
   redirect
 }));
 
-vi.mock("@/src/application/end-session/user-quit-intent", () => ({
-  recordUserQuitIntent
+vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
+  getLearnerEntryContext
+}));
+
+vi.mock("@/src/application/end-session/session-orchestrator", () => ({
+  createSessionOrchestrator
 }));
 
 describe("End Session action", () => {
@@ -21,13 +28,44 @@ describe("End Session action", () => {
     vi.clearAllMocks();
   });
 
-  it("records user-quit intent and redirects to Practice Dashboard", async () => {
+  it("redirects unauthenticated Learners to /login", async () => {
+    getLearnerEntryContext.mockResolvedValue({
+      ok: false,
+      reason: "unauthenticated"
+    });
+
+    const formData = new FormData();
+    formData.set("sessionId", "session-case-abc");
+
+    await expect(endSessionAction(formData)).rejects.toThrow("REDIRECT:/login");
+  });
+
+  it("delegates user quit to Session Orchestrator and redirects to Practice Dashboard", async () => {
+    const endSessionForLearner = vi.fn(async () => ({
+      nextPath: "/dashboard",
+      sessionStatus: "ended",
+      endedReason: "user-quit",
+      reportStatus: "not-requested"
+    }));
+
+    getLearnerEntryContext.mockResolvedValue({
+      ok: true,
+      learnerId: "learner-1",
+      idealCustomerProfileRepository: {},
+      generatedSessionCaseRepository: {}
+    });
+    createSessionOrchestrator.mockReturnValue({
+      endSessionForLearner
+    });
+
     const formData = new FormData();
     formData.set("sessionId", "session-case-abc");
 
     await expect(endSessionAction(formData)).rejects.toThrow("REDIRECT:/dashboard");
-    expect(recordUserQuitIntent).toHaveBeenCalledWith({
-      sessionId: "session-case-abc"
+    expect(endSessionForLearner).toHaveBeenCalledWith({
+      learnerId: "learner-1",
+      sessionId: "session-case-abc",
+      reason: "user-quit"
     });
   });
 });

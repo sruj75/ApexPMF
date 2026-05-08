@@ -59,7 +59,14 @@ describe("Generated Session Case repository", () => {
           provider: "test",
           model: "test-model"
         },
-        createdAt: new Date("2026-05-01T00:00:00.000Z")
+        createdAt: new Date("2026-05-01T00:00:00.000Z"),
+        sessionLifecycle: {
+          sessionStatus: "voice-conversation",
+          endedReason: null,
+          endedAt: null,
+          reportStatus: "not-requested",
+          reportReadyAt: null
+        }
       }
     ]);
 
@@ -120,5 +127,89 @@ describe("Generated Session Case repository", () => {
 
     expect(created.id).toBe("session-case-101");
     expect(created.personaBehavior.trapDelivery).toBe("natural-hidden");
+    expect(created.sessionLifecycle).toEqual({
+      sessionStatus: "voice-conversation",
+      endedReason: null,
+      endedAt: null,
+      reportStatus: "not-requested",
+      reportReadyAt: null
+    });
+  });
+
+  it("updates persisted session lifecycle state for the matching Learner and Session", async () => {
+    const repository = createInMemoryGeneratedSessionCaseRepository();
+    const created = await repository.create("learner-1", {
+      sessionSource: {
+        kind: "broad-practice-pool",
+        label: "Broad Practice Pool"
+      },
+      openingContext: "Opening context",
+      customerPersona: {
+        lightPersonaLabel: "Finance operator",
+        interviewRole: "Controller",
+        publicContext: "Owns reporting",
+        privateConstraints: ["Budget owner is VP Finance"]
+      },
+      hiddenBackstory: "Hidden backstory",
+      customerFit: "strong-fit",
+      hiddenTestPlan: {
+        focusAreas: ["Concrete History"],
+        successSignals: ["Asked about recent attempts"],
+        failureSignals: ["Accepted vague praise"]
+      },
+      personaBehavior: {
+        conversationalFriction: [
+          "hesitation",
+          "rambling",
+          "vague-answers",
+          "mild-discomfort",
+          "interruption",
+          "questions-back"
+        ],
+        weakQuestionSocialSignals: [
+          "politeness",
+          "praise",
+          "speculation",
+          "vague-interest"
+        ],
+        strongQuestionTruthAnchors: [
+          "paid-consultant-attempt",
+          "manual-rebuild-weekend"
+        ],
+        trapDelivery: "natural-hidden"
+      },
+      traps: [
+        {
+          id: "trap-1",
+          label: "Compliment Trap",
+          setup: "Persona praises the pitch.",
+          weakBehavior: "Learner accepts praise as validation."
+        }
+      ],
+      generationNonce: "nonce-1",
+      generationAudit: {
+        provider: "test",
+        model: "test-model"
+      }
+    });
+
+    const updated = await repository.updateSessionLifecycleForLearner({
+      learnerId: "learner-1",
+      sessionCaseId: created.id,
+      updater: (current) => ({
+        ...current,
+        sessionStatus: "ended",
+        endedReason: "time-cap",
+        endedAt: new Date("2026-05-08T08:00:00.000Z"),
+        reportStatus: "generating",
+        reportReadyAt: null
+      })
+    });
+
+    expect(updated?.sessionLifecycle).toMatchObject({
+      sessionStatus: "ended",
+      endedReason: "time-cap",
+      reportStatus: "generating"
+    });
   });
 });

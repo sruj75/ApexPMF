@@ -105,7 +105,7 @@ The simulator-led ending of a Session when the conversation has sufficiently exe
 _Avoid_: Completed all traps, quiz finished
 
 **Hidden Evaluation**:
-The simulator's internal assessment of the user's interview behavior during a Session.
+The simulator's internal assessment of the user's interview behavior after a Session ends.
 _Avoid_: Real-time coaching, live hints
 
 **Hidden Test Plan**:
@@ -217,7 +217,8 @@ _Avoid_: Progress bar, trap counter
 - The **Session Report** may reveal what the **Hidden Test Plan** evaluated after the **Session**
 - A **Generated Session Case** is preserved internally for audit and report quality
 - A **Generated Session Case** is not exposed to the user as a full hidden backstory by default
-- **Hidden Evaluation** happens during a **Session** without interrupting the conversation
+- **Hidden Evaluation** runs after a **Session** ends using the **Session Transcript**, without interrupting the conversation
+- **Hidden Evaluation** uses both the **Session Transcript** and internal **Generated Session Case** context (including hidden mechanics) to produce evaluation artifacts
 - A **Session Report** is generated after a **Session** ends
 - After a **Session** ends, the user sees the **Report Generating State** and then the **Session Report** directly
 - Coaching appears in the **Session Report**, not during the **Session**

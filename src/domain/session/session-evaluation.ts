@@ -37,3 +37,11 @@ export type SessionEvaluationArtifact = {
     soundingConfident: "not-scored";
   };
 };
+
+export type SessionEvaluationInsufficientReason =
+  | "not-ended"
+  | "user-quit"
+  | "transcript-too-short"
+  | "transcript-missing-speakers"
+  | "provider-failure"
+  | "invalid-judge-output";

@@ -1,17 +1,20 @@
 import type { GeneratedSessionCase } from "@/src/domain/session/generated-session-case";
-import {
-  createHiddenEvaluationEngine,
-  type HiddenEvaluationEngine
+import type { ReportBuilder } from "@/src/domain/session/report-builder";
+import { createDeterministicReportBuilder } from "@/src/domain/session/report-builder";
+import type {
+  HiddenEvaluationEngine,
+  HiddenEvaluationResult
 } from "@/src/domain/session/hidden-evaluation-engine";
-import {
-  createDeterministicReportBuilder,
-  type ReportBuilder
-} from "@/src/domain/session/report-builder";
-import type { SessionEvaluationArtifact } from "@/src/domain/session/session-evaluation";
+import { createHiddenEvaluationEngine } from "@/src/domain/session/hidden-evaluation-engine";
+import type {
+  SessionEvaluationArtifact,
+  SessionEvaluationInsufficientReason
+} from "@/src/domain/session/session-evaluation";
 import type {
   SessionReport,
   SessionTranscriptTurn
 } from "@/src/domain/session/session-report";
+import { createOpenRouterChatClient } from "@/src/infrastructure/llm/openrouter";
 
 export type ReportGenerationResult =
   | {
@@ -22,6 +25,7 @@ export type ReportGenerationResult =
     }
   | {
       status: "insufficient-evidence";
+      reason: SessionEvaluationInsufficientReason;
     };
 
 export type ReportGenerationCoordinator = {
@@ -37,22 +41,25 @@ export function createReportGenerationCoordinator(input?: {
   const reportBuilder =
     input?.reportBuilder ?? createDeterministicReportBuilder();
   const hiddenEvaluationEngine =
-    input?.hiddenEvaluationEngine ?? createHiddenEvaluationEngine();
+    input?.hiddenEvaluationEngine ?? createProductionHiddenEvaluationEngine();
 
   return {
     async generateForEndedSession({ generatedSessionCase }) {
-      const transcript =
-        generatedSessionCase.sessionTranscript ??
-        createSyntheticTranscript(generatedSessionCase);
+      const transcript = generatedSessionCase.sessionTranscript;
+      if (!transcript) {
+        return {
+          status: "insufficient-evidence",
+          reason: "transcript-too-short"
+        };
+      }
+
       const evaluationResult = await hiddenEvaluationEngine.evaluateEndedSession({
         generatedSessionCase,
         transcript
       });
 
       if (evaluationResult.status !== "ready") {
-        return {
-          status: "insufficient-evidence"
-        };
+        return insufficiencyFromEvaluation(evaluationResult);
       }
 
       const reportResult = await reportBuilder.buildFromEvaluation({
@@ -63,7 +70,8 @@ export function createReportGenerationCoordinator(input?: {
 
       if (reportResult.status !== "ready") {
         return {
-          status: "insufficient-evidence"
+          status: "insufficient-evidence",
+          reason: "invalid-judge-output"
         };
       }
 
@@ -77,40 +85,39 @@ export function createReportGenerationCoordinator(input?: {
   };
 }
 
-function createSyntheticTranscript(
-  generatedSessionCase: GeneratedSessionCase
-): SessionTranscriptTurn[] {
-  const firstTrap = generatedSessionCase.traps[0];
-
-  return [
-    {
-      sequence: 1,
-      turnId: "turn-1",
-      speaker: "learner",
-      text: "Would this be useful for your team?"
-    },
-    {
-      sequence: 2,
-      turnId: "turn-2",
-      speaker: "persona",
-      text: firstTrap
-        ? firstTrap.setup
-        : `${generatedSessionCase.customerPersona.interviewRole}: This sounds interesting, timing is difficult.`,
-      metadata: {
-        cue: "praise"
+function insufficiencyFromEvaluation(
+  evaluationResult: HiddenEvaluationResult
+) {
+  return evaluationResult.status === "ready"
+    ? {
+        status: "insufficient-evidence" as const,
+        reason: "invalid-judge-output" as const
       }
-    },
-    {
-      sequence: 3,
-      turnId: "turn-3",
-      speaker: "learner",
-      text: "What did you try in the last month and who decides this purchase?"
-    },
-    {
-      sequence: 4,
-      turnId: "turn-4",
-      speaker: "persona",
-      text: "We paid a consultant and still rebuilt reports manually."
-    }
-  ];
+    : {
+        status: "insufficient-evidence" as const,
+        reason: evaluationResult.reason
+      };
+}
+
+function createProductionHiddenEvaluationEngine(): HiddenEvaluationEngine {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    return {
+      async evaluateEndedSession() {
+        return {
+          status: "insufficient-evidence",
+          reason: "provider-failure"
+        };
+      }
+    };
+  }
+
+  return createHiddenEvaluationEngine({
+    chatClient: createOpenRouterChatClient({
+      apiKey,
+      model: process.env.OPENROUTER_MODEL ?? "openrouter/free",
+      siteUrl: process.env.OPENROUTER_SITE_URL,
+      appTitle: process.env.OPENROUTER_APP_TITLE ?? "The Mom Test Simulator"
+    })
+  });
 }

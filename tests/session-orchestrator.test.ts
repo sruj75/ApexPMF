@@ -287,7 +287,8 @@ describe("Session Orchestrator", () => {
       reportGenerationCoordinator: {
         async generateForEndedSession() {
           return {
-            status: "insufficient-evidence"
+            status: "insufficient-evidence",
+            reason: "invalid-judge-output"
           };
         }
       }

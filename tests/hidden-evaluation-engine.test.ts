@@ -1,145 +1,155 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createHiddenEvaluationEngine } from "../src/domain/session/hidden-evaluation-engine";
 import type { GeneratedSessionCase } from "../src/domain/session/generated-session-case";
 import type { SessionTranscriptTurn } from "../src/domain/session/session-report";
 
 describe("Hidden Evaluation engine", () => {
-  it("returns Mom-Test behavior evidence and excluded-dimension guards for ended non-quit sessions", async () => {
-    const engine = createHiddenEvaluationEngine();
+  it("returns ready from LLM judge JSON for ended non-quit sessions with >=5 turns", async () => {
+    const chatClient = {
+      createStructuredJsonCompletion: vi.fn(async () => ({
+        id: "resp-1",
+        model: "test-model",
+        content: JSON.stringify(makeReadyJudgeOutput())
+      }))
+    };
+    const engine = createHiddenEvaluationEngine({
+      chatClient
+    });
 
     const result = await engine.evaluateEndedSession({
-      generatedSessionCase: makeGeneratedSessionCase("bad-fit"),
-      transcript: makeTranscript({
-        learnerIntro:
-          "Would this be useful for your team if we shipped automation quickly?",
-        learnerFollowUp:
-          "What did you try in the last month and who decides this purchase?",
-        personaReply:
-          "Sounds exciting. We currently stitch this in spreadsheets and a consultant review."
-      })
+      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+      transcript: makeTranscript()
     });
 
     expect(result.status).toBe("ready");
     if (result.status !== "ready") {
-      throw new Error("Expected ready evaluation artifact");
+      throw new Error("Expected ready evaluation.");
     }
-
-    expect(result.evaluation.interviewBehavior.avoidingPitching.outcome).toBe(
-      "missed"
-    );
-    expect(
-      result.evaluation.interviewBehavior.askingConcreteHistory.outcome
-    ).toBe("met");
-    expect(
-      result.evaluation.interviewBehavior.followingUpOnVagueAnswers.outcome
-    ).toBe("met");
-    expect(
-      result.evaluation.interviewBehavior.resistingCompliments.outcome
-    ).toBe("met");
-    expect(
-      result.evaluation.interviewBehavior.identifyingBadFitPersonas.outcome
-    ).toBe("met");
-    expect(
-      result.evaluation.interviewBehavior.uncoveringWorkaroundsOrDecisionProcess
-        .outcome
-    ).toBe("met");
-
-    expect(result.evaluation.learningSignal.quality).toBe("high");
-    expect(result.evaluation.excludedDimensions).toEqual({
-      accent: "not-scored",
-      charisma: "not-scored",
-      vocalPolish: "not-scored",
-      soundingConfident: "not-scored"
-    });
-    expect(result.evaluation.interviewBehavior.askingConcreteHistory.evidence[0])
-      .toMatchObject({
-        sequence: 3
-      });
+    expect(result.evaluation.trapResults[0]?.outcome).toBe("partial");
+    expect(chatClient.createStructuredJsonCompletion).toHaveBeenCalledTimes(1);
   });
 
-  it("maps trap outcomes deterministically to triggered, avoided, and partial", async () => {
-    const engine = createHiddenEvaluationEngine();
-
-    const partial = await engine.evaluateEndedSession({
-      generatedSessionCase: makeGeneratedSessionCase("strong-fit"),
-      transcript: makeTranscript({
-        learnerIntro: "This will totally fix your reporting stack fast.",
-        learnerFollowUp: "What did you try before and what still broke?",
-        personaReply:
-          "Nice idea. We paid a consultant and still manually rebuilt at close."
-      })
-    });
-    expect(partial.status).toBe("ready");
-    if (partial.status !== "ready") {
-      throw new Error("Expected ready partial trap result.");
-    }
-    expect(partial.evaluation.trapResults[0]?.outcome).toBe("partial");
-
-    const triggered = await engine.evaluateEndedSession({
-      generatedSessionCase: makeGeneratedSessionCase("strong-fit"),
-      transcript: makeTranscript({
-        learnerIntro: "Would this be useful for your team?",
-        learnerFollowUp: "Amazing, should we book a demo then?",
-        personaReply: "This sounds great and very exciting."
-      })
-    });
-    expect(triggered.status).toBe("ready");
-    if (triggered.status !== "ready") {
-      throw new Error("Expected ready triggered trap result.");
-    }
-    expect(triggered.evaluation.trapResults[0]?.outcome).toBe("triggered");
-
-    const avoided = await engine.evaluateEndedSession({
-      generatedSessionCase: makeGeneratedSessionCase("strong-fit"),
-      transcript: makeTranscript({
-        learnerIntro: "Can you walk me through the last time this happened?",
-        learnerFollowUp:
-          "Who approved that workaround and what did it cost in time?",
-        personaReply:
-          "We rebuilt in spreadsheets and the finance director approved overtime."
-      })
-    });
-    expect(avoided.status).toBe("ready");
-    if (avoided.status !== "ready") {
-      throw new Error("Expected ready avoided trap result.");
-    }
-    expect(avoided.evaluation.trapResults[0]?.outcome).toBe("avoided");
-  });
-
-  it("returns insufficient-evidence for user-quit or missing transcript evidence", async () => {
-    const engine = createHiddenEvaluationEngine();
-    const generatedSessionCase = makeGeneratedSessionCase("strong-fit");
-    generatedSessionCase.sessionLifecycle = {
-      ...generatedSessionCase.sessionLifecycle,
-      endedReason: "user-quit"
+  it("returns typed insufficient reasons for user-quit, not-ended, short transcript, and missing speakers", async () => {
+    const chatClient = {
+      createStructuredJsonCompletion: vi.fn(async () => ({
+        id: "resp-1",
+        model: "test-model",
+        content: JSON.stringify(makeReadyJudgeOutput())
+      }))
     };
+    const engine = createHiddenEvaluationEngine({
+      chatClient
+    });
 
+    const userQuitCase = makeGeneratedSessionCase("user-quit");
     await expect(
       engine.evaluateEndedSession({
-        generatedSessionCase,
-        transcript: makeTranscript({
-          learnerIntro: "Would this help?",
-          learnerFollowUp: "Can we schedule a demo?",
-          personaReply: "Sure, maybe."
-        })
+        generatedSessionCase: userQuitCase,
+        transcript: makeTranscript()
       })
     ).resolves.toEqual({
-      status: "insufficient-evidence"
+      status: "insufficient-evidence",
+      reason: "user-quit"
+    });
+
+    const notEndedCase = makeGeneratedSessionCase("natural-conclusion");
+    notEndedCase.sessionLifecycle = {
+      ...notEndedCase.sessionLifecycle,
+      sessionStatus: "voice-conversation",
+      endedReason: null,
+      endedAt: null
+    };
+    await expect(
+      engine.evaluateEndedSession({
+        generatedSessionCase: notEndedCase,
+        transcript: makeTranscript()
+      })
+    ).resolves.toEqual({
+      status: "insufficient-evidence",
+      reason: "not-ended"
     });
 
     await expect(
       engine.evaluateEndedSession({
-        generatedSessionCase: makeGeneratedSessionCase("strong-fit"),
-        transcript: []
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+        transcript: makeTranscript().slice(0, 4)
       })
     ).resolves.toEqual({
-      status: "insufficient-evidence"
+      status: "insufficient-evidence",
+      reason: "transcript-too-short"
+    });
+
+    await expect(
+      engine.evaluateEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+        transcript: makeLearnerOnlyTranscript()
+      })
+    ).resolves.toEqual({
+      status: "insufficient-evidence",
+      reason: "transcript-missing-speakers"
+    });
+  });
+
+  it("retries once on invalid judge output and then returns invalid-judge-output when retry is still invalid", async () => {
+    const chatClient = {
+      createStructuredJsonCompletion: vi
+        .fn()
+        .mockResolvedValueOnce({
+          id: "resp-1",
+          model: "test-model",
+          content: "{invalid-json"
+        })
+        .mockResolvedValueOnce({
+          id: "resp-2",
+          model: "test-model",
+          content: JSON.stringify({
+            status: "ready",
+            reasonIfInsufficient: null,
+            evaluation: null
+          })
+        })
+    };
+    const engine = createHiddenEvaluationEngine({
+      chatClient
+    });
+
+    await expect(
+      engine.evaluateEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+        transcript: makeTranscript()
+      })
+    ).resolves.toEqual({
+      status: "insufficient-evidence",
+      reason: "invalid-judge-output"
+    });
+
+    expect(chatClient.createStructuredJsonCompletion).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns provider-failure when judge call throws", async () => {
+    const chatClient = {
+      createStructuredJsonCompletion: vi.fn(async () => {
+        throw new Error("provider unavailable");
+      })
+    };
+    const engine = createHiddenEvaluationEngine({
+      chatClient
+    });
+
+    await expect(
+      engine.evaluateEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+        transcript: makeTranscript()
+      })
+    ).resolves.toEqual({
+      status: "insufficient-evidence",
+      reason: "provider-failure"
     });
   });
 });
 
 function makeGeneratedSessionCase(
-  fit: GeneratedSessionCase["customerFit"]
+  endedReason: NonNullable<GeneratedSessionCase["sessionLifecycle"]["endedReason"]>
 ): GeneratedSessionCase {
   return {
     id: "123e4567-e89b-12d3-a456-426614174000",
@@ -155,13 +165,12 @@ function makeGeneratedSessionCase(
       publicContext: "Owns reporting",
       privateConstraints: ["Budget owner is VP Finance"]
     },
-    hiddenBackstory:
-      "The operator rebuilt reports manually after a failed automation handoff.",
-    customerFit: fit,
+    hiddenBackstory: "Hidden backstory",
+    customerFit: "bad-fit",
     hiddenTestPlan: {
       focusAreas: ["Concrete History"],
       successSignals: ["Asked about recent attempts"],
-      failureSignals: ["Pitched before diagnosis"]
+      failureSignals: ["Accepted vague praise"]
     },
     personaBehavior: {
       conversationalFriction: [
@@ -200,7 +209,7 @@ function makeGeneratedSessionCase(
     createdAt: new Date("2026-05-08T08:00:00.000Z"),
     sessionLifecycle: {
       sessionStatus: "ended",
-      endedReason: "natural-conclusion",
+      endedReason,
       endedAt: new Date("2026-05-08T09:00:00.000Z"),
       reportStatus: "generating",
       reportReadyAt: null
@@ -211,32 +220,193 @@ function makeGeneratedSessionCase(
   };
 }
 
-function makeTranscript(input: {
-  learnerIntro: string;
-  personaReply: string;
-  learnerFollowUp: string;
-}): SessionTranscriptTurn[] {
+function makeTranscript(): SessionTranscriptTurn[] {
   return [
     {
       sequence: 1,
       turnId: "turn-1",
       speaker: "learner",
-      text: input.learnerIntro
+      text: "Would this be useful for your team?"
     },
     {
       sequence: 2,
       turnId: "turn-2",
       speaker: "persona",
-      text: input.personaReply,
-      metadata: {
-        cue: "praise"
-      }
+      text: "Sounds exciting and maybe useful.",
+      metadata: { cue: "praise" }
     },
     {
       sequence: 3,
       turnId: "turn-3",
       speaker: "learner",
-      text: input.learnerFollowUp
+      text: "What did you try in the last month?"
+    },
+    {
+      sequence: 4,
+      turnId: "turn-4",
+      speaker: "persona",
+      text: "We tried a consultant and manual spreadsheet workaround."
+    },
+    {
+      sequence: 5,
+      turnId: "turn-5",
+      speaker: "learner",
+      text: "Who decides this purchase and budget?"
     }
   ];
+}
+
+function makeLearnerOnlyTranscript(): SessionTranscriptTurn[] {
+  return [
+    {
+      sequence: 1,
+      speaker: "learner",
+      text: "What did you try?"
+    },
+    {
+      sequence: 2,
+      speaker: "learner",
+      text: "Who decides?"
+    },
+    {
+      sequence: 3,
+      speaker: "learner",
+      text: "What workaround exists?"
+    },
+    {
+      sequence: 4,
+      speaker: "learner",
+      text: "What was the budget?"
+    },
+    {
+      sequence: 5,
+      speaker: "learner",
+      text: "How often does this happen?"
+    }
+  ];
+}
+
+function makeReadyJudgeOutput() {
+  return {
+    status: "ready",
+    reasonIfInsufficient: null,
+    evaluation: {
+      interviewBehavior: {
+        avoidingPitching: {
+          outcome: "missed",
+          note: "Pitch-first opener detected.",
+          evidence: [
+            {
+              sequence: 1,
+              turnId: "turn-1",
+              snippet: "Would this be useful for your team?",
+              title: "Speculative opener",
+              detail: "Validation-seeking appeared early."
+            }
+          ]
+        },
+        askingConcreteHistory: {
+          outcome: "met",
+          note: "Concrete history question detected.",
+          evidence: [
+            {
+              sequence: 3,
+              turnId: "turn-3",
+              snippet: "What did you try in the last month?",
+              title: "Concrete history question",
+              detail: "Asked for specific past attempts."
+            }
+          ]
+        },
+        followingUpOnVagueAnswers: {
+          outcome: "met",
+          note: "Vague answer followed with concrete probe.",
+          evidence: [
+            {
+              sequence: 3,
+              turnId: "turn-3",
+              snippet: "What did you try in the last month?",
+              title: "Follow-up",
+              detail: "Converted social signal to discovery."
+            }
+          ]
+        },
+        resistingCompliments: {
+          outcome: "met",
+          note: "Compliment was not treated as proof.",
+          evidence: [
+            {
+              sequence: 3,
+              turnId: "turn-3",
+              snippet: "What did you try in the last month?",
+              title: "Compliment resistance",
+              detail: "Asked behavior question after praise."
+            }
+          ]
+        },
+        identifyingBadFitPersonas: {
+          outcome: "met",
+          note: "Fit-discovery question detected.",
+          evidence: [
+            {
+              sequence: 5,
+              turnId: "turn-5",
+              snippet: "Who decides this purchase and budget?",
+              title: "Buyer/user fit probe",
+              detail: "Question checked decision authority."
+            }
+          ]
+        },
+        uncoveringWorkaroundsOrDecisionProcess: {
+          outcome: "met",
+          note: "Decision process and workaround detail uncovered.",
+          evidence: [
+            {
+              sequence: 5,
+              turnId: "turn-5",
+              snippet: "Who decides this purchase and budget?",
+              title: "Decision process probe",
+              detail: "Question targeted approval flow."
+            }
+          ]
+        }
+      },
+      learningSignal: {
+        quality: "high",
+        summary: "Learner extracted useful customer truth.",
+        evidence: [
+          {
+            sequence: 4,
+            turnId: "turn-4",
+            snippet: "We tried a consultant and manual spreadsheet workaround.",
+            title: "Concrete workaround evidence",
+            detail: "Persona described real past behavior."
+          }
+        ]
+      },
+      trapResults: [
+        {
+          trapId: "trap-1",
+          trapLabel: "Compliment Trap",
+          outcome: "partial",
+          detail: "Early validation-seeking partially recovered with stronger follow-ups.",
+          evidence: [
+            {
+              sequence: 1,
+              turnId: "turn-1",
+              snippet: "Would this be useful for your team?",
+              title: "Trigger evidence",
+              detail: "Validation-seeking opener."
+            }
+          ]
+        }
+      ],
+      excludedDimensions: {
+        accent: "not-scored",
+        charisma: "not-scored",
+        vocalPolish: "not-scored",
+        soundingConfident: "not-scored"
+      }
+    }
+  };
 }

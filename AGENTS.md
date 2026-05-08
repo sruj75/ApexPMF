@@ -14,6 +14,8 @@ The Mom Test Simulator is a voice-first customer discovery practice product wher
 ## Working Rules
 
 - Keep v1 simple: one modular Next.js app, 100% TypeScript, Effect at meaningful boundaries, Supabase behind repositories, and voice runtime/provider details behind domain boundaries.
+- Use Effect by default for workflow orchestration, typed failures, retries, resource lifecycles, and boundary integrations; avoid custom Promise-first control flow for domain/application logic unless the code is a tiny local helper.
+- For Effect patterns and APIs, use the official docs at `https://effect.website/`.
 - Keep UI thin. Do not leak prompts, provider events, Supabase rows, hidden test-plan details, or progression rules into `app/*` surfaces.
 - Customer Personas are generated fresh per Session. Ideal Customer Profiles and Broad Practice Pool seeds steer generation; they are not persona fixtures.
 - Before changing product behavior, check relevant ADRs and either follow them or explicitly call out the contradiction.

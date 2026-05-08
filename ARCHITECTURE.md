@@ -1,86 +1,96 @@
 # Architecture
 
-This file is the contributor map for the codebase: where to look, what each coarse module does, and which boundaries must not be crossed. It should stay short and stable. Product requirements live in `PRD.md`; domain language lives in `CONTEXT.md`; UI style lives in `DESIGN.md`; coding doctrine lives in `SOFTWARE.md`; decision rationale lives in `docs/adr/`.
+This document is the architecture contract for the repository. Keep it aligned with `PRD.md`, `CONTEXT.md`, `SOFTWARE.md`, and `docs/adr/` decisions.
 
-## Bird's-Eye View
+## Bird's-eye Overview
 
-The Mom Test Simulator is a single-player, voice-first practice app. A Learner starts a Session, interviews a fresh LLM-generated Customer Persona, then receives a structured Session Report that drives Progression.
+The Mom Test Simulator is a modular-monolith Next.js app where a Learner starts practice, gets a fresh generated Customer Persona, and continues through a voice-first Session loop into post-session feedback.
 
-V1 is a modular monolith: one Next.js app, 100% TypeScript, Effect at meaningful workflow boundaries, Supabase behind repository/data-access code, Gemini Live behind Voice Runtime, and normal LLM calls behind the domain modules that use them.
+Current implementation is a narrow vertical slice around Session entry:
+- authenticated entry and route guards,
+- Active Ideal Customer Profile or Broad Practice Pool resolution,
+- Persona Generation through OpenRouter structured JSON,
+- persistence of Generated Session Case in Supabase,
+- redirect into the practice session route.
+
+The contract still reserves the full v1 module seams from ADRs: Session lifecycle orchestration, Voice Runtime (Gemini Live default behind adapter), Hidden Evaluation, Report Builder, Credits, and Progression.
 
 ## Codemap
 
 ```text
 app/
+  auth/*
+  login
+  signup
+  dashboard
+  practice/*
+  profile/*
 src/
-  domain/
-    session/
-    persona/
-    evaluation/
-    report/
-    credits/
-    progression/
-  application/
-    start-session/
-    end-session/
-    generate-report/
-  infrastructure/
-    supabase/
-    gemini/
-    llm/
+  application/start-session/*
+  domain/persona/*
+  domain/session/*
+  infrastructure/supabase/*
+  infrastructure/llm/openrouter.ts
+  infrastructure/http/safe-next-path.ts
+tests/*
+docs/adr/*
 ```
 
-`app/` contains Next.js routes and UI surfaces. Look here for page composition, navigation, server actions/routes, and rendering of Practice Dashboard, Profile Settings, Voice Conversation, Report Generating State, and Session Report.
+`app/*`: Next.js routes, server actions, and UI surfaces. Owns rendering and navigation only.
 
-`src/application/` contains Effect-powered workflows that coordinate domain modules. Look here for flows such as starting a Session, ending a Session, generating a report, finalizing Credits, and updating Progression.
+`app/practice/actions.ts`: practice entry action. Converts seam results into redirects.
 
-`src/domain/session/` owns Session lifecycle concepts: Start Practice, Opening Context delivery, Voice Conversation state, end reasons, Natural Conclusion, Report Generating State, and routing to the Session Report.
+`src/application/start-session/*`: application seam for Start Practice flow. Handles entry context, failure classification, and orchestration of domain/repository dependencies.
 
-`src/domain/persona/` owns Persona Generation. Look here for Ideal Customer Profile and Broad Practice Pool inputs, fresh Customer Persona generation, hidden backstory, Customer Fit, Traps, Concrete History, Opening Context, and the small pre-Session quality gate.
+`src/domain/persona/*`: domain definitions for Ideal Customer Profile, Session Source, Persona Generation contract, and OpenRouter-backed persona generation behavior.
 
-`src/domain/evaluation/` owns Hidden Evaluation. It evaluates Interview Behavior after Session end from the structured transcript and Generated Session Case. It does not provide live coaching and does not create persona truth.
+`src/domain/session/*`: Generated Session Case aggregate shape, Started Session projection, and repository interface.
 
-`src/domain/report/` owns Report Builder and Session Report structure. Look here for reportability, partial-report decisions, structured report sections, prose display content, Trap Results, and Expandable Evidence.
+`src/infrastructure/supabase/*`: Supabase adapters for auth context and repository persistence/decoding.
 
-`src/domain/credits/` owns free trial, paid usage, estimates, duration rounding, Credit Exhaustion, and fair failed-voice charging.
+`src/infrastructure/llm/openrouter.ts`: low-level non-live LLM transport for structured JSON completion.
 
-`src/domain/progression/` owns Progression, Achievement Nodes, and the Global Ranking credibility gate. In v1 it reads saved Session Reports only.
+`tests/*`: contract and seam tests for auth entry, profile/session source rules, generated case decode/persistence, OpenRouter client/generator behavior, and route/action behavior.
 
-`src/infrastructure/supabase/` adapts Supabase tables, rows, auth payloads, and storage concerns into domain objects.
-
-`src/infrastructure/gemini/` adapts Gemini Live API behavior into Voice Runtime events and transcript/session events.
-
-`src/infrastructure/llm/` contains shared low-level non-live LLM transport: API execution, keys, logging, timeouts, and provider response handling. Domain modules still own their own prompts, schemas, parsing, retries, and validation.
+`docs/adr/*`: durable architecture/software decisions; architecture changes must reconcile with these.
 
 ## Architectural Invariants
 
-- UI renders product states and invokes application actions; it does not calculate domain behavior.
-- Domain modules do not import UI, Next.js request objects, Supabase clients, Gemini clients, or raw LLM clients directly.
-- Generated Session Case is the internal aggregate for hidden case context, transcript, evaluation artifacts, report, and audit context.
-- Customer Personas are generated fresh per Session. Ideal Customer Profiles and Broad Practice Pool seeds steer generation; they are not fixed persona fixtures.
-- Persona Generation is the source of persona truth. Voice Runtime may express unreliable social signals, but Concrete History must stay consistent with the Generated Session Case.
-- Session Reports are stored as structured sections with prose display content. Progression reads saved Session Reports only.
-- Session Transcripts are stored as structured turns. Plain text transcripts are convenience views.
-- Raw Audio Recording is not stored by default.
+- V1 remains one Next.js TypeScript app; no split deployable services.
+- UI code in `app/*` renders state and triggers application seams. It does not implement domain rules.
+- `src/application/*` composes workflows and error mapping. It does not own persona truth, reportability, progression logic, or credit policy.
+- Domain contracts (`src/domain/*`) are storage/provider-agnostic at their boundaries and use product language from `CONTEXT.md`.
+- Supabase access stays behind repository/adaptor modules in `src/infrastructure/supabase/*`.
+- Non-live LLM transport stays in `src/infrastructure/llm/*`; domain modules own prompt/schema/quality logic for their use cases.
+- Customer Personas are generated fresh per Session from Session Source inputs; they are not fixed fixtures.
+- Generated Session Case is the internal aggregate for generated persona context and downstream evaluation/report auditing.
+- Voice Runtime remains a boundary seam; when implemented, Gemini Live is the default adapter behind that seam.
+- Hidden Evaluation remains post-session and non-coaching in v1.
 
 ## Boundaries
 
-**App to Application**: Next.js surfaces call application workflows. They should not call Supabase, Gemini, or LLM transport directly for domain behavior.
+`app -> application`: routes and server actions call seam/workflow functions; they do not call Supabase tables or provider APIs for business behavior.
 
-**Application to Domain**: Application workflows coordinate modules and side effects. They should not absorb business rules that belong to Session, Persona Generation, Report Builder, Credits, or Progression.
+`application -> domain`: workflows pass learner/session inputs and coordinate domain interfaces; business policy stays in the owning domain module.
 
-**Domain to Infrastructure**: Domain modules speak in domain objects. Infrastructure translates provider/database shapes at the edge.
+`application -> infrastructure`: dependency wiring occurs at seams (for example repository and provider client construction), keeping external details out of UI.
 
-**Voice Runtime**: Gemini Live is the v1 default. Keep the adapter small; do not build speculative multi-provider voice abstractions.
+`domain -> infrastructure`: domain modules consume repository/provider interfaces and domain DTOs; row shapes, auth payloads, and HTTP response formats are decoded at infrastructure edges.
 
-**LLM Calls**: Persona Generation, Hidden Evaluation, and Report Builder each own their own prompt/schema boundary. Share transport plumbing only.
+`persona generation -> llm transport`: Persona Generation owns system/user prompt content, structured schema contract, decode failures, and quality gates; OpenRouter client owns HTTP protocol concerns only.
 
-## Cross-Cutting Concerns
+`session source -> profile repository`: active profile lookup happens once at Session start; Session Source is snapshotted into Generated Session Case for historical consistency.
 
-**Effect**: Use Effect where it clarifies typed failures, retries, interruption, concurrency, resource cleanup, and observability. Do not wrap tiny pure helpers in Effect ceremony.
+`future voice/report/progression seams`: add new modules under `src/domain/*` and `src/application/*` without bypassing the same boundary direction.
 
-**Effect Schema**: Validate external boundary data: LLM responses, Gemini events, Supabase rows, and user-created Ideal Customer Profile input.
+## Cross-cutting Concerns
 
-**Post-Session Work**: Report generation and Progression updates run directly in v1 while the user sees Report Generating State. Add queues/workers only after measured reliability or latency pressure.
+`Typing and validation`: external data is validated/decoded at boundaries (Supabase row decoders, structured JSON decode paths, safe redirect path checks).
 
-**Testing**: Test product behavior and domain rules through module boundaries. Avoid tests that depend on exact prompt wording, provider payloads, Supabase row shapes, or private implementation details unless the test is specifically for that adapter.
+`Error shaping`: use explicit failure categories for learner entry/start failures so redirects and UX outcomes are deterministic.
+
+`Security and auth`: learner identity is resolved server-side via Supabase auth context; unauthenticated access redirects to auth entry points.
+
+`Observability`: provider and decode failures are surfaced as typed/domain errors with enough context for debugging without leaking provider payload shapes into UI.
+
+`Testing strategy`: prioritize behavior tests around domain/application boundaries and adapter contract tests; avoid brittle assertions on incidental provider payload formatting.

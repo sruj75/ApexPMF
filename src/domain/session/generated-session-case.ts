@@ -3,6 +3,12 @@ import {
   presentSessionSource,
   type SessionSource
 } from "../persona/session-source";
+import {
+  createInitialSessionLifecycleState,
+  type SessionLifecycleState
+} from "./session-lifecycle";
+import type { SessionEvaluationArtifact } from "./session-evaluation";
+import type { SessionReport, SessionTranscriptTurn } from "./session-report";
 
 export type GeneratedSessionCase = GeneratedSessionCaseDraft & {
   id: string;
@@ -10,6 +16,10 @@ export type GeneratedSessionCase = GeneratedSessionCaseDraft & {
   sessionSource: SessionSource;
   generationNonce: string;
   createdAt: Date;
+  sessionLifecycle: SessionLifecycleState;
+  sessionReport: SessionReport | null;
+  sessionTranscript: SessionTranscriptTurn[] | null;
+  sessionEvaluation: SessionEvaluationArtifact | null;
 };
 
 export type CreateGeneratedSessionCaseInput = GeneratedSessionCaseDraft & {
@@ -38,4 +48,29 @@ export function toStartedSession(
 
 export function sessionSourceLabel(sessionSource: SessionSource): string {
   return presentSessionSource(sessionSource).label;
+}
+
+export function withDefaultSessionLifecycle(
+  generatedSessionCase: Omit<
+    GeneratedSessionCase,
+    | "sessionLifecycle"
+    | "sessionReport"
+    | "sessionTranscript"
+    | "sessionEvaluation"
+  > & {
+    sessionLifecycle?: SessionLifecycleState;
+    sessionReport?: SessionReport | null;
+    sessionTranscript?: SessionTranscriptTurn[] | null;
+    sessionEvaluation?: SessionEvaluationArtifact | null;
+  }
+): GeneratedSessionCase {
+  return {
+    ...generatedSessionCase,
+    sessionLifecycle:
+      generatedSessionCase.sessionLifecycle ??
+      createInitialSessionLifecycleState(),
+    sessionReport: generatedSessionCase.sessionReport ?? null,
+    sessionTranscript: generatedSessionCase.sessionTranscript ?? null,
+    sessionEvaluation: generatedSessionCase.sessionEvaluation ?? null
+  };
 }

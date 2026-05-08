@@ -1,22 +1,21 @@
 import { notFound, redirect } from "next/navigation";
 import { getLearnerEntryContext } from "@/src/application/start-session/practice-entry-seam";
-import { toStartedSession } from "@/src/domain/session/generated-session-case";
-import { SessionStartView } from "./session-start-view";
+import { SessionReportView } from "./report-view";
 
 export const dynamic = "force-dynamic";
 
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-type PracticeSessionPageProps = {
+type SessionReportPageProps = {
   params: Promise<{
     sessionId: string;
   }>;
 };
 
-export default async function PracticeSessionPage({
+export default async function SessionReportPage({
   params
-}: PracticeSessionPageProps) {
+}: SessionReportPageProps) {
   const { sessionId } = await params;
 
   if (!uuidPattern.test(sessionId)) {
@@ -37,28 +36,29 @@ export default async function PracticeSessionPage({
     notFound();
   }
 
-  if (generatedSessionCase.sessionLifecycle.sessionStatus === "ended") {
-    if (generatedSessionCase.sessionLifecycle.endedReason === "user-quit") {
-      redirect("/dashboard");
-    }
+  if (generatedSessionCase.sessionLifecycle.endedReason === "user-quit") {
+    redirect("/dashboard");
+  }
 
-    if (generatedSessionCase.sessionLifecycle.reportStatus === "ready") {
-      redirect(`/practice/${sessionId}/report`);
-    }
+  if (
+    generatedSessionCase.sessionLifecycle.reportStatus ===
+    "insufficient-evidence"
+  ) {
+    redirect("/dashboard");
+  }
 
-    if (
-      generatedSessionCase.sessionLifecycle.reportStatus ===
-      "insufficient-evidence"
-    ) {
-      redirect("/dashboard");
-    }
+  if (generatedSessionCase.sessionLifecycle.reportStatus !== "ready") {
+    redirect(`/practice/${sessionId}/report-generating`);
+  }
 
+  if (!generatedSessionCase.sessionReport || !generatedSessionCase.sessionTranscript) {
     redirect(`/practice/${sessionId}/report-generating`);
   }
 
   return (
-    <SessionStartView
-      startedSession={toStartedSession(generatedSessionCase)}
+    <SessionReportView
+      report={generatedSessionCase.sessionReport}
+      transcript={generatedSessionCase.sessionTranscript}
     />
   );
 }

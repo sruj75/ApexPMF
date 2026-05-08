@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { StartedSession } from "@/src/domain/session/generated-session-case";
+import { endSessionAction } from "./actions";
 
 type SessionStartViewProps = {
   startedSession: StartedSession;
@@ -16,15 +17,12 @@ export function SessionStartView({ startedSession }: SessionStartViewProps) {
           <p className="dashboard-card-label">Session Timer</p>
           <p className="session-timer-value">00:00</p>
         </div>
-        <button
-          className="secondary-action"
-          type="button"
-          disabled
-          aria-disabled="true"
-          title="End Session is not wired yet."
-        >
-          End Session
-        </button>
+        <form action={endSessionAction}>
+          <input type="hidden" name="sessionId" value={startedSession.sessionId} />
+          <button className="secondary-action" type="submit">
+            End Session
+          </button>
+        </form>
       </aside>
 
       <main className="dashboard-main session-main">

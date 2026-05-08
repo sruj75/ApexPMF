@@ -20,6 +20,27 @@ export type HiddenTestPlan = {
   failureSignals: readonly string[];
 };
 
+export type ConversationalFrictionCue =
+  | "hesitation"
+  | "rambling"
+  | "vague-answers"
+  | "mild-discomfort"
+  | "interruption"
+  | "questions-back";
+
+export type WeakQuestionSocialSignalCue =
+  | "politeness"
+  | "praise"
+  | "speculation"
+  | "vague-interest";
+
+export type PersonaBehavior = {
+  conversationalFriction: readonly ConversationalFrictionCue[];
+  weakQuestionSocialSignals: readonly WeakQuestionSocialSignalCue[];
+  strongQuestionTruthAnchors: readonly string[];
+  trapDelivery: "natural-hidden";
+};
+
 export type Trap = {
   id: string;
   label: string;
@@ -45,6 +66,7 @@ export type GeneratedSessionCaseDraft = {
   hiddenBackstory: string;
   customerFit: CustomerFit;
   hiddenTestPlan: HiddenTestPlan;
+  personaBehavior: PersonaBehavior;
   traps: readonly Trap[];
   generationAudit: GenerationAudit;
 };

@@ -24,6 +24,28 @@ const GeneratedSessionCaseResponseSchema = Schema.Struct({
     successSignals: Schema.Array(Schema.String),
     failureSignals: Schema.Array(Schema.String)
   }),
+  personaBehavior: Schema.Struct({
+    conversationalFriction: Schema.Array(
+      Schema.Literal(
+        "hesitation",
+        "rambling",
+        "vague-answers",
+        "mild-discomfort",
+        "interruption",
+        "questions-back"
+      )
+    ),
+    weakQuestionSocialSignals: Schema.Array(
+      Schema.Literal(
+        "politeness",
+        "praise",
+        "speculation",
+        "vague-interest"
+      )
+    ),
+    strongQuestionTruthAnchors: Schema.Array(Schema.String),
+    trapDelivery: Schema.Literal("natural-hidden")
+  }),
   traps: Schema.Array(
     Schema.Struct({
       id: Schema.String,
@@ -69,6 +91,7 @@ export const generatedSessionCaseResponseJsonSchema = {
     "hiddenBackstory",
     "customerFit",
     "hiddenTestPlan",
+    "personaBehavior",
     "traps"
   ],
   properties: {
@@ -119,6 +142,54 @@ export const generatedSessionCaseResponseJsonSchema = {
         failureSignals: {
           type: "array",
           items: { type: "string" }
+        }
+      }
+    },
+    personaBehavior: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "conversationalFriction",
+        "weakQuestionSocialSignals",
+        "strongQuestionTruthAnchors",
+        "trapDelivery"
+      ],
+      properties: {
+        conversationalFriction: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: [
+              "hesitation",
+              "rambling",
+              "vague-answers",
+              "mild-discomfort",
+              "interruption",
+              "questions-back"
+            ]
+          }
+        },
+        weakQuestionSocialSignals: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: [
+              "politeness",
+              "praise",
+              "speculation",
+              "vague-interest"
+            ]
+          }
+        },
+        strongQuestionTruthAnchors: {
+          type: "array",
+          items: {
+            type: "string"
+          }
+        },
+        trapDelivery: {
+          type: "string",
+          enum: ["natural-hidden"]
         }
       }
     },
@@ -180,6 +251,7 @@ export function decodeGeneratedSessionCaseResponse(
 function passesQualityGate(response: GeneratedSessionCaseResponse): boolean {
   return (
     response.openingContext.trim().length > 0 &&
+    !openingContextLeaksHiddenMechanics(response.openingContext) &&
     response.customerPersona.lightPersonaLabel.trim().length > 0 &&
     response.customerPersona.interviewRole.trim().length > 0 &&
     response.customerPersona.publicContext.trim().length > 0 &&
@@ -191,6 +263,12 @@ function passesQualityGate(response: GeneratedSessionCaseResponse): boolean {
     response.hiddenTestPlan.focusAreas.length > 0 &&
     response.hiddenTestPlan.successSignals.length > 0 &&
     response.hiddenTestPlan.failureSignals.length > 0 &&
+    response.personaBehavior.conversationalFriction.length > 0 &&
+    response.personaBehavior.weakQuestionSocialSignals.length > 0 &&
+    response.personaBehavior.strongQuestionTruthAnchors.length > 0 &&
+    response.personaBehavior.strongQuestionTruthAnchors.every(
+      (anchor) => anchor.trim().length > 0
+    ) &&
     response.traps.length > 0 &&
     response.traps.every(
       (trap) =>
@@ -199,5 +277,24 @@ function passesQualityGate(response: GeneratedSessionCaseResponse): boolean {
         trap.setup.trim().length > 0 &&
         trap.weakBehavior.trim().length > 0
     )
+  );
+}
+
+const hiddenMechanicLeakTerms = [
+  "hidden test plan",
+  "hidden backstory",
+  "customer fit",
+  "trap",
+  "strong-fit",
+  "weak-fit",
+  "bad-fit",
+  "buyer-user-mismatch",
+  "influencer"
+];
+
+function openingContextLeaksHiddenMechanics(openingContext: string): boolean {
+  const normalizedOpeningContext = openingContext.toLowerCase();
+  return hiddenMechanicLeakTerms.some((term) =>
+    normalizedOpeningContext.includes(term)
   );
 }

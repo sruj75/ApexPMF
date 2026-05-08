@@ -24,6 +24,27 @@ describe("Generated Session Case Supabase mapping", () => {
       kind: "broad-practice-pool",
       label: "Custom Broad Pool Label"
     });
+    expect(sessionCase?.personaBehavior).toEqual({
+      conversationalFriction: [
+        "hesitation",
+        "rambling",
+        "vague-answers",
+        "mild-discomfort",
+        "interruption",
+        "questions-back"
+      ],
+      weakQuestionSocialSignals: [
+        "politeness",
+        "praise",
+        "speculation",
+        "vague-interest"
+      ],
+      strongQuestionTruthAnchors: [
+        "paid-consultant-attempt",
+        "manual-rebuild-weekend"
+      ],
+      trapDelivery: "natural-hidden"
+    });
   });
 
   it("falls back to default broad-practice-pool label when source_snapshot label is invalid", async () => {
@@ -67,6 +88,22 @@ describe("Generated Session Case Supabase mapping", () => {
       adapter: "generated_session_cases",
       operation: "getForLearner"
     });
+  });
+
+  it("throws typed decode errors when persona_behavior is invalid", async () => {
+    const repository = createRepositoryForGetForLearner({
+      data: {
+        ...validGeneratedSessionCaseRow,
+        persona_behavior: "not-an-object"
+      }
+    });
+
+    await expect(
+      repository.getForLearner(
+        "learner-1",
+        "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
+      )
+    ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
   });
 
   it("throws typed decode errors when required row fields are invalid", async () => {
@@ -149,6 +186,27 @@ const validGeneratedSessionCaseRow = {
     focusAreas: ["Concrete History"],
     successSignals: ["Asked about recent attempts"],
     failureSignals: ["Pitched before diagnosis"]
+  },
+  persona_behavior: {
+    conversationalFriction: [
+      "hesitation",
+      "rambling",
+      "vague-answers",
+      "mild-discomfort",
+      "interruption",
+      "questions-back"
+    ],
+    weakQuestionSocialSignals: [
+      "politeness",
+      "praise",
+      "speculation",
+      "vague-interest"
+    ],
+    strongQuestionTruthAnchors: [
+      "paid-consultant-attempt",
+      "manual-rebuild-weekend"
+    ],
+    trapDelivery: "natural-hidden"
   },
   traps: [
     {

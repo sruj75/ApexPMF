@@ -29,6 +29,7 @@ describe("Start Practice", () => {
       sessionSourceLabel: "Broad Practice Pool",
       lightPersonaLabel: "Finance operator"
     });
+    expect((started as Record<string, unknown>).personaBehavior).toBeUndefined();
     expect(personaGenerator.inputs).toMatchObject([
       {
         generationNonce: "nonce-1",
@@ -58,6 +59,9 @@ describe("Start Practice", () => {
       customerFit: "strong-fit",
       hiddenTestPlan: {
         focusAreas: ["Concrete History", "budget owner"]
+      },
+      personaBehavior: {
+        trapDelivery: "natural-hidden"
       },
       traps: [
         {
@@ -190,6 +194,27 @@ function createRecordingPersonaGenerator(): PersonaGenerator & {
           focusAreas: ["Concrete History", "budget owner"],
           successSignals: ["Asks about recent attempts"],
           failureSignals: ["Accepts vague praise"]
+        },
+        personaBehavior: {
+          conversationalFriction: [
+            "hesitation",
+            "rambling",
+            "vague-answers",
+            "mild-discomfort",
+            "interruption",
+            "questions-back"
+          ],
+          weakQuestionSocialSignals: [
+            "politeness",
+            "praise",
+            "speculation",
+            "vague-interest"
+          ],
+          strongQuestionTruthAnchors: [
+            "paid-consultant-attempt",
+            "manual-rebuild-weekend"
+          ],
+          trapDelivery: "natural-hidden"
         },
         traps: [
           {

@@ -25,6 +25,27 @@ describe("Generated Session Case repository", () => {
           successSignals: ["Asked about recent attempts"],
           failureSignals: ["Accepted vague praise"]
         },
+        personaBehavior: {
+          conversationalFriction: [
+            "hesitation",
+            "rambling",
+            "vague-answers",
+            "mild-discomfort",
+            "interruption",
+            "questions-back"
+          ],
+          weakQuestionSocialSignals: [
+            "politeness",
+            "praise",
+            "speculation",
+            "vague-interest"
+          ],
+          strongQuestionTruthAnchors: [
+            "paid-consultant-attempt",
+            "manual-rebuild-weekend"
+          ],
+          trapDelivery: "natural-hidden"
+        },
         traps: [
           {
             id: "trap-1",
@@ -61,6 +82,27 @@ describe("Generated Session Case repository", () => {
         successSignals: ["Asked about current workaround"],
         failureSignals: ["Pitched before diagnosis"]
       },
+      personaBehavior: {
+        conversationalFriction: [
+          "hesitation",
+          "rambling",
+          "vague-answers",
+          "mild-discomfort",
+          "interruption",
+          "questions-back"
+        ],
+        weakQuestionSocialSignals: [
+          "politeness",
+          "praise",
+          "speculation",
+          "vague-interest"
+        ],
+        strongQuestionTruthAnchors: [
+          "paid-consultant-attempt",
+          "manual-rebuild-weekend"
+        ],
+        trapDelivery: "natural-hidden"
+      },
       traps: [
         {
           id: "trap-2",
@@ -77,5 +119,6 @@ describe("Generated Session Case repository", () => {
     });
 
     expect(created.id).toBe("session-case-101");
+    expect(created.personaBehavior.trapDelivery).toBe("natural-hidden");
   });
 });

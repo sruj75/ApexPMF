@@ -69,6 +69,8 @@ function buildMessages(input: PersonaGenerationInput) {
         `Generation nonce: ${input.generationNonce}`,
         `Session source: ${describeSessionSource(input.sessionSource)}`,
         "The Customer Persona must include Concrete History, a hidden Customer Fit, a Hidden Test Plan, and natural Traps.",
+        "Include personaBehavior with conversationalFriction cues, weakQuestionSocialSignals, strongQuestionTruthAnchors, and trapDelivery='natural-hidden'.",
+        "Weak questions should surface unreliable social signals. Strong questions should reveal truthful Concrete History anchored to the generated case.",
         "The Opening Context must not reveal hidden backstory, Customer Fit, Hidden Test Plan, or Traps."
       ].join("\n")
     }

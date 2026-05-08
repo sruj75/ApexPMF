@@ -12,6 +12,9 @@ describe("Generated Session Case contract", () => {
     expect(generatedSessionCaseResponseJsonSchema.required).toContain(
       "hiddenTestPlan"
     );
+    expect(generatedSessionCaseResponseJsonSchema.required).toContain(
+      "personaBehavior"
+    );
   });
 
   it("returns invalid_json when the response is not valid JSON", () => {
@@ -64,6 +67,23 @@ describe("Generated Session Case contract", () => {
     });
   });
 
+  it("returns quality_gate_failed when Opening Context leaks hidden mechanics", () => {
+    const leakedOpeningContext = {
+      ...validGeneratedSessionCaseResponse,
+      openingContext:
+        "Opening context that reveals Hidden Test Plan and trap details in advance."
+    };
+
+    const decoded = decodeGeneratedSessionCaseResponse(
+      JSON.stringify(leakedOpeningContext)
+    );
+
+    expect(decoded).toEqual({
+      ok: false,
+      reason: "quality_gate_failed"
+    });
+  });
+
   it("returns decoded domain-safe response for valid content", () => {
     const decoded = decodeGeneratedSessionCaseResponse(
       JSON.stringify(validGeneratedSessionCaseResponse)
@@ -96,6 +116,27 @@ const validGeneratedSessionCaseResponse = {
     focusAreas: ["Concrete History", "decision process"],
     successSignals: ["Asks about recent attempts"],
     failureSignals: ["Pitches before understanding workflow"]
+  },
+  personaBehavior: {
+    conversationalFriction: [
+      "hesitation",
+      "rambling",
+      "vague-answers",
+      "mild-discomfort",
+      "interruption",
+      "questions-back"
+    ],
+    weakQuestionSocialSignals: [
+      "politeness",
+      "praise",
+      "speculation",
+      "vague-interest"
+    ],
+    strongQuestionTruthAnchors: [
+      "paid-consultant-attempt",
+      "manual-rebuild-weekend"
+    ],
+    trapDelivery: "natural-hidden"
   },
   traps: [
     {

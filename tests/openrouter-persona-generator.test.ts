@@ -71,6 +71,10 @@ describe("OpenRouter Persona Generation", () => {
     expect(body.response_format.json_schema.schema.required).toContain(
       "hiddenBackstory"
     );
+    expect(body.response_format.json_schema.schema.required).toContain(
+      "personaBehavior"
+    );
+    expect(JSON.stringify(body.messages)).toContain("personaBehavior");
     expect(JSON.stringify(body.messages)).toContain("Broad Practice Pool");
   });
 
@@ -246,6 +250,27 @@ const validPersonaGenerationResponse = {
     focusAreas: ["Concrete History", "decision process"],
     successSignals: ["Asks about recent attempts"],
     failureSignals: ["Pitches before understanding workflow"]
+  },
+  personaBehavior: {
+    conversationalFriction: [
+      "hesitation",
+      "rambling",
+      "vague-answers",
+      "mild-discomfort",
+      "interruption",
+      "questions-back"
+    ],
+    weakQuestionSocialSignals: [
+      "politeness",
+      "praise",
+      "speculation",
+      "vague-interest"
+    ],
+    strongQuestionTruthAnchors: [
+      "paid-consultant-attempt",
+      "manual-rebuild-weekend"
+    ],
+    trapDelivery: "natural-hidden"
   },
   traps: [
     {

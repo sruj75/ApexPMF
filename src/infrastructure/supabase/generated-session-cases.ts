@@ -42,6 +42,29 @@ const HiddenTestPlanSchema = Schema.Struct({
   failureSignals: Schema.Array(Schema.String)
 });
 
+const PersonaBehaviorSchema = Schema.Struct({
+  conversationalFriction: Schema.Array(
+    Schema.Literal(
+      "hesitation",
+      "rambling",
+      "vague-answers",
+      "mild-discomfort",
+      "interruption",
+      "questions-back"
+    )
+  ),
+  weakQuestionSocialSignals: Schema.Array(
+    Schema.Literal(
+      "politeness",
+      "praise",
+      "speculation",
+      "vague-interest"
+    )
+  ),
+  strongQuestionTruthAnchors: Schema.Array(Schema.String),
+  trapDelivery: Schema.Literal("natural-hidden")
+});
+
 const TrapSchema = Schema.Struct({
   id: Schema.String,
   label: Schema.String,
@@ -74,6 +97,7 @@ const GeneratedSessionCaseRowSchema = Schema.Struct({
   hidden_backstory: Schema.String,
   customer_fit: CustomerFitSchema,
   hidden_test_plan: HiddenTestPlanSchema,
+  persona_behavior: PersonaBehaviorSchema,
   traps: Schema.Array(TrapSchema),
   generation_nonce: Schema.String,
   generation_audit: GenerationAuditSchema,
@@ -96,6 +120,7 @@ const generatedSessionCaseColumns = [
   "hidden_backstory",
   "customer_fit",
   "hidden_test_plan",
+  "persona_behavior",
   "traps",
   "generation_nonce",
   "generation_audit",
@@ -150,6 +175,7 @@ function toInsertRow(
     hidden_backstory: input.hiddenBackstory,
     customer_fit: input.customerFit,
     hidden_test_plan: input.hiddenTestPlan,
+    persona_behavior: input.personaBehavior,
     traps: input.traps,
     generation_nonce: input.generationNonce,
     generation_audit: input.generationAudit
@@ -197,6 +223,7 @@ function decodeGeneratedSessionCaseRowOrThrow(
     hiddenBackstory: decodedRow.hidden_backstory,
     customerFit: decodedRow.customer_fit,
     hiddenTestPlan: decodedRow.hidden_test_plan,
+    personaBehavior: decodedRow.persona_behavior,
     traps: decodedRow.traps,
     generationNonce: decodedRow.generation_nonce,
     generationAudit: decodedRow.generation_audit,

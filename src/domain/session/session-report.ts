@@ -19,6 +19,8 @@ export type PersonaEvidenceRef = {
   detail: string;
 };
 
+export type TrapOutcome = "triggered" | "avoided" | "partial";
+
 export type SessionReport = {
   outcome: {
     summary: string;
@@ -40,7 +42,7 @@ export type SessionReport = {
   }>;
   trapResults: Array<{
     trapLabel: string;
-    outcome: "triggered" | "avoided";
+    outcome: TrapOutcome;
     detail: string;
     evidence: PersonaEvidenceRef[];
   }>;

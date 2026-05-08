@@ -68,7 +68,8 @@ describe("Generated Session Case repository", () => {
           reportReadyAt: null
         },
         sessionReport: null,
-        sessionTranscript: null
+        sessionTranscript: null,
+        sessionEvaluation: null
       }
     ]);
 
@@ -301,7 +302,61 @@ describe("Generated Session Case repository", () => {
           speaker: "learner",
           text: "What did you try recently?"
         }
-      ]
+      ],
+      sessionEvaluation: {
+        interviewBehavior: {
+          avoidingPitching: {
+            outcome: "missed",
+            note: "Pitch-first opener detected.",
+            evidence: []
+          },
+          askingConcreteHistory: {
+            outcome: "met",
+            note: "Concrete history question detected.",
+            evidence: []
+          },
+          followingUpOnVagueAnswers: {
+            outcome: "met",
+            note: "Vague answer followed by concrete question.",
+            evidence: []
+          },
+          resistingCompliments: {
+            outcome: "met",
+            note: "Praise was resisted.",
+            evidence: []
+          },
+          identifyingBadFitPersonas: {
+            outcome: "partial",
+            note: "Not central in this fit context.",
+            evidence: []
+          },
+          uncoveringWorkaroundsOrDecisionProcess: {
+            outcome: "met",
+            note: "Workaround prompt detected.",
+            evidence: []
+          }
+        },
+        learningSignal: {
+          quality: "medium",
+          summary: "Useful discovery evidence appeared.",
+          evidence: []
+        },
+        trapResults: [
+          {
+            trapId: "trap-1",
+            trapLabel: "Compliment Trap",
+            outcome: "partial",
+            detail: "Learner partially recovered from praise bait.",
+            evidence: []
+          }
+        ],
+        excludedDimensions: {
+          accent: "not-scored",
+          charisma: "not-scored",
+          vocalPolish: "not-scored",
+          soundingConfident: "not-scored"
+        }
+      }
     });
 
     expect(updated?.sessionLifecycle).toMatchObject({
@@ -317,5 +372,6 @@ describe("Generated Session Case repository", () => {
         text: "What did you try recently?"
       }
     ]);
+    expect(updated?.sessionEvaluation?.trapResults[0]?.outcome).toBe("partial");
   });
 });

@@ -187,6 +187,22 @@ describe("Generated Session Case Supabase mapping", () => {
     ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
   });
 
+  it("throws typed decode errors when session_evaluation payload is malformed", async () => {
+    const repository = createRepositoryForGetForLearner({
+      data: {
+        ...validGeneratedSessionCaseRow,
+        session_evaluation: "not-an-evaluation"
+      }
+    });
+
+    await expect(
+      repository.getForLearner(
+        "learner-1",
+        "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
+      )
+    ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
+  });
+
   it("still throws Supabase query errors as plain Error", async () => {
     const repository = createRepositoryForGetForLearner({
       data: null,
@@ -264,7 +280,61 @@ describe("Generated Session Case Supabase mapping", () => {
           speaker: "learner",
           text: "What did you try recently?"
         }
-      ]
+      ],
+      sessionEvaluation: {
+        interviewBehavior: {
+          avoidingPitching: {
+            outcome: "missed",
+            note: "Pitch-first opener detected.",
+            evidence: []
+          },
+          askingConcreteHistory: {
+            outcome: "met",
+            note: "Concrete history detected.",
+            evidence: []
+          },
+          followingUpOnVagueAnswers: {
+            outcome: "met",
+            note: "Concrete follow-up after vague answer.",
+            evidence: []
+          },
+          resistingCompliments: {
+            outcome: "met",
+            note: "Compliment resisted with follow-up.",
+            evidence: []
+          },
+          identifyingBadFitPersonas: {
+            outcome: "partial",
+            note: "Not central in this fit context.",
+            evidence: []
+          },
+          uncoveringWorkaroundsOrDecisionProcess: {
+            outcome: "met",
+            note: "Workaround/decision probe detected.",
+            evidence: []
+          }
+        },
+        learningSignal: {
+          quality: "medium",
+          summary: "Useful discovery evidence appeared.",
+          evidence: []
+        },
+        trapResults: [
+          {
+            trapId: "trap-1",
+            trapLabel: "Compliment Trap",
+            outcome: "partial",
+            detail: "Learner partially recovered from praise bait.",
+            evidence: []
+          }
+        ],
+        excludedDimensions: {
+          accent: "not-scored",
+          charisma: "not-scored",
+          vocalPolish: "not-scored",
+          soundingConfident: "not-scored"
+        }
+      }
     });
 
     expect(update).toHaveBeenCalledWith(
@@ -282,7 +352,12 @@ describe("Generated Session Case Supabase mapping", () => {
             speaker: "learner",
             text: "What did you try recently?"
           }
-        ]
+        ],
+        session_evaluation: expect.objectContaining({
+          learningSignal: expect.objectContaining({
+            quality: "medium"
+          })
+        })
       })
     );
   });
@@ -386,7 +461,61 @@ function createRepositoryForReportArtifactsUpdate() {
           speaker: "learner",
           text: "What did you try recently?"
         }
-      ]
+      ],
+      session_evaluation: {
+        interviewBehavior: {
+          avoidingPitching: {
+            outcome: "missed",
+            note: "Pitch-first opener detected.",
+            evidence: []
+          },
+          askingConcreteHistory: {
+            outcome: "met",
+            note: "Concrete history detected.",
+            evidence: []
+          },
+          followingUpOnVagueAnswers: {
+            outcome: "met",
+            note: "Concrete follow-up after vague answer.",
+            evidence: []
+          },
+          resistingCompliments: {
+            outcome: "met",
+            note: "Compliment resisted with follow-up.",
+            evidence: []
+          },
+          identifyingBadFitPersonas: {
+            outcome: "partial",
+            note: "Not central in this fit context.",
+            evidence: []
+          },
+          uncoveringWorkaroundsOrDecisionProcess: {
+            outcome: "met",
+            note: "Workaround/decision probe detected.",
+            evidence: []
+          }
+        },
+        learningSignal: {
+          quality: "medium",
+          summary: "Useful discovery evidence appeared.",
+          evidence: []
+        },
+        trapResults: [
+          {
+            trapId: "trap-1",
+            trapLabel: "Compliment Trap",
+            outcome: "partial",
+            detail: "Learner partially recovered from praise bait.",
+            evidence: []
+          }
+        ],
+        excludedDimensions: {
+          accent: "not-scored",
+          charisma: "not-scored",
+          vocalPolish: "not-scored",
+          soundingConfident: "not-scored"
+        }
+      }
     },
     error: null
   }));
@@ -490,5 +619,6 @@ const validGeneratedSessionCaseRow = {
   report_status: "not-requested",
   report_ready_at: null,
   session_report: null,
-  session_transcript: null
+  session_transcript: null,
+  session_evaluation: null
 };

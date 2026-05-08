@@ -9,6 +9,7 @@ import type {
   SessionReport,
   SessionTranscriptTurn
 } from "@/src/domain/session/session-report";
+import type { SessionEvaluationArtifact } from "@/src/domain/session/session-evaluation";
 import {
   createBroadPracticePoolSessionSource,
   type SessionSource
@@ -145,7 +146,7 @@ const SessionReportSchema = Schema.Struct({
   trapResults: Schema.Array(
     Schema.Struct({
       trapLabel: Schema.String,
-      outcome: Schema.Literal("triggered", "avoided"),
+      outcome: Schema.Literal("triggered", "avoided", "partial"),
       detail: Schema.String,
       evidence: Schema.Array(EvidenceRefSchema)
     })
@@ -179,6 +180,45 @@ const SessionTranscriptTurnSchema = Schema.Struct({
   )
 });
 
+const BehaviorOutcomeSchema = Schema.Literal("met", "missed", "partial");
+
+const BehaviorAssessmentSchema = Schema.Struct({
+  outcome: BehaviorOutcomeSchema,
+  note: Schema.String,
+  evidence: Schema.Array(EvidenceRefSchema)
+});
+
+const SessionEvaluationSchema = Schema.Struct({
+  interviewBehavior: Schema.Struct({
+    avoidingPitching: BehaviorAssessmentSchema,
+    askingConcreteHistory: BehaviorAssessmentSchema,
+    followingUpOnVagueAnswers: BehaviorAssessmentSchema,
+    resistingCompliments: BehaviorAssessmentSchema,
+    identifyingBadFitPersonas: BehaviorAssessmentSchema,
+    uncoveringWorkaroundsOrDecisionProcess: BehaviorAssessmentSchema
+  }),
+  learningSignal: Schema.Struct({
+    quality: Schema.Literal("high", "medium", "low"),
+    summary: Schema.String,
+    evidence: Schema.Array(EvidenceRefSchema)
+  }),
+  trapResults: Schema.Array(
+    Schema.Struct({
+      trapId: Schema.String,
+      trapLabel: Schema.String,
+      outcome: Schema.Literal("triggered", "avoided", "partial"),
+      detail: Schema.String,
+      evidence: Schema.Array(EvidenceRefSchema)
+    })
+  ),
+  excludedDimensions: Schema.Struct({
+    accent: Schema.Literal("not-scored"),
+    charisma: Schema.Literal("not-scored"),
+    vocalPolish: Schema.Literal("not-scored"),
+    soundingConfident: Schema.Literal("not-scored")
+  })
+});
+
 const GeneratedSessionCaseRowSchema = Schema.Struct({
   id: Schema.String,
   learner_id: Schema.String,
@@ -202,7 +242,8 @@ const GeneratedSessionCaseRowSchema = Schema.Struct({
   report_status: ReportStatusSchema,
   report_ready_at: Schema.NullOr(Schema.Date),
   session_report: Schema.NullOr(SessionReportSchema),
-  session_transcript: Schema.NullOr(Schema.Array(SessionTranscriptTurnSchema))
+  session_transcript: Schema.NullOr(Schema.Array(SessionTranscriptTurnSchema)),
+  session_evaluation: Schema.NullOr(SessionEvaluationSchema)
 });
 
 type GeneratedSessionCaseRow = Schema.Schema.Type<
@@ -232,7 +273,8 @@ const generatedSessionCaseColumns = [
   "report_status",
   "report_ready_at",
   "session_report",
-  "session_transcript"
+  "session_transcript",
+  "session_evaluation"
 ].join(", ");
 
 export function createSupabaseGeneratedSessionCaseRepository(
@@ -309,7 +351,8 @@ export function createSupabaseGeneratedSessionCaseRepository(
           report_status: input.reportStatus,
           report_ready_at: input.reportReadyAt?.toISOString() ?? null,
           session_report: input.sessionReport,
-          session_transcript: input.sessionTranscript
+          session_transcript: input.sessionTranscript,
+          session_evaluation: input.sessionEvaluation
         })
         .eq("learner_id", input.learnerId)
         .eq("id", input.sessionCaseId)
@@ -348,7 +391,8 @@ function toInsertRow(
     report_status: "not-requested",
     report_ready_at: null,
     session_report: null,
-    session_transcript: null
+    session_transcript: null,
+    session_evaluation: null
   };
 }
 
@@ -417,7 +461,9 @@ function decodeGeneratedSessionCaseRowOrThrow(
     },
     sessionReport: decodedRow.session_report as SessionReport | null,
     sessionTranscript:
-      decodedRow.session_transcript as SessionTranscriptTurn[] | null
+      decodedRow.session_transcript as SessionTranscriptTurn[] | null,
+    sessionEvaluation:
+      decodedRow.session_evaluation as SessionEvaluationArtifact | null
   };
 }
 

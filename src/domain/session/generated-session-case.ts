@@ -7,6 +7,7 @@ import {
   createInitialSessionLifecycleState,
   type SessionLifecycleState
 } from "./session-lifecycle";
+import type { SessionEvaluationArtifact } from "./session-evaluation";
 import type { SessionReport, SessionTranscriptTurn } from "./session-report";
 
 export type GeneratedSessionCase = GeneratedSessionCaseDraft & {
@@ -18,6 +19,7 @@ export type GeneratedSessionCase = GeneratedSessionCaseDraft & {
   sessionLifecycle: SessionLifecycleState;
   sessionReport: SessionReport | null;
   sessionTranscript: SessionTranscriptTurn[] | null;
+  sessionEvaluation: SessionEvaluationArtifact | null;
 };
 
 export type CreateGeneratedSessionCaseInput = GeneratedSessionCaseDraft & {
@@ -51,11 +53,15 @@ export function sessionSourceLabel(sessionSource: SessionSource): string {
 export function withDefaultSessionLifecycle(
   generatedSessionCase: Omit<
     GeneratedSessionCase,
-    "sessionLifecycle" | "sessionReport" | "sessionTranscript"
+    | "sessionLifecycle"
+    | "sessionReport"
+    | "sessionTranscript"
+    | "sessionEvaluation"
   > & {
     sessionLifecycle?: SessionLifecycleState;
     sessionReport?: SessionReport | null;
     sessionTranscript?: SessionTranscriptTurn[] | null;
+    sessionEvaluation?: SessionEvaluationArtifact | null;
   }
 ): GeneratedSessionCase {
   return {
@@ -64,6 +70,7 @@ export function withDefaultSessionLifecycle(
       generatedSessionCase.sessionLifecycle ??
       createInitialSessionLifecycleState(),
     sessionReport: generatedSessionCase.sessionReport ?? null,
-    sessionTranscript: generatedSessionCase.sessionTranscript ?? null
+    sessionTranscript: generatedSessionCase.sessionTranscript ?? null,
+    sessionEvaluation: generatedSessionCase.sessionEvaluation ?? null
   };
 }

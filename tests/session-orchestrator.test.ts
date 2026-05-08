@@ -190,7 +190,61 @@ describe("Session Orchestrator", () => {
                 speaker: "learner",
                 text: "What did you try recently?"
               }
-            ]
+            ],
+            evaluation: {
+              interviewBehavior: {
+                avoidingPitching: {
+                  outcome: "missed",
+                  note: "Pitch-first opener detected.",
+                  evidence: []
+                },
+                askingConcreteHistory: {
+                  outcome: "met",
+                  note: "Concrete history question detected.",
+                  evidence: []
+                },
+                followingUpOnVagueAnswers: {
+                  outcome: "met",
+                  note: "Vague answer followed by concrete question.",
+                  evidence: []
+                },
+                resistingCompliments: {
+                  outcome: "met",
+                  note: "Praise resisted with follow-up.",
+                  evidence: []
+                },
+                identifyingBadFitPersonas: {
+                  outcome: "partial",
+                  note: "Not central in this fit context.",
+                  evidence: []
+                },
+                uncoveringWorkaroundsOrDecisionProcess: {
+                  outcome: "met",
+                  note: "Workaround discovery detected.",
+                  evidence: []
+                }
+              },
+              learningSignal: {
+                quality: "medium",
+                summary: "Useful discovery evidence appeared.",
+                evidence: []
+              },
+              trapResults: [
+                {
+                  trapId: "trap-1",
+                  trapLabel: "Compliment Trap",
+                  outcome: "partial",
+                  detail: "Learner partially recovered from praise bait.",
+                  evidence: []
+                }
+              ],
+              excludedDimensions: {
+                accent: "not-scored",
+                charisma: "not-scored",
+                vocalPolish: "not-scored",
+                soundingConfident: "not-scored"
+              }
+            }
           };
         }
       }
@@ -223,6 +277,7 @@ describe("Session Orchestrator", () => {
         text: "What did you try recently?"
       }
     ]);
+    expect(persisted?.sessionEvaluation?.trapResults[0]?.outcome).toBe("partial");
   });
 
   it("routes report-generating flow to Practice Dashboard when evidence is insufficient", async () => {
@@ -373,6 +428,60 @@ function makeReadyReportGenerationResult() {
         speaker: "learner" as const,
         text: "What did you try recently?"
       }
-    ]
+    ],
+    evaluation: {
+      interviewBehavior: {
+        avoidingPitching: {
+          outcome: "missed" as const,
+          note: "Pitch-first opener detected.",
+          evidence: []
+        },
+        askingConcreteHistory: {
+          outcome: "met" as const,
+          note: "Concrete history question detected.",
+          evidence: []
+        },
+        followingUpOnVagueAnswers: {
+          outcome: "met" as const,
+          note: "Vague answer followed by concrete question.",
+          evidence: []
+        },
+        resistingCompliments: {
+          outcome: "met" as const,
+          note: "Praise resisted with follow-up.",
+          evidence: []
+        },
+        identifyingBadFitPersonas: {
+          outcome: "partial" as const,
+          note: "Not central in this fit context.",
+          evidence: []
+        },
+        uncoveringWorkaroundsOrDecisionProcess: {
+          outcome: "met" as const,
+          note: "Workaround discovery detected.",
+          evidence: []
+        }
+      },
+      learningSignal: {
+        quality: "medium" as const,
+        summary: "Useful discovery evidence appeared.",
+        evidence: []
+      },
+      trapResults: [
+        {
+          trapId: "trap-1",
+          trapLabel: "Compliment Trap",
+          outcome: "partial" as const,
+          detail: "Learner partially recovered from praise bait.",
+          evidence: []
+        }
+      ],
+      excludedDimensions: {
+        accent: "not-scored" as const,
+        charisma: "not-scored" as const,
+        vocalPolish: "not-scored" as const,
+        soundingConfident: "not-scored" as const
+      }
+    }
   };
 }

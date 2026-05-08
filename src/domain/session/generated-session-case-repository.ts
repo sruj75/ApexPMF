@@ -6,6 +6,7 @@ import { withDefaultSessionLifecycle } from "./generated-session-case";
 import type { ReportStatus } from "./session-lifecycle";
 import type { SessionReport, SessionTranscriptTurn } from "./session-report";
 import type { SessionLifecycleState } from "./session-lifecycle";
+import type { SessionEvaluationArtifact } from "./session-evaluation";
 
 export type GeneratedSessionCaseRepository = {
   create(
@@ -28,6 +29,7 @@ export type GeneratedSessionCaseRepository = {
     reportReadyAt: Date | null;
     sessionReport: SessionReport | null;
     sessionTranscript: SessionTranscriptTurn[] | null;
+    sessionEvaluation: SessionEvaluationArtifact | null;
   }): Promise<GeneratedSessionCase | null>;
 };
 
@@ -106,7 +108,8 @@ export function createInMemoryGeneratedSessionCaseRepository(
           reportReadyAt: input.reportReadyAt
         },
         sessionReport: input.sessionReport,
-        sessionTranscript: input.sessionTranscript
+        sessionTranscript: input.sessionTranscript,
+        sessionEvaluation: input.sessionEvaluation
       };
 
       generatedSessionCases = generatedSessionCases.map((sessionCase, rowIndex) =>

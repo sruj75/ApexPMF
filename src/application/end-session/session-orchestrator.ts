@@ -122,7 +122,8 @@ export function createSessionOrchestrator(input: {
           reportStatus: "ready",
           reportReadyAt: new Date(),
           sessionReport: result.report,
-          sessionTranscript: result.transcript
+          sessionTranscript: result.transcript,
+          sessionEvaluation: result.evaluation
         });
 
         return {
@@ -137,7 +138,8 @@ export function createSessionOrchestrator(input: {
         reportStatus: "insufficient-evidence",
         reportReadyAt: null,
         sessionReport: null,
-        sessionTranscript: null
+        sessionTranscript: null,
+        sessionEvaluation: null
       });
 
       return {

@@ -34,5 +34,8 @@ describe("Session start view", () => {
     expect(screen.queryByText(/global ranking/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/hint/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/coaching/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/text chat/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/text fallback/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 });

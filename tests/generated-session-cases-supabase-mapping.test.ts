@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createSupabaseGeneratedSessionCaseRepository } from "../src/infrastructure/supabase/generated-session-cases";
-import { SupabaseRowDecodeError } from "../src/infrastructure/supabase/supabase-row-decode-error";
+import { Either, Effect } from "effect";
 
 describe("Generated Session Case Supabase mapping", () => {
   it("preserves broad-practice-pool label from source_snapshot on readback", async () => {
@@ -84,8 +84,7 @@ describe("Generated Session Case Supabase mapping", () => {
         "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
       )
     ).rejects.toMatchObject({
-      name: "SupabaseRowDecodeError",
-      adapter: "generated_session_cases",
+      _tag: "GeneratedSessionCaseRepositoryDecodeError",
       operation: "getForLearner"
     });
   });
@@ -103,7 +102,9 @@ describe("Generated Session Case Supabase mapping", () => {
         "learner-1",
         "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
       )
-    ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
+    ).rejects.toMatchObject({
+      _tag: "GeneratedSessionCaseRepositoryDecodeError"
+    });
   });
 
   it("throws typed decode errors when required row fields are invalid", async () => {
@@ -119,7 +120,9 @@ describe("Generated Session Case Supabase mapping", () => {
         "learner-1",
         "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
       )
-    ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
+    ).rejects.toMatchObject({
+      _tag: "GeneratedSessionCaseRepositoryDecodeError"
+    });
   });
 
   it("throws typed decode errors when session lifecycle status is invalid", async () => {
@@ -135,7 +138,9 @@ describe("Generated Session Case Supabase mapping", () => {
         "learner-1",
         "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
       )
-    ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
+    ).rejects.toMatchObject({
+      _tag: "GeneratedSessionCaseRepositoryDecodeError"
+    });
   });
 
   it("throws typed decode errors when ended reason is invalid", async () => {
@@ -152,7 +157,9 @@ describe("Generated Session Case Supabase mapping", () => {
         "learner-1",
         "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
       )
-    ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
+    ).rejects.toMatchObject({
+      _tag: "GeneratedSessionCaseRepositoryDecodeError"
+    });
   });
 
   it("throws typed decode errors when session_report payload is malformed", async () => {
@@ -168,7 +175,9 @@ describe("Generated Session Case Supabase mapping", () => {
         "learner-1",
         "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
       )
-    ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
+    ).rejects.toMatchObject({
+      _tag: "GeneratedSessionCaseRepositoryDecodeError"
+    });
   });
 
   it("throws typed decode errors when session_transcript payload is malformed", async () => {
@@ -184,7 +193,9 @@ describe("Generated Session Case Supabase mapping", () => {
         "learner-1",
         "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
       )
-    ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
+    ).rejects.toMatchObject({
+      _tag: "GeneratedSessionCaseRepositoryDecodeError"
+    });
   });
 
   it("throws typed decode errors when session_evaluation payload is malformed", async () => {
@@ -200,7 +211,9 @@ describe("Generated Session Case Supabase mapping", () => {
         "learner-1",
         "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
       )
-    ).rejects.toBeInstanceOf(SupabaseRowDecodeError);
+    ).rejects.toMatchObject({
+      _tag: "GeneratedSessionCaseRepositoryDecodeError"
+    });
   });
 
   it("accepts null evidence fields in persisted evaluation artifacts", async () => {
@@ -374,7 +387,7 @@ describe("Generated Session Case Supabase mapping", () => {
     });
   });
 
-  it("still throws Supabase query errors as plain Error", async () => {
+  it("maps Supabase query errors into typed persistence errors", async () => {
     const repository = createRepositoryForGetForLearner({
       data: null,
       error: {
@@ -387,7 +400,9 @@ describe("Generated Session Case Supabase mapping", () => {
         "learner-1",
         "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
       )
-    ).rejects.toThrow("database is unavailable");
+    ).rejects.toMatchObject({
+      _tag: "GeneratedSessionCaseRepositoryPersistenceError"
+    });
   });
 
   it("encodes lifecycle status updates with persisted session/report fields", async () => {
@@ -553,7 +568,9 @@ function createRepositoryForGetForLearner(input: {
     from: vi.fn(() => queryBuilder)
   };
 
-  return createSupabaseGeneratedSessionCaseRepository(supabase as never);
+  return toPromiseRepository(
+    createSupabaseGeneratedSessionCaseRepository(supabase as never)
+  );
 }
 
 function createRepositoryForLifecycleUpdate(input: { existing: unknown }) {
@@ -597,7 +614,9 @@ function createRepositoryForLifecycleUpdate(input: { existing: unknown }) {
   };
 
   return {
-    repository: createSupabaseGeneratedSessionCaseRepository(supabase as never),
+    repository: toPromiseRepository(
+      createSupabaseGeneratedSessionCaseRepository(supabase as never)
+    ),
     update
   };
 }
@@ -718,9 +737,42 @@ function createRepositoryForReportArtifactsUpdate() {
   };
 
   return {
-    repository: createSupabaseGeneratedSessionCaseRepository(supabase as never),
+    repository: toPromiseRepository(
+      createSupabaseGeneratedSessionCaseRepository(supabase as never)
+    ),
     update
   };
+}
+
+function toPromiseRepository(
+  repository: ReturnType<typeof createSupabaseGeneratedSessionCaseRepository>
+) {
+  return {
+    create: (
+      learnerId: Parameters<typeof repository.create>[0],
+      input: Parameters<typeof repository.create>[1]
+    ) => runEffect(repository.create(learnerId, input)),
+    getForLearner: (
+      learnerId: Parameters<typeof repository.getForLearner>[0],
+      sessionCaseId: Parameters<typeof repository.getForLearner>[1]
+    ) => runEffect(repository.getForLearner(learnerId, sessionCaseId)),
+    updateSessionLifecycleForLearner: (
+      input: Parameters<typeof repository.updateSessionLifecycleForLearner>[0]
+    ) => runEffect(repository.updateSessionLifecycleForLearner(input)),
+    updateReportArtifactsForLearner: (
+      input: Parameters<typeof repository.updateReportArtifactsForLearner>[0]
+    ) => runEffect(repository.updateReportArtifactsForLearner(input))
+  };
+}
+
+async function runEffect<Success, Error>(
+  effect: Effect.Effect<Success, Error, never>
+): Promise<Success> {
+  const result = await Effect.runPromise(Effect.either(effect));
+  if (Either.isLeft(result)) {
+    throw result.left;
+  }
+  return result.right;
 }
 
 const validGeneratedSessionCaseRow = {

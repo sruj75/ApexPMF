@@ -1,4 +1,6 @@
 import type { SessionSource } from "./session-source";
+import type { GeneratedSessionCaseContractFailureReason } from "./generated-session-case-contract";
+import { Data, Effect } from "effect";
 
 export type CustomerFit =
   | "strong-fit"
@@ -71,8 +73,27 @@ export type GeneratedSessionCaseDraft = {
   generationAudit: GenerationAudit;
 };
 
+export class PersonaGenerationProviderError extends Data.TaggedError(
+  "PersonaGenerationProviderError"
+)<{
+  message: string;
+  cause: unknown;
+}> {}
+
+export class PersonaGenerationDecodeError extends Data.TaggedError(
+  "PersonaGenerationDecodeError"
+)<{
+  reason: GeneratedSessionCaseContractFailureReason;
+  message: string;
+  cause?: unknown;
+}> {}
+
+export type PersonaGenerationError =
+  | PersonaGenerationProviderError
+  | PersonaGenerationDecodeError;
+
 export interface PersonaGenerator {
   generateSessionCase(
     input: PersonaGenerationInput
-  ): Promise<GeneratedSessionCaseDraft>;
+  ): Effect.Effect<GeneratedSessionCaseDraft, PersonaGenerationError, never>;
 }

@@ -1,10 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import type {
   CreateGeneratedSessionCaseInput,
   GeneratedSessionCase
 } from "@/src/domain/session/generated-session-case";
-import type { GeneratedSessionCaseRepository } from "@/src/domain/session/generated-session-case-repository";
+import {
+  GeneratedSessionCaseRepositoryDecodeError,
+  GeneratedSessionCaseRepositoryPersistenceError,
+  type GeneratedSessionCaseRepository,
+  type GeneratedSessionCaseRepositoryOperation
+} from "@/src/domain/session/generated-session-case-repository";
 import type {
   SessionReport,
   SessionTranscriptTurn
@@ -178,89 +183,114 @@ export function createSupabaseGeneratedSessionCaseRepository(
   supabase: SupabaseClient
 ): GeneratedSessionCaseRepository {
   return {
-    async create(learnerId, input) {
-      const { data, error } = await supabase
-        .from("generated_session_cases")
-        .insert(toInsertRow(learnerId, input))
-        .select(generatedSessionCaseColumns)
-        .single();
+    create(learnerId, input) {
+      return Effect.gen(function* () {
+        const result = yield* querySupabase({
+          operation: "create",
+          run: () =>
+            supabase
+              .from("generated_session_cases")
+              .insert(toInsertRow(learnerId, input))
+              .select(generatedSessionCaseColumns)
+              .single()
+        });
 
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return decodeGeneratedSessionCaseRowOrThrow(data, "create");
+        return yield* decodeGeneratedSessionCaseRow(result.data, "create");
+      });
     },
 
-    async getForLearner(learnerId, sessionCaseId) {
-      const { data, error } = await supabase
-        .from("generated_session_cases")
-        .select(generatedSessionCaseColumns)
-        .eq("learner_id", learnerId)
-        .eq("id", sessionCaseId)
-        .maybeSingle();
+    getForLearner(learnerId, sessionCaseId) {
+      return Effect.gen(function* () {
+        const result = yield* querySupabase({
+          operation: "getForLearner",
+          run: () =>
+            supabase
+              .from("generated_session_cases")
+              .select(generatedSessionCaseColumns)
+              .eq("learner_id", learnerId)
+              .eq("id", sessionCaseId)
+              .maybeSingle()
+        });
 
-      if (error) {
-        throw new Error(error.message);
-      }
+        if (!result.data) {
+          return null;
+        }
 
-      return data ? decodeGeneratedSessionCaseRowOrThrow(data, "getForLearner") : null;
+        return yield* decodeGeneratedSessionCaseRow(result.data, "getForLearner");
+      });
     },
 
-    async updateSessionLifecycleForLearner(input) {
-      const { data: existingRow, error: getError } = await supabase
-        .from("generated_session_cases")
-        .select(generatedSessionCaseColumns)
-        .eq("learner_id", input.learnerId)
-        .eq("id", input.sessionCaseId)
-        .maybeSingle();
+    updateSessionLifecycleForLearner(input) {
+      return Effect.gen(function* () {
+        const existing = yield* querySupabase({
+          operation: "getForLearner",
+          run: () =>
+            supabase
+              .from("generated_session_cases")
+              .select(generatedSessionCaseColumns)
+              .eq("learner_id", input.learnerId)
+              .eq("id", input.sessionCaseId)
+              .maybeSingle()
+        });
 
-      if (getError) {
-        throw new Error(getError.message);
-      }
+        if (!existing.data) {
+          return null;
+        }
 
-      if (!existingRow) {
-        return null;
-      }
+        const current = yield* decodeGeneratedSessionCaseRow(
+          existing.data,
+          "getForLearner"
+        );
+        const nextLifecycle = input.updater(current.sessionLifecycle);
 
-      const current = decodeGeneratedSessionCaseRowOrThrow(existingRow, "getForLearner");
-      const nextLifecycle = input.updater(current.sessionLifecycle);
+        const updated = yield* querySupabase({
+          operation: "updateSessionLifecycleForLearner",
+          run: () =>
+            supabase
+              .from("generated_session_cases")
+              .update(toLifecycleUpdateRow(nextLifecycle))
+              .eq("learner_id", input.learnerId)
+              .eq("id", input.sessionCaseId)
+              .select(generatedSessionCaseColumns)
+              .single()
+        });
 
-      const { data, error } = await supabase
-        .from("generated_session_cases")
-        .update(toLifecycleUpdateRow(nextLifecycle))
-        .eq("learner_id", input.learnerId)
-        .eq("id", input.sessionCaseId)
-        .select(generatedSessionCaseColumns)
-        .single();
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return decodeGeneratedSessionCaseRowOrThrow(data, "getForLearner");
+        return yield* decodeGeneratedSessionCaseRow(
+          updated.data,
+          "updateSessionLifecycleForLearner"
+        );
+      });
     },
 
-    async updateReportArtifactsForLearner(input) {
-      const { data, error } = await supabase
-        .from("generated_session_cases")
-        .update({
-          report_status: input.reportStatus,
-          report_ready_at: input.reportReadyAt?.toISOString() ?? null,
-          session_report: input.sessionReport,
-          session_transcript: input.sessionTranscript,
-          session_evaluation: input.sessionEvaluation
-        })
-        .eq("learner_id", input.learnerId)
-        .eq("id", input.sessionCaseId)
-        .select(generatedSessionCaseColumns)
-        .maybeSingle();
+    updateReportArtifactsForLearner(input) {
+      return Effect.gen(function* () {
+        const updated = yield* querySupabase({
+          operation: "updateReportArtifactsForLearner",
+          run: () =>
+            supabase
+              .from("generated_session_cases")
+              .update({
+                report_status: input.reportStatus,
+                report_ready_at: input.reportReadyAt?.toISOString() ?? null,
+                session_report: input.sessionReport,
+                session_transcript: input.sessionTranscript,
+                session_evaluation: input.sessionEvaluation
+              })
+              .eq("learner_id", input.learnerId)
+              .eq("id", input.sessionCaseId)
+              .select(generatedSessionCaseColumns)
+              .maybeSingle()
+        });
 
-      if (error) {
-        throw new Error(error.message);
-      }
+        if (!updated.data) {
+          return null;
+        }
 
-      return data ? decodeGeneratedSessionCaseRowOrThrow(data, "getForLearner") : null;
+        return yield* decodeGeneratedSessionCaseRow(
+          updated.data,
+          "updateReportArtifactsForLearner"
+        );
+      });
     }
   };
 }
@@ -325,50 +355,92 @@ function sourceColumns(sessionSource: SessionSource) {
   return assertNeverSessionSource(sessionSource);
 }
 
-function decodeGeneratedSessionCaseRowOrThrow(
-  row: unknown,
-  operation: "create" | "getForLearner"
-): GeneratedSessionCase {
-  const decodedRow = decodeWithSchemaOrThrow(
-    GeneratedSessionCaseRowSchema,
-    row,
-    operation
-  );
-
-  return {
-    id: decodedRow.id,
-    learnerId: decodedRow.learner_id,
-    sessionSource: decodeSessionSourceOrThrow(decodedRow, operation),
-    openingContext: decodedRow.opening_context,
-    customerPersona: decodedRow.customer_persona,
-    hiddenBackstory: decodedRow.hidden_backstory,
-    customerFit: decodedRow.customer_fit,
-    hiddenTestPlan: decodedRow.hidden_test_plan,
-    personaBehavior: decodedRow.persona_behavior,
-    traps: decodedRow.traps,
-    generationNonce: decodedRow.generation_nonce,
-    generationAudit: decodedRow.generation_audit,
-    createdAt: decodedRow.created_at,
-    sessionLifecycle: {
-      sessionStatus: decodedRow.session_status,
-      endedReason: decodedRow.ended_reason,
-      endedAt: decodedRow.ended_at,
-      reportStatus: decodedRow.report_status,
-      reportReadyAt: decodedRow.report_ready_at
-    },
-    sessionReport: cloneUnknownOrNull<SessionReport>(decodedRow.session_report),
-    sessionTranscript: cloneUnknownOrNull<SessionTranscriptTurn[]>(
-      decodedRow.session_transcript
-    ),
-    sessionEvaluation: cloneUnknownOrNull<SessionEvaluationArtifact>(
-      decodedRow.session_evaluation
+function querySupabase<T>(input: {
+  operation: GeneratedSessionCaseRepositoryOperation;
+  run: () => Promise<{ data: T; error: { message: string } | null }>;
+}): Effect.Effect<
+  { data: T; error: { message: string } | null },
+  GeneratedSessionCaseRepositoryPersistenceError,
+  never
+> {
+  return Effect.tryPromise({
+    try: input.run,
+    catch: (cause) =>
+      new GeneratedSessionCaseRepositoryPersistenceError({
+        operation: input.operation,
+        cause
+      })
+  }).pipe(
+    Effect.flatMap((result) =>
+      result.error
+        ? Effect.fail(
+            new GeneratedSessionCaseRepositoryPersistenceError({
+              operation: input.operation,
+              cause: new Error(result.error.message)
+            })
+          )
+        : Effect.succeed(result)
     )
-  };
+  );
+}
+
+function decodeGeneratedSessionCaseRow(
+  row: unknown,
+  operation: GeneratedSessionCaseRepositoryOperation
+): Effect.Effect<
+  GeneratedSessionCase,
+  GeneratedSessionCaseRepositoryDecodeError,
+  never
+> {
+  return Effect.try({
+    try: () => {
+      const decodedRow = decodeWithSchemaOrThrow(
+        GeneratedSessionCaseRowSchema,
+        row,
+        operation
+      );
+
+      return {
+        id: decodedRow.id,
+        learnerId: decodedRow.learner_id,
+        sessionSource: decodeSessionSourceOrThrow(decodedRow, operation),
+        openingContext: decodedRow.opening_context,
+        customerPersona: decodedRow.customer_persona,
+        hiddenBackstory: decodedRow.hidden_backstory,
+        customerFit: decodedRow.customer_fit,
+        hiddenTestPlan: decodedRow.hidden_test_plan,
+        personaBehavior: decodedRow.persona_behavior,
+        traps: decodedRow.traps,
+        generationNonce: decodedRow.generation_nonce,
+        generationAudit: decodedRow.generation_audit,
+        createdAt: decodedRow.created_at,
+        sessionLifecycle: {
+          sessionStatus: decodedRow.session_status,
+          endedReason: decodedRow.ended_reason,
+          endedAt: decodedRow.ended_at,
+          reportStatus: decodedRow.report_status,
+          reportReadyAt: decodedRow.report_ready_at
+        },
+        sessionReport: cloneUnknownOrNull<SessionReport>(decodedRow.session_report),
+        sessionTranscript: cloneUnknownOrNull<SessionTranscriptTurn[]>(
+          decodedRow.session_transcript
+        ),
+        sessionEvaluation: cloneUnknownOrNull<SessionEvaluationArtifact>(
+          decodedRow.session_evaluation
+        )
+      };
+    },
+    catch: (cause) =>
+      new GeneratedSessionCaseRepositoryDecodeError({
+        operation,
+        cause
+      })
+  });
 }
 
 function decodeSessionSourceOrThrow(
   row: GeneratedSessionCaseRow,
-  operation: "create" | "getForLearner"
+  operation: GeneratedSessionCaseRepositoryOperation
 ): SessionSource {
   if (row.source_kind === "active-ideal-customer-profile") {
     const decodedSnapshot = decodeWithSchemaOrThrow(
@@ -405,7 +477,7 @@ function readBroadPracticeLabel(sourceSnapshot: unknown): unknown {
 function decodeWithSchemaOrThrow<T, I>(
   schema: Schema.Schema<T, I, never>,
   value: unknown,
-  operation: "create" | "getForLearner"
+  operation: GeneratedSessionCaseRepositoryOperation
 ): T {
   const decoded = Schema.decodeUnknownEither(schema)(
     normalizeNullOptionalTextFields(value)

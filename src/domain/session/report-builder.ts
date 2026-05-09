@@ -1,4 +1,5 @@
 import type { GeneratedSessionCase } from "./generated-session-case";
+import { Effect } from "effect";
 import type { SessionEvaluationArtifact } from "./session-evaluation";
 import type {
   PersonaEvidenceRef,
@@ -20,47 +21,49 @@ export type ReportBuilder = {
     generatedSessionCase: GeneratedSessionCase;
     transcript: SessionTranscriptTurn[];
     evaluation: SessionEvaluationArtifact;
-  }): Promise<ReportBuilderResult>;
+  }): Effect.Effect<ReportBuilderResult, never, never>;
 };
 
 export function createDeterministicReportBuilder(): ReportBuilder {
   return {
-    async buildFromEvaluation({ generatedSessionCase, transcript, evaluation }) {
-      if (transcript.length === 0 || evaluation.learningSignal.evidence.length === 0) {
-        return { status: "insufficient-evidence" };
-      }
+    buildFromEvaluation({ generatedSessionCase, transcript, evaluation }) {
+      return Effect.sync(() => {
+        if (transcript.length === 0 || evaluation.learningSignal.evidence.length === 0) {
+          return { status: "insufficient-evidence" } satisfies ReportBuilderResult;
+        }
 
-      const report: SessionReport = {
-        outcome: {
-          summary: `Session ended with reason: ${generatedSessionCase.sessionLifecycle.endedReason}. ${evaluation.learningSignal.summary}`
-        },
-        missedSignals: buildMissedSignals(evaluation),
-        badQuestions: buildBadQuestions(evaluation),
-        strongQuestions: buildStrongQuestions(evaluation),
-        trapResults: evaluation.trapResults.map((trapResult) => ({
-          trapLabel: trapResult.trapLabel,
-          outcome: trapResult.outcome,
-          detail: trapResult.detail,
-          evidence: trapResult.evidence
-        })),
-        skillMovement: buildSkillMovement(evaluation),
-        nextPracticeFocus: {
-          title: "Ask behavior-first discovery follow-ups",
-          description:
-            "When social signals appear, ask for concrete customer history before discussing solutions."
-        },
-        sourceContext:
-          generatedSessionCase.sessionSource.kind === "active-ideal-customer-profile"
-            ? generatedSessionCase.sessionSource.idealCustomerProfile.name
-            : generatedSessionCase.sessionSource.label,
-        lightPersonaLabel: generatedSessionCase.customerPersona.lightPersonaLabel,
-        expandableEvidence: takeEvidence(evaluation)
-      };
+        const report: SessionReport = {
+          outcome: {
+            summary: `Session ended with reason: ${generatedSessionCase.sessionLifecycle.endedReason}. ${evaluation.learningSignal.summary}`
+          },
+          missedSignals: buildMissedSignals(evaluation),
+          badQuestions: buildBadQuestions(evaluation),
+          strongQuestions: buildStrongQuestions(evaluation),
+          trapResults: evaluation.trapResults.map((trapResult) => ({
+            trapLabel: trapResult.trapLabel,
+            outcome: trapResult.outcome,
+            detail: trapResult.detail,
+            evidence: trapResult.evidence
+          })),
+          skillMovement: buildSkillMovement(evaluation),
+          nextPracticeFocus: {
+            title: "Ask behavior-first discovery follow-ups",
+            description:
+              "When social signals appear, ask for concrete customer history before discussing solutions."
+          },
+          sourceContext:
+            generatedSessionCase.sessionSource.kind === "active-ideal-customer-profile"
+              ? generatedSessionCase.sessionSource.idealCustomerProfile.name
+              : generatedSessionCase.sessionSource.label,
+          lightPersonaLabel: generatedSessionCase.customerPersona.lightPersonaLabel,
+          expandableEvidence: takeEvidence(evaluation)
+        };
 
-      return {
-        status: "ready",
-        report
-      };
+        return {
+          status: "ready",
+          report
+        } satisfies ReportBuilderResult;
+      });
     }
   };
 }

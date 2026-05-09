@@ -122,10 +122,17 @@ function resolvePracticeRouteDecisionEffect(
       } satisfies PracticeRouteDecision;
     }
 
-    const generatedSessionCase = yield* tryDependency(
-      "generatedSessionCaseRepository.getForLearner",
-      () => context.generatedSessionCaseRepository.getForLearner(context.learnerId, sessionId)
-    );
+    const generatedSessionCase = yield* context.generatedSessionCaseRepository
+      .getForLearner(context.learnerId, sessionId)
+      .pipe(
+        Effect.mapError(
+          (cause) =>
+            new PracticeRouteDecisionDependencyError({
+              operation: "generatedSessionCaseRepository.getForLearner",
+              cause
+            })
+        )
+      );
 
     if (!generatedSessionCase) {
       return { action: "not-found" } satisfies PracticeRouteDecision;

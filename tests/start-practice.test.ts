@@ -7,6 +7,7 @@ import type {
   PersonaGenerator
 } from "../src/domain/persona/persona-generation";
 import { createInMemoryGeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
+import { Effect } from "effect";
 
 const learnerId = "learner-1";
 
@@ -40,9 +41,8 @@ describe("Start Practice", () => {
       }
     ]);
 
-    const persisted = await generatedSessionCases.getForLearner(
-      learnerId,
-      started.sessionId
+    const persisted = await Effect.runPromise(
+      generatedSessionCases.getForLearner(learnerId, started.sessionId)
     );
     expect(persisted).toMatchObject({
       id: "session-case-1",
@@ -102,7 +102,9 @@ describe("Start Practice", () => {
       }
     });
     await expect(
-      generatedSessionCases.getForLearner(learnerId, started.sessionId)
+      Effect.runPromise(
+        generatedSessionCases.getForLearner(learnerId, started.sessionId)
+      )
     ).resolves.toMatchObject({
       sessionSource: {
         kind: "active-ideal-customer-profile",
@@ -156,10 +158,14 @@ describe("Start Practice", () => {
       ["nonce-a", "nonce-b"]
     );
     await expect(
-      generatedSessionCases.getForLearner(learnerId, first.sessionId)
+      Effect.runPromise(
+        generatedSessionCases.getForLearner(learnerId, first.sessionId)
+      )
     ).resolves.toMatchObject({ generationNonce: "nonce-a" });
     await expect(
-      generatedSessionCases.getForLearner(learnerId, second.sessionId)
+      Effect.runPromise(
+        generatedSessionCases.getForLearner(learnerId, second.sessionId)
+      )
     ).resolves.toMatchObject({ generationNonce: "nonce-b" });
   });
 });

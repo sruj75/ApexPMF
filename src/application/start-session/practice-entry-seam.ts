@@ -4,7 +4,6 @@ import {
   type NonLiveLlmRuntimePolicy
 } from "@/src/application/non-live-llm-policy";
 import { createSessionOrchestrator } from "@/src/application/end-session/session-orchestrator";
-import type { SessionOrchestrator } from "@/src/application/end-session/session-orchestrator";
 import { createReportGenerationCoordinator } from "@/src/application/generate-report/report-generation-coordinator";
 import type { SessionEndReason } from "@/src/domain/session/session-lifecycle";
 import { startPracticeForLearner } from "@/src/application/start-session/start-practice";
@@ -12,6 +11,7 @@ import {
   getSupabaseLearnerEntryContext,
   type SupabaseLearnerEntryContextResult
 } from "@/src/infrastructure/supabase/learner-entry-context";
+import { Either, Effect } from "effect";
 
 export type LearnerEntryContextResult =
   | {
@@ -55,10 +55,23 @@ export type LearnerSessionRuntimeResult =
       endSessionForLearner(input: {
         sessionId: string;
         reason: SessionEndReason;
-      }): ReturnType<SessionOrchestrator["endSessionForLearner"]>;
+      }): Promise<{
+        nextPath: string;
+        sessionStatus: "ended";
+        endedReason: SessionEndReason;
+        reportStatus: "not-requested" | "generating" | "ready" | "insufficient-evidence";
+      }>;
       runReportGeneratingFlowForLearner(input: {
         sessionId: string;
-      }): ReturnType<SessionOrchestrator["runReportGeneratingFlowForLearner"]>;
+      }): Promise<
+        | {
+            reportStatus: "not-found";
+          }
+        | {
+            reportStatus: "ready" | "insufficient-evidence";
+            nextPath: string;
+          }
+      >;
     };
 
 /**
@@ -81,19 +94,33 @@ export async function getLearnerSessionRuntime(): Promise<LearnerSessionRuntimeR
   return {
     ok: true,
     endSessionForLearner({ sessionId, reason }) {
-      return orchestrator.endSessionForLearner({
-        learnerId,
-        sessionId,
-        reason
-      });
+      return runEffect(
+        orchestrator.endSessionForLearner({
+          learnerId,
+          sessionId,
+          reason
+        })
+      );
     },
     runReportGeneratingFlowForLearner({ sessionId }) {
-      return orchestrator.runReportGeneratingFlowForLearner({
-        learnerId,
-        sessionId
-      });
+      return runEffect(
+        orchestrator.runReportGeneratingFlowForLearner({
+          learnerId,
+          sessionId
+        })
+      );
     }
   };
+}
+
+async function runEffect<Success, Error>(
+  effect: Effect.Effect<Success, Error, never>
+): Promise<Success> {
+  const result = await Effect.runPromise(Effect.either(effect));
+  if (Either.isLeft(result)) {
+    throw result.left;
+  }
+  return result.right;
 }
 
 export async function startPracticeFromEntryContext(context: {

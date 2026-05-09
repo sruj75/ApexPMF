@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Effect } from "effect";
 
 const {
   getSupabaseLearnerEntryContext,
@@ -42,16 +43,20 @@ describe("Learner session runtime seam", () => {
   });
 
   it("returns learner-scoped runtime actions for authenticated learners", async () => {
-    const endSessionForLearner = vi.fn(async () => ({
-      nextPath: "/dashboard",
-      sessionStatus: "ended" as const,
-      endedReason: "user-quit" as const,
-      reportStatus: "insufficient-evidence" as const
-    }));
-    const runReportGeneratingFlowForLearner = vi.fn(async () => ({
-      reportStatus: "ready" as const,
-      nextPath: "/practice/session-case-1/report"
-    }));
+    const endSessionForLearner = vi.fn(() =>
+      Effect.succeed({
+        nextPath: "/dashboard",
+        sessionStatus: "ended" as const,
+        endedReason: "user-quit" as const,
+        reportStatus: "insufficient-evidence" as const
+      })
+    );
+    const runReportGeneratingFlowForLearner = vi.fn(() =>
+      Effect.succeed({
+        reportStatus: "ready" as const,
+        nextPath: "/practice/session-case-1/report"
+      })
+    );
 
     getSupabaseLearnerEntryContext.mockResolvedValue({
       ok: true,

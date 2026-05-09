@@ -9,6 +9,7 @@ import {
 } from "../src/application/non-live-llm-policy";
 import { EntryFailure } from "../src/application/start-session/entry-failure";
 import { OpenRouterProviderError } from "../src/infrastructure/llm/openrouter";
+import { Effect } from "effect";
 
 describe("Non-live LLM policy", () => {
   it("returns unavailable when OPENROUTER_API_KEY is missing", () => {
@@ -115,10 +116,11 @@ describe("Non-live LLM policy", () => {
       }
     };
     const hiddenEvaluationEngine = {
-      evaluateEndedSession: async () => ({
-        status: "insufficient-evidence" as const,
-        reason: "provider-failure" as const
-      })
+      evaluateEndedSession: () =>
+        Effect.succeed({
+          status: "insufficient-evidence" as const,
+          reason: "provider-failure" as const
+        })
     };
     const createPersonaGenerator = (input: { chatClient: unknown }) => {
       expect(input.chatClient).toEqual(
@@ -161,10 +163,12 @@ describe("Non-live LLM policy", () => {
 
     const hiddenEvaluationEngine = policy.composeHiddenEvaluationEngine();
     await expect(
-      hiddenEvaluationEngine.evaluateEndedSession({
-        generatedSessionCase: {} as never,
-        transcript: []
-      })
+      Effect.runPromise(
+        hiddenEvaluationEngine.evaluateEndedSession({
+          generatedSessionCase: {} as never,
+          transcript: []
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "provider-failure"

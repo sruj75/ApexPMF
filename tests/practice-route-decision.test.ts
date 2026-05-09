@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Effect } from "effect";
 import {
   resolvePracticeRouteDecision,
   type PracticeRouteDecisionDependencies
@@ -48,7 +49,7 @@ describe("Practice route decision module", () => {
       ok: true,
       learnerId: "learner-1",
       generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () => null)
+        getForLearner: vi.fn(() => Effect.succeed(null))
       }
     });
 
@@ -68,15 +69,17 @@ describe("Practice route decision module", () => {
       ok: true,
       learnerId: "learner-1",
       generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () =>
-          makeGeneratedSessionCase({
-            id: defaultPracticeSessionId,
-            sessionLifecycle: {
-              sessionStatus: "ended",
-              endedReason: "natural-conclusion",
-              reportStatus: "generating"
-            }
-          })
+        getForLearner: vi.fn(() =>
+          Effect.succeed(
+            makeGeneratedSessionCase({
+              id: defaultPracticeSessionId,
+              sessionLifecycle: {
+                sessionStatus: "ended",
+                endedReason: "natural-conclusion",
+                reportStatus: "generating"
+              }
+            })
+          )
         )
       }
     });
@@ -100,18 +103,20 @@ describe("Practice route decision module", () => {
       ok: true,
       learnerId: "learner-1",
       generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () =>
-          makeGeneratedSessionCase({
-            id: defaultPracticeSessionId,
-            sessionLifecycle: {
-              sessionStatus: "ended",
-              endedReason: "natural-conclusion",
-              reportStatus: "ready"
-            },
-            sessionReport: makeSessionReport(),
-            sessionTranscript: [{ sequence: 1, speaker: "learner", text: "What changed?" }],
-            sessionEvaluation: makeSessionEvaluation()
-          })
+        getForLearner: vi.fn(() =>
+          Effect.succeed(
+            makeGeneratedSessionCase({
+              id: defaultPracticeSessionId,
+              sessionLifecycle: {
+                sessionStatus: "ended",
+                endedReason: "natural-conclusion",
+                reportStatus: "ready"
+              },
+              sessionReport: makeSessionReport(),
+              sessionTranscript: [{ sequence: 1, speaker: "learner", text: "What changed?" }],
+              sessionEvaluation: makeSessionEvaluation()
+            })
+          )
         )
       }
     });
@@ -135,13 +140,15 @@ describe("Practice route decision module", () => {
       ok: true,
       learnerId: "learner-1",
       generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () =>
-          makeGeneratedSessionCase({
-            id: defaultPracticeSessionId,
-            sessionLifecycle: {
-              sessionStatus: "voice-conversation"
-            }
-          })
+        getForLearner: vi.fn(() =>
+          Effect.succeed(
+            makeGeneratedSessionCase({
+              id: defaultPracticeSessionId,
+              sessionLifecycle: {
+                sessionStatus: "voice-conversation"
+              }
+            })
+          )
         )
       }
     });
@@ -170,15 +177,17 @@ describe("Practice route decision module", () => {
       ok: true,
       learnerId: "learner-1",
       generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () =>
-          makeGeneratedSessionCase({
-            id: defaultPracticeSessionId,
-            sessionLifecycle: {
-              sessionStatus: "ended",
-              endedReason: "credit-exhaustion",
-              reportStatus: "generating"
-            }
-          })
+        getForLearner: vi.fn(() =>
+          Effect.succeed(
+            makeGeneratedSessionCase({
+              id: defaultPracticeSessionId,
+              sessionLifecycle: {
+                sessionStatus: "ended",
+                endedReason: "credit-exhaustion",
+                reportStatus: "generating"
+              }
+            })
+          )
         )
       }
     });
@@ -202,15 +211,17 @@ describe("Practice route decision module", () => {
       ok: true,
       learnerId: "learner-1",
       generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () =>
-          makeGeneratedSessionCase({
-            id: defaultPracticeSessionId,
-            sessionLifecycle: {
-              sessionStatus: "ended",
-              endedReason: "user-quit",
-              reportStatus: "insufficient-evidence"
-            }
-          })
+        getForLearner: vi.fn(() =>
+          Effect.succeed(
+            makeGeneratedSessionCase({
+              id: defaultPracticeSessionId,
+              sessionLifecycle: {
+                sessionStatus: "ended",
+                endedReason: "user-quit",
+                reportStatus: "insufficient-evidence"
+              }
+            })
+          )
         )
       }
     });
@@ -234,18 +245,20 @@ describe("Practice route decision module", () => {
       ok: true,
       learnerId: "learner-1",
       generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () =>
-          makeGeneratedSessionCase({
-            id: defaultPracticeSessionId,
-            sessionLifecycle: {
-              sessionStatus: "ended",
-              endedReason: "natural-conclusion",
-              reportStatus: "ready"
-            },
-            sessionReport: makeSessionReport(),
-            sessionTranscript: null,
-            sessionEvaluation: makeSessionEvaluation()
-          })
+        getForLearner: vi.fn(() =>
+          Effect.succeed(
+            makeGeneratedSessionCase({
+              id: defaultPracticeSessionId,
+              sessionLifecycle: {
+                sessionStatus: "ended",
+                endedReason: "natural-conclusion",
+                reportStatus: "ready"
+              },
+              sessionReport: makeSessionReport(),
+              sessionTranscript: null,
+              sessionEvaluation: makeSessionEvaluation()
+            })
+          )
         )
       }
     });
@@ -269,18 +282,20 @@ describe("Practice route decision module", () => {
       ok: true,
       learnerId: "learner-1",
       generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () =>
-          makeGeneratedSessionCase({
-            id: defaultPracticeSessionId,
-            sessionLifecycle: {
-              sessionStatus: "ended",
-              endedReason: "natural-conclusion",
-              reportStatus: "ready"
-            },
-            sessionReport: makeSessionReport(),
-            sessionTranscript: [{ sequence: 1, speaker: "learner", text: "What changed?" }],
-            sessionEvaluation: makeSessionEvaluation()
-          })
+        getForLearner: vi.fn(() =>
+          Effect.succeed(
+            makeGeneratedSessionCase({
+              id: defaultPracticeSessionId,
+              sessionLifecycle: {
+                sessionStatus: "ended",
+                endedReason: "natural-conclusion",
+                reportStatus: "ready"
+              },
+              sessionReport: makeSessionReport(),
+              sessionTranscript: [{ sequence: 1, speaker: "learner", text: "What changed?" }],
+              sessionEvaluation: makeSessionEvaluation()
+            })
+          )
         )
       }
     });
@@ -402,11 +417,13 @@ function makeDependencies(): PracticeRouteDecisionDependencies {
       ok: true,
       learnerId: "learner-1",
       generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () =>
-          makeGeneratedSessionCase({
-            id: defaultPracticeSessionId,
-            sessionLifecycle: { sessionStatus: "voice-conversation" }
-          })
+        getForLearner: vi.fn(() =>
+          Effect.succeed(
+            makeGeneratedSessionCase({
+              id: defaultPracticeSessionId,
+              sessionLifecycle: { sessionStatus: "voice-conversation" }
+            })
+          )
         )
       }
     })),

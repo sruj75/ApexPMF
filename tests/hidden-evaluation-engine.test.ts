@@ -7,6 +7,7 @@ import {
 } from "../src/domain/session/hidden-evaluation-prompt-source";
 import type { GeneratedSessionCase } from "../src/domain/session/generated-session-case";
 import type { SessionTranscriptTurn } from "../src/domain/session/session-report";
+import { Effect } from "effect";
 
 describe("Hidden Evaluation engine", () => {
   it("returns ready from LLM judge JSON for ended non-quit sessions with >=5 turns", async () => {
@@ -21,10 +22,12 @@ describe("Hidden Evaluation engine", () => {
       judge
     });
 
-    const result = await engine.evaluateEndedSession({
-      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-      transcript: makeTranscript()
-    });
+    const result = await Effect.runPromise(
+      engine.evaluateEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+        transcript: makeTranscript()
+      })
+    );
 
     expect(result.status).toBe("ready");
     if (result.status !== "ready") {
@@ -48,10 +51,12 @@ describe("Hidden Evaluation engine", () => {
 
     const userQuitCase = makeGeneratedSessionCase("user-quit");
     await expect(
-      engine.evaluateEndedSession({
-        generatedSessionCase: userQuitCase,
-        transcript: makeTranscript()
-      })
+      Effect.runPromise(
+        engine.evaluateEndedSession({
+          generatedSessionCase: userQuitCase,
+          transcript: makeTranscript()
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "user-quit"
@@ -65,30 +70,36 @@ describe("Hidden Evaluation engine", () => {
       endedAt: null
     };
     await expect(
-      engine.evaluateEndedSession({
-        generatedSessionCase: notEndedCase,
-        transcript: makeTranscript()
-      })
+      Effect.runPromise(
+        engine.evaluateEndedSession({
+          generatedSessionCase: notEndedCase,
+          transcript: makeTranscript()
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "not-ended"
     });
 
     await expect(
-      engine.evaluateEndedSession({
-        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-        transcript: makeTranscript().slice(0, 4)
-      })
+      Effect.runPromise(
+        engine.evaluateEndedSession({
+          generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+          transcript: makeTranscript().slice(0, 4)
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "transcript-too-short"
     });
 
     await expect(
-      engine.evaluateEndedSession({
-        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-        transcript: makeLearnerOnlyTranscript()
-      })
+      Effect.runPromise(
+        engine.evaluateEndedSession({
+          generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+          transcript: makeLearnerOnlyTranscript()
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "transcript-missing-speakers"
@@ -119,10 +130,12 @@ describe("Hidden Evaluation engine", () => {
     });
 
     await expect(
-      engine.evaluateEndedSession({
-        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-        transcript: makeTranscript()
-      })
+      Effect.runPromise(
+        engine.evaluateEndedSession({
+          generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+          transcript: makeTranscript()
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "invalid-judge-output"
@@ -142,10 +155,12 @@ describe("Hidden Evaluation engine", () => {
     });
 
     await expect(
-      engine.evaluateEndedSession({
-        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-        transcript: makeTranscript()
-      })
+      Effect.runPromise(
+        engine.evaluateEndedSession({
+          generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+          transcript: makeTranscript()
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "provider-failure"
@@ -170,10 +185,12 @@ describe("Hidden Evaluation engine", () => {
       promptSource
     });
 
-    await engine.evaluateEndedSession({
-      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-      transcript: makeTranscript()
-    });
+    await Effect.runPromise(
+      engine.evaluateEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+        transcript: makeTranscript()
+      })
+    );
 
     expect(judge.createStructuredJsonCompletion).toHaveBeenCalledTimes(1);
     const firstRequest = judge.createStructuredJsonCompletion.mock.calls[0]?.[0];
@@ -210,10 +227,12 @@ describe("Hidden Evaluation engine", () => {
       })
     });
 
-    await engine.evaluateEndedSession({
-      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-      transcript: makeTranscript()
-    });
+    await Effect.runPromise(
+      engine.evaluateEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+        transcript: makeTranscript()
+      })
+    );
 
     expect(judge.createStructuredJsonCompletion).toHaveBeenCalledTimes(2);
     const secondRequest = judge.createStructuredJsonCompletion.mock.calls[1]?.[0];
@@ -246,10 +265,12 @@ describe("Hidden Evaluation engine", () => {
       promptSource
     });
 
-    await engine.evaluateEndedSession({
-      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-      transcript: makeTranscript()
-    });
+    await Effect.runPromise(
+      engine.evaluateEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+        transcript: makeTranscript()
+      })
+    );
 
     const firstRequest = judge.createStructuredJsonCompletion.mock.calls[0]?.[0];
     expect(firstRequest?.messages[0]?.content).toBe("FALLBACK SYSTEM");

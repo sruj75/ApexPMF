@@ -2,6 +2,7 @@ import { afterAll, describe, expect, it, vi } from "vitest";
 import { createReportGenerationCoordinator } from "../src/application/generate-report/report-generation-coordinator";
 import type { NonLiveLlmRuntimePolicy } from "../src/application/non-live-llm-policy";
 import type { GeneratedSessionCase } from "../src/domain/session/generated-session-case";
+import { Effect } from "effect";
 
 const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
 
@@ -12,16 +13,20 @@ describe("Report generation coordinator", () => {
 
   it("uses real transcript and returns ready artifacts when judge and report builder succeed", async () => {
     const hiddenEvaluationEngine = {
-      evaluateEndedSession: vi.fn(async () => ({
-        status: "ready" as const,
-        evaluation: makeEvaluation()
-      }))
+      evaluateEndedSession: vi.fn(() =>
+        Effect.succeed({
+          status: "ready" as const,
+          evaluation: makeEvaluation()
+        })
+      )
     };
     const reportBuilder = {
-      buildFromEvaluation: vi.fn(async () => ({
-        status: "ready" as const,
-        report: makeReport()
-      }))
+      buildFromEvaluation: vi.fn(() =>
+        Effect.succeed({
+          status: "ready" as const,
+          report: makeReport()
+        })
+      )
     };
 
     const coordinator = createReportGenerationCoordinator({
@@ -30,9 +35,11 @@ describe("Report generation coordinator", () => {
     });
 
     const generatedSessionCase = makeGeneratedSessionCase("natural-conclusion");
-    const result = await coordinator.generateForEndedSession({
-      generatedSessionCase
-    });
+    const result = await Effect.runPromise(
+      coordinator.generateForEndedSession({
+        generatedSessionCase
+      })
+    );
 
     expect(result.status).toBe("ready");
     if (result.status !== "ready") {
@@ -48,26 +55,32 @@ describe("Report generation coordinator", () => {
   it("returns insufficient-evidence when transcript is missing or too short", async () => {
     const coordinator = createReportGenerationCoordinator({
       hiddenEvaluationEngine: {
-        evaluateEndedSession: vi.fn(async () => ({
-          status: "ready" as const,
-          evaluation: makeEvaluation()
-        }))
+        evaluateEndedSession: vi.fn(() =>
+          Effect.succeed({
+            status: "ready" as const,
+            evaluation: makeEvaluation()
+          })
+        )
       },
       reportBuilder: {
-        buildFromEvaluation: vi.fn(async () => ({
-          status: "ready" as const,
-          report: makeReport()
-        }))
+        buildFromEvaluation: vi.fn(() =>
+          Effect.succeed({
+            status: "ready" as const,
+            report: makeReport()
+          })
+        )
       }
     });
 
     await expect(
-      coordinator.generateForEndedSession({
-        generatedSessionCase: {
-          ...makeGeneratedSessionCase("natural-conclusion"),
-          sessionTranscript: null
-        }
-      })
+      Effect.runPromise(
+        coordinator.generateForEndedSession({
+          generatedSessionCase: {
+            ...makeGeneratedSessionCase("natural-conclusion"),
+            sessionTranscript: null
+          }
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "transcript-too-short"
@@ -77,23 +90,29 @@ describe("Report generation coordinator", () => {
   it("passes through typed insufficient reason from hidden evaluation", async () => {
     const coordinator = createReportGenerationCoordinator({
       hiddenEvaluationEngine: {
-        evaluateEndedSession: vi.fn(async () => ({
-          status: "insufficient-evidence" as const,
-          reason: "invalid-judge-output" as const
-        }))
+        evaluateEndedSession: vi.fn(() =>
+          Effect.succeed({
+            status: "insufficient-evidence" as const,
+            reason: "invalid-judge-output" as const
+          })
+        )
       },
       reportBuilder: {
-        buildFromEvaluation: vi.fn(async () => ({
-          status: "ready" as const,
-          report: makeReport()
-        }))
+        buildFromEvaluation: vi.fn(() =>
+          Effect.succeed({
+            status: "ready" as const,
+            report: makeReport()
+          })
+        )
       }
     });
 
     await expect(
-      coordinator.generateForEndedSession({
-        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion")
-      })
+      Effect.runPromise(
+        coordinator.generateForEndedSession({
+          generatedSessionCase: makeGeneratedSessionCase("natural-conclusion")
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "invalid-judge-output"
@@ -103,23 +122,29 @@ describe("Report generation coordinator", () => {
   it("passes through provider-failure reason from hidden evaluation", async () => {
     const coordinator = createReportGenerationCoordinator({
       hiddenEvaluationEngine: {
-        evaluateEndedSession: vi.fn(async () => ({
-          status: "insufficient-evidence" as const,
-          reason: "provider-failure" as const
-        }))
+        evaluateEndedSession: vi.fn(() =>
+          Effect.succeed({
+            status: "insufficient-evidence" as const,
+            reason: "provider-failure" as const
+          })
+        )
       },
       reportBuilder: {
-        buildFromEvaluation: vi.fn(async () => ({
-          status: "ready" as const,
-          report: makeReport()
-        }))
+        buildFromEvaluation: vi.fn(() =>
+          Effect.succeed({
+            status: "ready" as const,
+            report: makeReport()
+          })
+        )
       }
     });
 
     await expect(
-      coordinator.generateForEndedSession({
-        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion")
-      })
+      Effect.runPromise(
+        coordinator.generateForEndedSession({
+          generatedSessionCase: makeGeneratedSessionCase("natural-conclusion")
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "provider-failure"
@@ -131,9 +156,11 @@ describe("Report generation coordinator", () => {
     const coordinator = createReportGenerationCoordinator();
 
     await expect(
-      coordinator.generateForEndedSession({
-        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion")
-      })
+      Effect.runPromise(
+        coordinator.generateForEndedSession({
+          generatedSessionCase: makeGeneratedSessionCase("natural-conclusion")
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "provider-failure"
@@ -141,12 +168,16 @@ describe("Report generation coordinator", () => {
   });
 
   it("uses injected non-live runtime policy to compose hidden evaluation engine", async () => {
-    const evaluateEndedSession = vi.fn(async () => ({
-      status: "insufficient-evidence" as const,
-      reason: "provider-failure" as const
-    }));
+    const evaluateEndedSession = vi.fn(() =>
+      Effect.succeed({
+        status: "insufficient-evidence" as const,
+        reason: "provider-failure" as const
+      })
+    );
     const nonLiveLlmRuntimePolicy: NonLiveLlmRuntimePolicy = {
-      composePersonaGenerator: () => ({ generateSessionCase: async () => makeGeneratedSessionCase("natural-conclusion") }),
+      composePersonaGenerator: () => ({
+        generateSessionCase: async () => makeGeneratedSessionCase("natural-conclusion")
+      }),
       composeHiddenEvaluationEngine: () => ({
         evaluateEndedSession
       }),
@@ -158,9 +189,11 @@ describe("Report generation coordinator", () => {
       nonLiveLlmRuntimePolicy
     });
 
-    const result = await coordinator.generateForEndedSession({
-      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion")
-    });
+    const result = await Effect.runPromise(
+      coordinator.generateForEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion")
+      })
+    );
 
     expect(evaluateEndedSession).toHaveBeenCalledTimes(1);
     expect(result).toEqual({

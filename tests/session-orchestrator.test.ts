@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createSessionOrchestrator } from "../src/application/end-session/session-orchestrator";
 import { createInMemoryGeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
 import type { GeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
+import { Effect } from "effect";
 
 const learnerId = "learner-1";
 
@@ -11,18 +12,20 @@ describe("Session Orchestrator", () => {
     const orchestrator = createSessionOrchestrator({
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
-        async generateForEndedSession() {
-          return makeReadyReportGenerationResult();
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
         }
       }
     });
 
     await expect(
-      orchestrator.endSessionForLearner({
-        learnerId,
-        sessionId: sessionIds.userQuit,
-        reason: "user-quit"
-      })
+      Effect.runPromise(
+        orchestrator.endSessionForLearner({
+          learnerId,
+          sessionId: sessionIds.userQuit,
+          reason: "user-quit"
+        })
+      )
     ).resolves.toMatchObject({
       nextPath: "/dashboard",
       sessionStatus: "ended",
@@ -30,11 +33,13 @@ describe("Session Orchestrator", () => {
     });
 
     await expect(
-      orchestrator.endSessionForLearner({
-        learnerId,
-        sessionId: sessionIds.naturalConclusion,
-        reason: "natural-conclusion"
-      })
+      Effect.runPromise(
+        orchestrator.endSessionForLearner({
+          learnerId,
+          sessionId: sessionIds.naturalConclusion,
+          reason: "natural-conclusion"
+        })
+      )
     ).resolves.toMatchObject({
       nextPath: `/practice/${sessionIds.naturalConclusion}/report-generating`,
       sessionStatus: "ended",
@@ -43,11 +48,13 @@ describe("Session Orchestrator", () => {
     });
 
     await expect(
-      orchestrator.endSessionForLearner({
-        learnerId,
-        sessionId: sessionIds.timeCap,
-        reason: "60-minute cap"
-      })
+      Effect.runPromise(
+        orchestrator.endSessionForLearner({
+          learnerId,
+          sessionId: sessionIds.timeCap,
+          reason: "60-minute cap"
+        })
+      )
     ).resolves.toMatchObject({
       nextPath: `/practice/${sessionIds.timeCap}/report-generating`,
       sessionStatus: "ended",
@@ -56,11 +63,13 @@ describe("Session Orchestrator", () => {
     });
 
     await expect(
-      orchestrator.endSessionForLearner({
-        learnerId,
-        sessionId: sessionIds.creditExhaustion,
-        reason: "credit-exhaustion"
-      })
+      Effect.runPromise(
+        orchestrator.endSessionForLearner({
+          learnerId,
+          sessionId: sessionIds.creditExhaustion,
+          reason: "credit-exhaustion"
+        })
+      )
     ).resolves.toMatchObject({
       nextPath: `/practice/${sessionIds.creditExhaustion}/report-generating`,
       sessionStatus: "ended",
@@ -69,11 +78,13 @@ describe("Session Orchestrator", () => {
     });
 
     await expect(
-      orchestrator.endSessionForLearner({
-        learnerId,
-        sessionId: sessionIds.voiceFailure,
-        reason: "voice-failure"
-      })
+      Effect.runPromise(
+        orchestrator.endSessionForLearner({
+          learnerId,
+          sessionId: sessionIds.voiceFailure,
+          reason: "voice-failure"
+        })
+      )
     ).resolves.toMatchObject({
       nextPath: `/practice/${sessionIds.voiceFailure}/report-generating`,
       sessionStatus: "ended",
@@ -87,17 +98,19 @@ describe("Session Orchestrator", () => {
     const orchestrator = createSessionOrchestrator({
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
-        async generateForEndedSession() {
-          return makeReadyReportGenerationResult();
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
         }
       }
     });
 
-    const outcome = await orchestrator.handleVoiceFailureForLearner({
-      learnerId,
-      sessionId: sessionIds.voiceFailure,
-      recoverable: true
-    });
+    const outcome = await Effect.runPromise(
+      orchestrator.handleVoiceFailureForLearner({
+        learnerId,
+        sessionId: sessionIds.voiceFailure,
+        recoverable: true
+      })
+    );
 
     expect(outcome).toEqual({
       behavior: "resume-voice-conversation",
@@ -111,18 +124,20 @@ describe("Session Orchestrator", () => {
     const orchestrator = createSessionOrchestrator({
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
-        async generateForEndedSession() {
-          return makeReadyReportGenerationResult();
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
         }
       }
     });
 
     await expect(
-      orchestrator.handleVoiceFailureForLearner({
-        learnerId,
-        sessionId: sessionIds.voiceFailure,
-        recoverable: false
-      })
+      Effect.runPromise(
+        orchestrator.handleVoiceFailureForLearner({
+          learnerId,
+          sessionId: sessionIds.voiceFailure,
+          recoverable: false
+        })
+      )
     ).resolves.toEqual({
       behavior: "end-session",
       nextPath: `/practice/${sessionIds.voiceFailure}/report-generating`
@@ -134,23 +149,27 @@ describe("Session Orchestrator", () => {
     const orchestrator = createSessionOrchestrator({
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
-        async generateForEndedSession() {
-          return makeReadyReportGenerationResult();
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
         }
       }
     });
 
-    await orchestrator.endSessionForLearner({
-      learnerId,
-      sessionId: sessionIds.naturalConclusion,
-      reason: "natural-conclusion"
-    });
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion,
+        reason: "natural-conclusion"
+      })
+    );
 
     await expect(
-      orchestrator.runReportGeneratingFlowForLearner({
-        learnerId,
-        sessionId: sessionIds.naturalConclusion
-      })
+      Effect.runPromise(
+        orchestrator.runReportGeneratingFlowForLearner({
+          learnerId,
+          sessionId: sessionIds.naturalConclusion
+        })
+      )
     ).resolves.toEqual({
       reportStatus: "ready",
       nextPath: `/practice/${sessionIds.naturalConclusion}/report`
@@ -163,24 +182,28 @@ describe("Session Orchestrator", () => {
     const orchestrator = createSessionOrchestrator({
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
-        async generateForEndedSession() {
+        generateForEndedSession() {
           generationCount += 1;
-          return makeReadyReportGenerationResult();
+          return Effect.succeed(makeReadyReportGenerationResult());
         }
       }
     });
 
-    await orchestrator.endSessionForLearner({
-      learnerId,
-      sessionId: sessionIds.userQuit,
-      reason: "user-quit"
-    });
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.userQuit,
+        reason: "user-quit"
+      })
+    );
 
     await expect(
-      orchestrator.runReportGeneratingFlowForLearner({
-        learnerId,
-        sessionId: sessionIds.userQuit
-      })
+      Effect.runPromise(
+        orchestrator.runReportGeneratingFlowForLearner({
+          learnerId,
+          sessionId: sessionIds.userQuit
+        })
+      )
     ).resolves.toEqual({
       reportStatus: "insufficient-evidence",
       nextPath: "/dashboard"
@@ -195,18 +218,20 @@ describe("Session Orchestrator", () => {
     const orchestrator = createSessionOrchestrator({
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
-        async generateForEndedSession() {
+        generateForEndedSession() {
           generationCount += 1;
-          return makeReadyReportGenerationResult();
+          return Effect.succeed(makeReadyReportGenerationResult());
         }
       }
     });
 
     await expect(
-      orchestrator.runReportGeneratingFlowForLearner({
-        learnerId,
-        sessionId: sessionIds.voiceFailure
-      })
+      Effect.runPromise(
+        orchestrator.runReportGeneratingFlowForLearner({
+          learnerId,
+          sessionId: sessionIds.voiceFailure
+        })
+      )
     ).resolves.toEqual({
       reportStatus: "insufficient-evidence",
       nextPath: `/practice/${sessionIds.voiceFailure}`
@@ -220,8 +245,8 @@ describe("Session Orchestrator", () => {
     const orchestrator = createSessionOrchestrator({
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
-        async generateForEndedSession() {
-          return {
+        generateForEndedSession() {
+          return Effect.succeed({
             status: "ready",
             report: {
               outcome: {
@@ -303,25 +328,28 @@ describe("Session Orchestrator", () => {
                 soundingConfident: "not-scored"
               }
             }
-          };
+          });
         }
       }
     });
 
-    await orchestrator.endSessionForLearner({
-      learnerId,
-      sessionId: sessionIds.naturalConclusion,
-      reason: "natural-conclusion"
-    });
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion,
+        reason: "natural-conclusion"
+      })
+    );
 
-    await orchestrator.runReportGeneratingFlowForLearner({
-      learnerId,
-      sessionId: sessionIds.naturalConclusion
-    });
+    await Effect.runPromise(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion
+      })
+    );
 
-    const persisted = await repository.getForLearner(
-      learnerId,
-      sessionIds.naturalConclusion
+    const persisted = await Effect.runPromise(
+      repository.getForLearner(learnerId, sessionIds.naturalConclusion)
     );
 
     expect(persisted?.sessionReport?.outcome.summary).toBe(
@@ -343,26 +371,30 @@ describe("Session Orchestrator", () => {
     const orchestrator = createSessionOrchestrator({
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
-        async generateForEndedSession() {
-          return {
+        generateForEndedSession() {
+          return Effect.succeed({
             status: "insufficient-evidence",
             reason: "invalid-judge-output"
-          };
+          });
         }
       }
     });
 
-    await orchestrator.endSessionForLearner({
-      learnerId,
-      sessionId: sessionIds.creditExhaustion,
-      reason: "credit-exhaustion"
-    });
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.creditExhaustion,
+        reason: "credit-exhaustion"
+      })
+    );
 
     await expect(
-      orchestrator.runReportGeneratingFlowForLearner({
-        learnerId,
-        sessionId: sessionIds.creditExhaustion
-      })
+      Effect.runPromise(
+        orchestrator.runReportGeneratingFlowForLearner({
+          learnerId,
+          sessionId: sessionIds.creditExhaustion
+        })
+      )
     ).resolves.toEqual({
       reportStatus: "insufficient-evidence",
       nextPath: "/dashboard"
@@ -375,48 +407,53 @@ describe("Session Orchestrator", () => {
     const orchestrator = createSessionOrchestrator({
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
-        async generateForEndedSession() {
+        generateForEndedSession() {
           generationCount += 1;
           if (generationCount === 1) {
-            return makeReadyReportGenerationResult();
+            return Effect.succeed(makeReadyReportGenerationResult());
           }
-          return {
+          return Effect.succeed({
             status: "insufficient-evidence",
             reason: "provider-failure"
-          };
+          });
         }
       }
     });
 
-    await orchestrator.endSessionForLearner({
-      learnerId,
-      sessionId: sessionIds.naturalConclusion,
-      reason: "natural-conclusion"
-    });
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion,
+        reason: "natural-conclusion"
+      })
+    );
 
     await expect(
-      orchestrator.runReportGeneratingFlowForLearner({
-        learnerId,
-        sessionId: sessionIds.naturalConclusion
-      })
+      Effect.runPromise(
+        orchestrator.runReportGeneratingFlowForLearner({
+          learnerId,
+          sessionId: sessionIds.naturalConclusion
+        })
+      )
     ).resolves.toEqual({
       reportStatus: "ready",
       nextPath: `/practice/${sessionIds.naturalConclusion}/report`
     });
 
     await expect(
-      orchestrator.runReportGeneratingFlowForLearner({
-        learnerId,
-        sessionId: sessionIds.naturalConclusion
-      })
+      Effect.runPromise(
+        orchestrator.runReportGeneratingFlowForLearner({
+          learnerId,
+          sessionId: sessionIds.naturalConclusion
+        })
+      )
     ).resolves.toEqual({
       reportStatus: "ready",
       nextPath: `/practice/${sessionIds.naturalConclusion}/report`
     });
 
-    const persisted = await repository.getForLearner(
-      learnerId,
-      sessionIds.naturalConclusion
+    const persisted = await Effect.runPromise(
+      repository.getForLearner(learnerId, sessionIds.naturalConclusion)
     );
 
     expect(generationCount).toBe(1);
@@ -431,17 +468,19 @@ describe("Session Orchestrator", () => {
     const orchestrator = createSessionOrchestrator({
       generatedSessionCaseRepository: repository,
       reportGenerationCoordinator: {
-        async generateForEndedSession() {
-          return makeReadyReportGenerationResult();
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
         }
       }
     });
 
     await expect(
-      orchestrator.runReportGeneratingFlowForLearner({
-        learnerId,
-        sessionId: "00000000-0000-4000-8000-000000000001"
-      })
+      Effect.runPromise(
+        orchestrator.runReportGeneratingFlowForLearner({
+          learnerId,
+          sessionId: "00000000-0000-4000-8000-000000000001"
+        })
+      )
     ).resolves.toEqual({
       reportStatus: "not-found"
     });
@@ -482,60 +521,62 @@ async function createSessionCase(
   repository: GeneratedSessionCaseRepository,
   generationNonce: string
 ) {
-  return repository.create(learnerId, {
-    sessionSource: {
-      kind: "broad-practice-pool",
-      label: "Broad Practice Pool"
-    },
-    openingContext: "Opening context",
-    customerPersona: {
-      lightPersonaLabel: "Finance operator",
-      interviewRole: "Controller",
-      publicContext: "Owns reporting",
-      privateConstraints: ["Budget owner is VP Finance"]
-    },
-    hiddenBackstory: "Hidden backstory",
-    customerFit: "strong-fit",
-    hiddenTestPlan: {
-      focusAreas: ["Concrete History"],
-      successSignals: ["Asked about recent attempts"],
-      failureSignals: ["Accepted vague praise"]
-    },
-    personaBehavior: {
-      conversationalFriction: [
-        "hesitation",
-        "rambling",
-        "vague-answers",
-        "mild-discomfort",
-        "interruption",
-        "questions-back"
+  return Effect.runPromise(
+    repository.create(learnerId, {
+      sessionSource: {
+        kind: "broad-practice-pool",
+        label: "Broad Practice Pool"
+      },
+      openingContext: "Opening context",
+      customerPersona: {
+        lightPersonaLabel: "Finance operator",
+        interviewRole: "Controller",
+        publicContext: "Owns reporting",
+        privateConstraints: ["Budget owner is VP Finance"]
+      },
+      hiddenBackstory: "Hidden backstory",
+      customerFit: "strong-fit",
+      hiddenTestPlan: {
+        focusAreas: ["Concrete History"],
+        successSignals: ["Asked about recent attempts"],
+        failureSignals: ["Accepted vague praise"]
+      },
+      personaBehavior: {
+        conversationalFriction: [
+          "hesitation",
+          "rambling",
+          "vague-answers",
+          "mild-discomfort",
+          "interruption",
+          "questions-back"
+        ],
+        weakQuestionSocialSignals: [
+          "politeness",
+          "praise",
+          "speculation",
+          "vague-interest"
+        ],
+        strongQuestionTruthAnchors: [
+          "paid-consultant-attempt",
+          "manual-rebuild-weekend"
+        ],
+        trapDelivery: "natural-hidden"
+      },
+      traps: [
+        {
+          id: "trap-1",
+          label: "Compliment Trap",
+          setup: "Persona praises the pitch.",
+          weakBehavior: "Learner accepts praise as validation."
+        }
       ],
-      weakQuestionSocialSignals: [
-        "politeness",
-        "praise",
-        "speculation",
-        "vague-interest"
-      ],
-      strongQuestionTruthAnchors: [
-        "paid-consultant-attempt",
-        "manual-rebuild-weekend"
-      ],
-      trapDelivery: "natural-hidden"
-    },
-    traps: [
-      {
-        id: "trap-1",
-        label: "Compliment Trap",
-        setup: "Persona praises the pitch.",
-        weakBehavior: "Learner accepts praise as validation."
+      generationNonce,
+      generationAudit: {
+        provider: "test",
+        model: "test-model"
       }
-    ],
-    generationNonce,
-    generationAudit: {
-      provider: "test",
-      model: "test-model"
-    }
-  });
+    })
+  );
 }
 
 function makeReadyReportGenerationResult() {

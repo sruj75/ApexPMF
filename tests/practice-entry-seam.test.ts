@@ -6,6 +6,7 @@ import {
 import type { NonLiveLlmRuntimePolicy } from "../src/application/non-live-llm-policy";
 import { createEntryFailure } from "../src/application/start-session/entry-failure";
 import { OpenRouterProviderError } from "../src/infrastructure/llm/openrouter";
+import { Effect } from "effect";
 
 const { getSupabaseLearnerEntryContext, startPracticeForLearner } = vi.hoisted(
   () => ({
@@ -18,9 +19,15 @@ vi.mock("@/src/infrastructure/supabase/learner-entry-context", () => ({
   getSupabaseLearnerEntryContext
 }));
 
-vi.mock("@/src/application/start-session/start-practice", () => ({
-  startPracticeForLearner
-}));
+vi.mock("@/src/application/start-session/start-practice", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("@/src/application/start-session/start-practice")
+  >();
+  return {
+    ...actual,
+    startPracticeForLearner
+  };
+});
 
 const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
 
@@ -48,9 +55,11 @@ describe("Practice entry seam", () => {
 
   it("returns a started Session id when Start Practice succeeds", async () => {
     process.env.OPENROUTER_API_KEY = "openrouter-key";
-    startPracticeForLearner.mockResolvedValue({
-      sessionId: "session-case-123"
-    });
+    startPracticeForLearner.mockReturnValue(
+      Effect.succeed({
+        sessionId: "session-case-123"
+      })
+    );
 
     const result = await startPracticeFromEntryContext({
       learnerId: "learner-1",
@@ -89,7 +98,9 @@ describe("Practice entry seam", () => {
 
   it("maps downstream Start Practice failures to persistence_failure by default", async () => {
     process.env.OPENROUTER_API_KEY = "openrouter-key";
-    startPracticeForLearner.mockRejectedValue(new Error("downstream failure"));
+    startPracticeForLearner.mockReturnValue(
+      Effect.fail(new Error("downstream failure"))
+    );
 
     const result = await startPracticeFromEntryContext({
       learnerId: "learner-3",
@@ -107,13 +118,15 @@ describe("Practice entry seam", () => {
 
   it("maps typed OpenRouter provider failures to provider_failure", async () => {
     process.env.OPENROUTER_API_KEY = "openrouter-key";
-    startPracticeForLearner.mockRejectedValue(
-      new OpenRouterProviderError({
-        phase: "request_failed",
-        status: 503,
-        statusText: "Service Unavailable",
-        message: "OpenRouter request failed: 503 Service Unavailable"
-      })
+    startPracticeForLearner.mockReturnValue(
+      Effect.fail(
+        new OpenRouterProviderError({
+          phase: "request_failed",
+          status: 503,
+          statusText: "Service Unavailable",
+          message: "OpenRouter request failed: 503 Service Unavailable"
+        })
+      )
     );
 
     const result = await startPracticeFromEntryContext({
@@ -140,16 +153,19 @@ describe("Practice entry seam", () => {
       message: "mapped by injected non-live policy"
     });
     const nonLiveLlmRuntimePolicy: NonLiveLlmRuntimePolicy = {
-      composePersonaGenerator: () => personaGenerator,
+      composePersonaGenerator: () => Effect.succeed(personaGenerator),
       composeHiddenEvaluationEngine: () => ({
-        evaluateEndedSession: async () => ({
+        evaluateEndedSession: () =>
+          Effect.succeed({
           status: "insufficient-evidence",
           reason: "provider-failure"
         })
       }),
       mapStartSessionFailure: () => mappedFailure
     };
-    startPracticeForLearner.mockRejectedValue(new Error("downstream failure"));
+    startPracticeForLearner.mockReturnValue(
+      Effect.fail(new Error("downstream failure"))
+    );
 
     const result = await startPracticeFromEntryContext(
       {

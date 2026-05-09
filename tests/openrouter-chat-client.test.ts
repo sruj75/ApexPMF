@@ -4,6 +4,7 @@ import {
   createOpenRouterChatClient,
   OpenRouterProviderError
 } from "../src/infrastructure/llm/openrouter";
+import { Effect } from "effect";
 
 describe("OpenRouter chat client transport failures", () => {
   it("throws typed provider failure when request fails before receiving response", async () => {
@@ -17,9 +18,9 @@ describe("OpenRouter chat client transport failures", () => {
       fetch
     });
 
-    const thrown = await client
-      .createStructuredJsonCompletion(validRequest)
-      .catch((error) => error);
+    const thrown = await Effect.runPromise(
+      client.createStructuredJsonCompletion(validRequest).pipe(Effect.flip)
+    );
 
     expect(thrown).toBeInstanceOf(OpenRouterProviderError);
     expect(thrown).toMatchObject({
@@ -40,9 +41,9 @@ describe("OpenRouter chat client transport failures", () => {
       fetch
     });
 
-    const thrown = await client
-      .createStructuredJsonCompletion(validRequest)
-      .catch((error) => error);
+    const thrown = await Effect.runPromise(
+      client.createStructuredJsonCompletion(validRequest).pipe(Effect.flip)
+    );
 
     expect(thrown).toBeInstanceOf(OpenRouterProviderError);
     expect(thrown).toMatchObject({
@@ -66,9 +67,9 @@ describe("OpenRouter chat client transport failures", () => {
       fetch
     });
 
-    const thrown = await client
-      .createStructuredJsonCompletion(validRequest)
-      .catch((error) => error);
+    const thrown = await Effect.runPromise(
+      client.createStructuredJsonCompletion(validRequest).pipe(Effect.flip)
+    );
 
     expect(thrown).toBeInstanceOf(OpenRouterProviderError);
     expect(thrown).toMatchObject({
@@ -90,9 +91,9 @@ describe("OpenRouter chat client transport failures", () => {
       fetch
     });
 
-    const thrown = await client
-      .createStructuredJsonCompletion(validRequest)
-      .catch((error) => error);
+    const thrown = await Effect.runPromise(
+      client.createStructuredJsonCompletion(validRequest).pipe(Effect.flip)
+    );
 
     expect(thrown).toBeInstanceOf(OpenRouterProviderError);
     expect(thrown).toMatchObject({
@@ -104,11 +105,13 @@ describe("OpenRouter chat client transport failures", () => {
 describe("OpenRouter hidden evaluation judge adapter", () => {
   it("delegates structured completion requests to the OpenRouter chat client", async () => {
     const chatClient = {
-      createStructuredJsonCompletion: vi.fn(async () => ({
-        id: "completion-1",
-        model: "openai/gpt-5.2",
-        content: "{\"status\":\"ready\"}"
-      }))
+      createStructuredJsonCompletion: vi.fn(() =>
+        Effect.succeed({
+          id: "completion-1",
+          model: "openai/gpt-5.2",
+          content: "{\"status\":\"ready\"}"
+        })
+      )
     };
     const judge = createOpenRouterHiddenEvaluationJudge({
       chatClient
@@ -134,9 +137,7 @@ describe("OpenRouter hidden evaluation judge adapter", () => {
     });
     const judge = createOpenRouterHiddenEvaluationJudge({
       chatClient: {
-        createStructuredJsonCompletion: vi.fn(async () => {
-          throw providerError;
-        })
+        createStructuredJsonCompletion: vi.fn(() => Effect.fail(providerError))
       }
     });
 

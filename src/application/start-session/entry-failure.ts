@@ -1,6 +1,13 @@
 import type { SupabaseRowDecodeError } from "@/src/infrastructure/supabase/supabase-row-decode-error";
-import type { OpenRouterProviderError } from "@/src/infrastructure/llm/openrouter";
-import type { PersonaGenerationDecodeError } from "@/src/domain/persona/openrouter-persona-generator";
+import { OpenRouterProviderError } from "@/src/infrastructure/llm/openrouter";
+import {
+  PersonaGenerationDecodeError,
+  PersonaGenerationProviderError
+} from "@/src/domain/persona/persona-generation";
+import {
+  GeneratedSessionCaseRepositoryDecodeError,
+  GeneratedSessionCaseRepositoryPersistenceError
+} from "@/src/domain/session/generated-session-case-repository";
 
 export type EntryFailureCategory =
   | "input_invalid"
@@ -61,6 +68,46 @@ export function classifyEntryFailure(cause: unknown): EntryFailure {
       message: cause.message,
       cause,
       details: [`reason=${cause.reason}`]
+    });
+  }
+
+  if (isPersonaGenerationProviderError(cause)) {
+    const providerCause = cause.cause;
+    if (isOpenRouterProviderError(providerCause)) {
+      return createEntryFailure({
+        category: "provider_failure",
+        message: providerCause.message,
+        cause: providerCause,
+        details: [
+          `phase=${providerCause.phase}`,
+          providerCause.status ? `status=${providerCause.status}` : "",
+          providerCause.statusText ? `statusText=${providerCause.statusText}` : ""
+        ].filter((detail) => detail.length > 0)
+      });
+    }
+
+    return createEntryFailure({
+      category: "provider_failure",
+      message: cause.message,
+      cause
+    });
+  }
+
+  if (isGeneratedSessionCaseRepositoryDecodeError(cause)) {
+    return createEntryFailure({
+      category: "decode_failure",
+      message: "Generated Session Case decode failed.",
+      cause,
+      details: [`operation=${cause.operation}`]
+    });
+  }
+
+  if (isGeneratedSessionCaseRepositoryPersistenceError(cause)) {
+    return createEntryFailure({
+      category: "persistence_failure",
+      message: "Generated Session Case persistence failed.",
+      cause,
+      details: [`operation=${cause.operation}`]
     });
   }
 
@@ -145,23 +192,31 @@ function defaultMessageForCategory(category: EntryFailureCategory): string {
 function isOpenRouterProviderError(
   value: unknown
 ): value is OpenRouterProviderError {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "name" in value &&
-    value.name === "OpenRouterProviderError"
-  );
+  return value instanceof OpenRouterProviderError;
 }
 
 function isPersonaGenerationDecodeError(
   value: unknown
 ): value is PersonaGenerationDecodeError {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "name" in value &&
-    value.name === "PersonaGenerationDecodeError"
-  );
+  return value instanceof PersonaGenerationDecodeError;
+}
+
+function isPersonaGenerationProviderError(
+  value: unknown
+): value is PersonaGenerationProviderError {
+  return value instanceof PersonaGenerationProviderError;
+}
+
+function isGeneratedSessionCaseRepositoryDecodeError(
+  value: unknown
+): value is GeneratedSessionCaseRepositoryDecodeError {
+  return isTaggedError(value, "GeneratedSessionCaseRepositoryDecodeError");
+}
+
+function isGeneratedSessionCaseRepositoryPersistenceError(
+  value: unknown
+): value is GeneratedSessionCaseRepositoryPersistenceError {
+  return isTaggedError(value, "GeneratedSessionCaseRepositoryPersistenceError");
 }
 
 function isSupabaseRowDecodeError(
@@ -172,6 +227,18 @@ function isSupabaseRowDecodeError(
     value !== null &&
     "name" in value &&
     value.name === "SupabaseRowDecodeError"
+  );
+}
+
+function isTaggedError<Tag extends string>(
+  value: unknown,
+  tag: Tag
+): value is { _tag: Tag } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "_tag" in value &&
+    value._tag === tag
   );
 }
 

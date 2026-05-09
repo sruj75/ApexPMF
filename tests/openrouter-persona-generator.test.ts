@@ -4,6 +4,7 @@ import {
   PersonaGenerationDecodeError
 } from "../src/domain/persona/openrouter-persona-generator";
 import { createOpenRouterChatClient } from "../src/infrastructure/llm/openrouter";
+import { Either, Effect } from "effect";
 
 describe("OpenRouter Persona Generation", () => {
   it("requests structured JSON and maps a valid Generated Session Case draft", async () => {
@@ -30,13 +31,15 @@ describe("OpenRouter Persona Generation", () => {
       })
     });
 
-    const generated = await personaGenerator.generateSessionCase({
-      generationNonce: "nonce-1",
-      sessionSource: {
-        kind: "broad-practice-pool",
-        label: "Broad Practice Pool"
-      }
-    });
+    const generated = await Effect.runPromise(
+      personaGenerator.generateSessionCase({
+        generationNonce: "nonce-1",
+        sessionSource: {
+          kind: "broad-practice-pool",
+          label: "Broad Practice Pool"
+        }
+      })
+    );
 
     expect(generated).toEqual({
       ...validPersonaGenerationResponse,
@@ -106,36 +109,30 @@ describe("OpenRouter Persona Generation", () => {
       })
     });
 
-    await expect(
-      personaGenerator.generateSessionCase({
-        generationNonce: "nonce-2",
-        sessionSource: {
-          kind: "active-ideal-customer-profile",
-          idealCustomerProfile: {
-            id: "profile-1",
-            name: "Finance operators",
-            customerDescription: "Controllers at growing SaaS companies",
-            notes: null
+    const result = await Effect.runPromise(
+      Effect.either(
+        personaGenerator.generateSessionCase({
+          generationNonce: "nonce-2",
+          sessionSource: {
+            kind: "active-ideal-customer-profile",
+            idealCustomerProfile: {
+              id: "profile-1",
+              name: "Finance operators",
+              customerDescription: "Controllers at growing SaaS companies",
+              notes: null
+            }
           }
-        }
-      })
-    ).rejects.toBeInstanceOf(PersonaGenerationDecodeError);
-    await expect(
-      personaGenerator.generateSessionCase({
-        generationNonce: "nonce-2",
-        sessionSource: {
-          kind: "active-ideal-customer-profile",
-          idealCustomerProfile: {
-            id: "profile-1",
-            name: "Finance operators",
-            customerDescription: "Controllers at growing SaaS companies",
-            notes: null
-          }
-        }
-      })
-    ).rejects.toMatchObject({
-      reason: "schema_validation_failed"
-    });
+        })
+      )
+    );
+
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isLeft(result)) {
+      expect(result.left).toBeInstanceOf(PersonaGenerationDecodeError);
+      expect(result.left).toMatchObject({
+        reason: "schema_validation_failed"
+      });
+    }
   });
 
   it("rejects invalid JSON responses before schema validation", async () => {
@@ -160,26 +157,25 @@ describe("OpenRouter Persona Generation", () => {
       })
     });
 
-    await expect(
-      personaGenerator.generateSessionCase({
-        generationNonce: "nonce-3",
-        sessionSource: {
-          kind: "broad-practice-pool",
-          label: "Broad Practice Pool"
-        }
-      })
-    ).rejects.toBeInstanceOf(PersonaGenerationDecodeError);
-    await expect(
-      personaGenerator.generateSessionCase({
-        generationNonce: "nonce-3",
-        sessionSource: {
-          kind: "broad-practice-pool",
-          label: "Broad Practice Pool"
-        }
-      })
-    ).rejects.toMatchObject({
-      reason: "invalid_json"
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        personaGenerator.generateSessionCase({
+          generationNonce: "nonce-3",
+          sessionSource: {
+            kind: "broad-practice-pool",
+            label: "Broad Practice Pool"
+          }
+        })
+      )
+    );
+
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isLeft(result)) {
+      expect(result.left).toBeInstanceOf(PersonaGenerationDecodeError);
+      expect(result.left).toMatchObject({
+        reason: "invalid_json"
+      });
+    }
   });
 
   it("rejects quality-gate failures before the domain consumes the response", async () => {
@@ -207,26 +203,25 @@ describe("OpenRouter Persona Generation", () => {
       })
     });
 
-    await expect(
-      personaGenerator.generateSessionCase({
-        generationNonce: "nonce-4",
-        sessionSource: {
-          kind: "broad-practice-pool",
-          label: "Broad Practice Pool"
-        }
-      })
-    ).rejects.toBeInstanceOf(PersonaGenerationDecodeError);
-    await expect(
-      personaGenerator.generateSessionCase({
-        generationNonce: "nonce-4",
-        sessionSource: {
-          kind: "broad-practice-pool",
-          label: "Broad Practice Pool"
-        }
-      })
-    ).rejects.toMatchObject({
-      reason: "quality_gate_failed"
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        personaGenerator.generateSessionCase({
+          generationNonce: "nonce-4",
+          sessionSource: {
+            kind: "broad-practice-pool",
+            label: "Broad Practice Pool"
+          }
+        })
+      )
+    );
+
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isLeft(result)) {
+      expect(result.left).toBeInstanceOf(PersonaGenerationDecodeError);
+      expect(result.left).toMatchObject({
+        reason: "quality_gate_failed"
+      });
+    }
   });
 });
 

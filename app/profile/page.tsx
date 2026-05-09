@@ -12,6 +12,7 @@ import {
   updateIdealCustomerProfileAction
 } from "./actions";
 import { ProfileSettingsView } from "./profile-settings-view";
+import { Effect } from "effect";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const repository = context.idealCustomerProfileRepository;
   const [profiles, sessionSource, params] = await Promise.all([
     repository.listForLearner(context.learnerId),
-    resolveNextSessionSource(context.learnerId, repository),
+    Effect.runPromise(resolveNextSessionSource(context.learnerId, repository)),
     searchParams
   ]);
   const error = Array.isArray(params?.error) ? params.error[0] : params?.error;

@@ -7,38 +7,38 @@ import {
   mapNonLiveLlmFailureToHiddenEvaluationReason,
   resolveNonLiveLlmAccess
 } from "../src/application/non-live-llm-policy";
-import { EntryFailure } from "../src/application/start-session/entry-failure";
 import { OpenRouterProviderError } from "../src/infrastructure/llm/openrouter";
-import { Effect } from "effect";
+import { Either, Effect } from "effect";
 
 describe("Non-live LLM policy", () => {
   it("returns unavailable when OPENROUTER_API_KEY is missing", () => {
-    const access = resolveNonLiveLlmAccess({
-      OPENROUTER_MODEL: "openai/gpt-5.2"
-    });
+    const access = Effect.runSync(
+      Effect.either(
+        resolveNonLiveLlmAccess({
+          OPENROUTER_MODEL: "openai/gpt-5.2"
+        })
+      )
+    );
+    if (!Either.isLeft(access)) {
+      throw new Error("Expected unavailable non-live LLM access.");
+    }
 
-    expect(access).toEqual({
-      status: "unavailable",
-      failure: {
-        category: "provider_unavailable",
-        missingEnvVar: "OPENROUTER_API_KEY",
-        message: "OPENROUTER_API_KEY is required for non-live LLM flows."
-      }
+    expect(access.left).toMatchObject({
+      category: "provider_unavailable",
+      missingEnvVar: "OPENROUTER_API_KEY",
+      message: "OPENROUTER_API_KEY is required for non-live LLM flows."
     });
   });
 
   it("returns available with configured or default OpenRouter settings", () => {
-    const configuredAccess = resolveNonLiveLlmAccess({
-      OPENROUTER_API_KEY: "openrouter-key",
-      OPENROUTER_MODEL: "openai/gpt-5.2",
-      OPENROUTER_SITE_URL: "https://example.com",
-      OPENROUTER_APP_TITLE: "The Mom Test Simulator QA"
-    });
-
-    expect(configuredAccess.status).toBe("available");
-    if (configuredAccess.status !== "available") {
-      throw new Error("Expected available non-live LLM access.");
-    }
+    const configuredAccess = Effect.runSync(
+      resolveNonLiveLlmAccess({
+        OPENROUTER_API_KEY: "openrouter-key",
+        OPENROUTER_MODEL: "openai/gpt-5.2",
+        OPENROUTER_SITE_URL: "https://example.com",
+        OPENROUTER_APP_TITLE: "The Mom Test Simulator QA"
+      })
+    );
 
     expect(configuredAccess.provider).toBe("openrouter");
     expect(configuredAccess.configuration).toEqual({
@@ -52,13 +52,11 @@ describe("Non-live LLM policy", () => {
       })
     );
 
-    const defaultedAccess = resolveNonLiveLlmAccess({
-      OPENROUTER_API_KEY: "openrouter-key"
-    });
-    expect(defaultedAccess.status).toBe("available");
-    if (defaultedAccess.status !== "available") {
-      throw new Error("Expected available non-live LLM access with defaults.");
-    }
+    const defaultedAccess = Effect.runSync(
+      resolveNonLiveLlmAccess({
+        OPENROUTER_API_KEY: "openrouter-key"
+      })
+    );
     expect(defaultedAccess.configuration).toEqual({
       model: "openrouter/free",
       siteUrl: undefined,
@@ -75,7 +73,7 @@ describe("Non-live LLM policy", () => {
     });
 
     const providerFailure = classifyNonLiveLlmFailure(providerError);
-    expect(providerFailure).toEqual({
+    expect(providerFailure).toMatchObject({
       category: "provider_failure",
       message: "OpenRouter request failed: 502 Bad Gateway",
       phase: "request_failed",
@@ -83,18 +81,19 @@ describe("Non-live LLM policy", () => {
       statusText: "Bad Gateway",
       cause: providerError
     });
+    if (!providerFailure) {
+      throw new Error("Expected provider failure classification.");
+    }
     expect(mapNonLiveLlmFailureToHiddenEvaluationReason(providerFailure)).toBe(
       "provider-failure"
     );
 
-    const unavailableAccess = resolveNonLiveLlmAccess({});
-    if (unavailableAccess.status !== "unavailable") {
+    const unavailableAccess = Effect.runSync(Effect.either(resolveNonLiveLlmAccess({})));
+    if (!Either.isLeft(unavailableAccess)) {
       throw new Error("Expected unavailable non-live LLM access.");
     }
 
-    const entryFailure = mapNonLiveLlmFailureToEntryFailure(
-      unavailableAccess.failure
-    );
+    const entryFailure = mapNonLiveLlmFailureToEntryFailure(unavailableAccess.left);
     expect(entryFailure.category).toBe("provider_failure");
     expect(entryFailure.message).toContain("OPENROUTER_API_KEY");
 
@@ -111,9 +110,8 @@ describe("Non-live LLM policy", () => {
 
   it("composes persona generation and hidden evaluation from one available runtime policy", async () => {
     const personaGenerator = {
-      generateSessionCase: async () => {
-        throw new Error("not expected in this test");
-      }
+      generateSessionCase: () =>
+        Effect.fail(new Error("not expected in this test") as never)
     };
     const hiddenEvaluationEngine = {
       evaluateEndedSession: () =>
@@ -147,7 +145,9 @@ describe("Non-live LLM policy", () => {
       createHiddenEvaluationEngine
     });
 
-    expect(policy.composePersonaGenerator()).toBe(personaGenerator);
+    await expect(
+      Effect.runPromise(policy.composePersonaGenerator())
+    ).resolves.toBe(personaGenerator);
     expect(policy.composeHiddenEvaluationEngine()).toBe(hiddenEvaluationEngine);
   });
 
@@ -156,10 +156,17 @@ describe("Non-live LLM policy", () => {
       env: {}
     });
 
-    expect(() => policy.composePersonaGenerator()).toThrow(EntryFailure);
-    expect(() => policy.composePersonaGenerator()).toThrow(
-      "OPENROUTER_API_KEY is required for non-live LLM flows."
+    const personaGeneratorResult = await Effect.runPromise(
+      Effect.either(policy.composePersonaGenerator())
     );
+    expect(Either.isLeft(personaGeneratorResult)).toBe(true);
+    if (Either.isLeft(personaGeneratorResult)) {
+      expect(personaGeneratorResult.left).toMatchObject({
+        category: "provider_unavailable",
+        missingEnvVar: "OPENROUTER_API_KEY",
+        message: "OPENROUTER_API_KEY is required for non-live LLM flows."
+      });
+    }
 
     const hiddenEvaluationEngine = policy.composeHiddenEvaluationEngine();
     await expect(

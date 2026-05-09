@@ -30,12 +30,20 @@ export function createOpenRouterHiddenEvaluationJudge(input: {
   return {
     createStructuredJsonCompletion(request) {
       return Effect.runPromise(
-        input.chatClient.createStructuredJsonCompletion(request).pipe(
-          Effect.map((completion) => ({
-            content: completion.content
-          }))
+        Effect.either(
+          input.chatClient.createStructuredJsonCompletion(request).pipe(
+            Effect.map((completion) => ({
+              content: completion.content
+            }))
+          )
         )
-      );
+      ).then((result) => {
+        if (result._tag === "Left") {
+          throw result.left;
+        }
+
+        return result.right;
+      });
     }
   };
 }

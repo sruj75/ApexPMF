@@ -16,12 +16,14 @@ describe("Start Practice", () => {
     const generatedSessionCases = createInMemoryGeneratedSessionCaseRepository();
     const personaGenerator = createRecordingPersonaGenerator();
 
-    const started = await startPracticeForLearner(learnerId, {
-      idealCustomerProfileRepository: createInMemoryIdealCustomerProfileRepository(),
-      generatedSessionCaseRepository: generatedSessionCases,
-      personaGenerator,
-      createNonce: () => "nonce-1"
-    });
+    const started = await Effect.runPromise(
+      startPracticeForLearner(learnerId, {
+        idealCustomerProfileRepository: createInMemoryIdealCustomerProfileRepository(),
+        generatedSessionCaseRepository: generatedSessionCases,
+        personaGenerator,
+        createNonce: () => "nonce-1"
+      })
+    );
 
     expect(started).toEqual({
       sessionId: "session-case-1",
@@ -83,13 +85,15 @@ describe("Start Practice", () => {
     const generatedSessionCases = createInMemoryGeneratedSessionCaseRepository();
     const personaGenerator = createRecordingPersonaGenerator();
 
-    const started = await startPracticeForLearner(learnerId, {
-      idealCustomerProfileRepository:
-        createInMemoryIdealCustomerProfileRepository([profile]),
-      generatedSessionCaseRepository: generatedSessionCases,
-      personaGenerator,
-      createNonce: () => "nonce-profile"
-    });
+    const started = await Effect.runPromise(
+      startPracticeForLearner(learnerId, {
+        idealCustomerProfileRepository:
+          createInMemoryIdealCustomerProfileRepository([profile]),
+        generatedSessionCaseRepository: generatedSessionCases,
+        personaGenerator,
+        createNonce: () => "nonce-profile"
+      })
+    );
 
     expect(started.sessionSourceLabel).toBe("Clinical operators");
     expect(personaGenerator.inputs[0]?.sessionSource).toEqual({
@@ -121,13 +125,16 @@ describe("Start Practice", () => {
   it("uses the Broad Practice Pool when no Active Ideal Customer Profile exists", async () => {
     const personaGenerator = createRecordingPersonaGenerator();
 
-    const started = await startPracticeForLearner(learnerId, {
-      idealCustomerProfileRepository: createInMemoryIdealCustomerProfileRepository(),
-      generatedSessionCaseRepository:
-        createInMemoryGeneratedSessionCaseRepository(),
-      personaGenerator,
-      createNonce: () => "nonce-broad"
-    });
+    const started = await Effect.runPromise(
+      startPracticeForLearner(learnerId, {
+        idealCustomerProfileRepository:
+          createInMemoryIdealCustomerProfileRepository(),
+        generatedSessionCaseRepository:
+          createInMemoryGeneratedSessionCaseRepository(),
+        personaGenerator,
+        createNonce: () => "nonce-broad"
+      })
+    );
 
     expect(started.sessionSourceLabel).toBe("Broad Practice Pool");
     expect(personaGenerator.inputs[0]?.sessionSource.kind).toBe(
@@ -150,8 +157,8 @@ describe("Start Practice", () => {
       createNonce: () => nonces.shift() ?? "unexpected-nonce"
     };
 
-    const first = await startPracticeForLearner(learnerId, deps);
-    const second = await startPracticeForLearner(learnerId, deps);
+    const first = await Effect.runPromise(startPracticeForLearner(learnerId, deps));
+    const second = await Effect.runPromise(startPracticeForLearner(learnerId, deps));
 
     expect(first.sessionId).not.toBe(second.sessionId);
     expect(personaGenerator.inputs.map((input) => input.generationNonce)).toEqual(
@@ -177,10 +184,10 @@ function createRecordingPersonaGenerator(): PersonaGenerator & {
 
   return {
     inputs,
-    async generateSessionCase(input) {
+    generateSessionCase(input) {
       inputs.push(input);
 
-      return {
+      return Effect.succeed({
         openingContext:
           "You are speaking with a finance operator who recently tried to improve month-end close.",
         customerPersona: {
@@ -234,7 +241,7 @@ function createRecordingPersonaGenerator(): PersonaGenerator & {
           provider: "test",
           model: "fake-persona-generator"
         }
-      };
+      });
     }
   };
 }

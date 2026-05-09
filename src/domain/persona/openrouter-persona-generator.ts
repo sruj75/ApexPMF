@@ -1,13 +1,18 @@
 import type { OpenRouterChatClient } from "@/src/infrastructure/llm/openrouter";
+import { Effect } from "effect";
 import {
   decodeGeneratedSessionCaseResponse,
-  type GeneratedSessionCaseContractFailureReason,
   generatedSessionCaseResponseJsonSchema,
-  generatedSessionCaseResponseSchemaName
+  generatedSessionCaseResponseSchemaName,
+  type GeneratedSessionCaseContractResponse
 } from "./generated-session-case-contract";
 import type {
   PersonaGenerationInput,
   PersonaGenerator
+} from "./persona-generation";
+import {
+  PersonaGenerationDecodeError,
+  PersonaGenerationProviderError
 } from "./persona-generation";
 import type { SessionSource } from "./session-source";
 
@@ -15,42 +20,38 @@ type OpenRouterPersonaGeneratorOptions = {
   chatClient: OpenRouterChatClient;
 };
 
-export class PersonaGenerationDecodeError extends Error {
-  readonly name = "PersonaGenerationDecodeError";
-  readonly reason: GeneratedSessionCaseContractFailureReason;
-  readonly cause?: unknown;
-
-  constructor(input: {
-    reason: GeneratedSessionCaseContractFailureReason;
-    message: string;
-    cause?: unknown;
-  }) {
-    super(input.message);
-    this.reason = input.reason;
-    this.cause = input.cause;
-  }
-}
-
 export function createOpenRouterPersonaGenerator({
   chatClient
 }: OpenRouterPersonaGeneratorOptions): PersonaGenerator {
   return {
-    async generateSessionCase(input) {
-      const completion = await chatClient.createStructuredJsonCompletion({
-        messages: buildMessages(input),
-        responseSchemaName: generatedSessionCaseResponseSchemaName,
-        responseJsonSchema: generatedSessionCaseResponseJsonSchema
-      });
-      const generated = decodePersonaGenerationResponse(completion.content);
-
-      return {
-        ...generated,
-        generationAudit: {
-          provider: "openrouter",
-          model: completion.model,
-          responseId: completion.id
-        }
-      };
+    generateSessionCase(input) {
+      return chatClient
+        .createStructuredJsonCompletion({
+          messages: buildMessages(input),
+          responseSchemaName: generatedSessionCaseResponseSchemaName,
+          responseJsonSchema: generatedSessionCaseResponseJsonSchema
+        })
+        .pipe(
+          Effect.mapError(
+            (cause) =>
+              new PersonaGenerationProviderError({
+                message: cause.message,
+                cause
+              })
+          ),
+          Effect.flatMap((completion) =>
+            decodePersonaGenerationResponse(completion.content).pipe(
+              Effect.map((generated) => ({
+                ...generated,
+                generationAudit: {
+                  provider: "openrouter",
+                  model: completion.model,
+                  responseId: completion.id
+                }
+              }))
+            )
+          )
+        );
     }
   };
 }
@@ -79,33 +80,51 @@ function buildMessages(input: PersonaGenerationInput) {
 
 function decodePersonaGenerationResponse(
   content: string
-){
+): Effect.Effect<
+  GeneratedSessionCaseContractResponse,
+  PersonaGenerationDecodeError,
+  never
+> {
   const decoded = decodeGeneratedSessionCaseResponse(content);
 
   if (decoded.ok) {
-    return decoded.value;
+    return Effect.succeed(decoded.value);
   }
 
   switch (decoded.reason) {
     case "invalid_json":
-      throw new PersonaGenerationDecodeError({
-        reason: "invalid_json",
-        message: "Persona Generation response is not valid JSON."
-      });
+      return Effect.fail(
+        new PersonaGenerationDecodeError({
+          reason: "invalid_json",
+          message: "Persona Generation response is not valid JSON."
+        })
+      );
     case "schema_validation_failed":
-      throw new PersonaGenerationDecodeError({
-        reason: "schema_validation_failed",
-        message: "Persona Generation response failed schema validation."
-      });
+      return Effect.fail(
+        new PersonaGenerationDecodeError({
+          reason: "schema_validation_failed",
+          message: "Persona Generation response failed schema validation."
+        })
+      );
     case "quality_gate_failed":
-      throw new PersonaGenerationDecodeError({
-        reason: "quality_gate_failed",
-        message: "Persona Generation response failed quality gate."
-      });
-    default:
-      return assertNever(decoded.reason);
+      return Effect.fail(
+        new PersonaGenerationDecodeError({
+          reason: "quality_gate_failed",
+          message: "Persona Generation response failed quality gate."
+        })
+      );
+    default: {
+      const unexpectedReason: never = decoded.reason;
+      return Effect.die(
+        new Error(
+          `Unknown Persona Generation contract error: ${String(unexpectedReason)}`
+        )
+      );
+    }
   }
 }
+
+export { PersonaGenerationDecodeError };
 
 function describeSessionSource(sessionSource: SessionSource): string {
   if (sessionSource.kind === "active-ideal-customer-profile") {
@@ -119,6 +138,3 @@ function describeSessionSource(sessionSource: SessionSource): string {
   return "Broad Practice Pool";
 }
 
-function assertNever(value: never): never {
-  throw new Error(`Unknown Persona Generation contract error: ${String(value)}`);
-}

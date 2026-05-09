@@ -111,6 +111,9 @@ export function createNonLiveLlmRuntimePolicy(input?: {
     },
     mapStartSessionFailure(cause) {
       const normalizedCause = unwrapStartSessionCause(cause);
+      if (normalizedCause instanceof NonLiveLlmProviderUnavailableError) {
+        return mapNonLiveLlmFailureToEntryFailure(normalizedCause);
+      }
       const nonLiveLlmFailure = classifyNonLiveLlmFailure(normalizedCause);
       return nonLiveLlmFailure
         ? mapNonLiveLlmFailureToEntryFailure(nonLiveLlmFailure)
@@ -202,10 +205,7 @@ export function mapNonLiveLlmFailureToHiddenEvaluationReason(
   }
 }
 
-function missingOpenRouterApiKeyFailure(): Extract<
-  NonLiveLlmFailure,
-  NonLiveLlmProviderUnavailableError
-> {
+function missingOpenRouterApiKeyFailure(): NonLiveLlmProviderUnavailableError {
   return new NonLiveLlmProviderUnavailableError({
     category: "provider_unavailable",
     missingEnvVar: "OPENROUTER_API_KEY",

@@ -140,21 +140,29 @@ input?: {
   const nonLiveLlmRuntimePolicy =
     input?.nonLiveLlmRuntimePolicy ?? createNonLiveLlmRuntimePolicy();
 
-  try {
-    const startedSession = await startPracticeForLearner(context.learnerId, {
-      idealCustomerProfileRepository: context.idealCustomerProfileRepository,
-      generatedSessionCaseRepository: context.generatedSessionCaseRepository,
-      personaGenerator: nonLiveLlmRuntimePolicy.composePersonaGenerator()
-    });
+  const result = await Effect.runPromise(
+    Effect.either(
+      Effect.gen(function* () {
+        const personaGenerator =
+          yield* nonLiveLlmRuntimePolicy.composePersonaGenerator();
+        return yield* startPracticeForLearner(context.learnerId, {
+          idealCustomerProfileRepository: context.idealCustomerProfileRepository,
+          generatedSessionCaseRepository: context.generatedSessionCaseRepository,
+          personaGenerator
+        });
+      })
+    )
+  );
 
-    return {
-      ok: true,
-      sessionId: startedSession.sessionId
-    };
-  } catch (cause) {
+  if (Either.isLeft(result)) {
     return {
       ok: false,
-      failure: nonLiveLlmRuntimePolicy.mapStartSessionFailure(cause)
+      failure: nonLiveLlmRuntimePolicy.mapStartSessionFailure(result.left)
     };
   }
+
+  return {
+    ok: true,
+    sessionId: result.right.sessionId
+  };
 }

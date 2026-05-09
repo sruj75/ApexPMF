@@ -175,9 +175,11 @@ describe("Report generation coordinator", () => {
       })
     );
     const nonLiveLlmRuntimePolicy: NonLiveLlmRuntimePolicy = {
-      composePersonaGenerator: () => ({
-        generateSessionCase: async () => makeGeneratedSessionCase("natural-conclusion")
-      }),
+      composePersonaGenerator: () =>
+        Effect.succeed({
+          generateSessionCase: () =>
+            Effect.succeed(makeGeneratedSessionCase("natural-conclusion"))
+        }),
       composeHiddenEvaluationEngine: () => ({
         evaluateEndedSession
       }),

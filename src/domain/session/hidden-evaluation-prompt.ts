@@ -25,13 +25,4 @@ HARD OUTPUT CONTRACT:
 - Every Trap Result must include at least one evidence item.
 - Every non-partial behavior outcome must include at least one evidence item.
 - If evidence is insufficient, return status="insufficient-evidence", reasonIfInsufficient as short text, evaluation=null.
-
-SECTION: INPUT_FORMAT
-<generated_session_case_json>
-{{GENERATED_SESSION_CASE_JSON}}
-</generated_session_case_json>
-
-<session_transcript_json>
-{{SESSION_TRANSCRIPT_JSON}}
-</session_transcript_json>
 `.trim();

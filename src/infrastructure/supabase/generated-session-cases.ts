@@ -11,6 +11,12 @@ import type {
 } from "@/src/domain/session/session-report";
 import type { SessionEvaluationArtifact } from "@/src/domain/session/session-evaluation";
 import {
+  SessionEvaluationArtifactSchema,
+  SessionReportSchema,
+  SessionTranscriptTurnSchema,
+  normalizeNullOptionalTextFields
+} from "@/src/domain/session/session-artifact-contract";
+import {
   createBroadPracticePoolSessionSource,
   type SessionSource
 } from "@/src/domain/persona/session-source";
@@ -110,115 +116,6 @@ const ReportStatusSchema = Schema.Literal(
   "insufficient-evidence"
 );
 
-const EvidenceRefSchema = Schema.Struct({
-  sequence: Schema.Number,
-  turnId: Schema.optional(Schema.NullOr(Schema.String)),
-  snippet: Schema.optional(Schema.NullOr(Schema.String)),
-  title: Schema.String,
-  detail: Schema.String
-});
-
-const SessionReportSchema = Schema.Struct({
-  outcome: Schema.Struct({
-    summary: Schema.String
-  }),
-  missedSignals: Schema.Array(
-    Schema.Struct({
-      title: Schema.String,
-      detail: Schema.String,
-      evidence: Schema.Array(EvidenceRefSchema)
-    })
-  ),
-  badQuestions: Schema.Array(
-    Schema.Struct({
-      question: Schema.String,
-      whyItMissed: Schema.String,
-      evidence: Schema.Array(EvidenceRefSchema)
-    })
-  ),
-  strongQuestions: Schema.Array(
-    Schema.Struct({
-      question: Schema.String,
-      whyItWorked: Schema.String,
-      evidence: Schema.Array(EvidenceRefSchema)
-    })
-  ),
-  trapResults: Schema.Array(
-    Schema.Struct({
-      trapLabel: Schema.String,
-      outcome: Schema.Literal("triggered", "avoided", "partial"),
-      detail: Schema.String,
-      evidence: Schema.Array(EvidenceRefSchema)
-    })
-  ),
-  skillMovement: Schema.Array(
-    Schema.Struct({
-      skill: Schema.String,
-      movement: Schema.Literal("up", "flat", "down"),
-      rationale: Schema.String
-    })
-  ),
-  nextPracticeFocus: Schema.Struct({
-    title: Schema.String,
-    description: Schema.String
-  }),
-  sourceContext: Schema.String,
-  lightPersonaLabel: Schema.String,
-  expandableEvidence: Schema.Array(EvidenceRefSchema)
-});
-
-const SessionTranscriptTurnSchema = Schema.Struct({
-  sequence: Schema.Number,
-  turnId: Schema.optional(Schema.String),
-  speaker: Schema.Literal("learner", "persona"),
-  text: Schema.String,
-  metadata: Schema.optional(
-    Schema.Struct({
-      cue: Schema.optional(Schema.String),
-      latencyMs: Schema.optional(Schema.Number)
-    })
-  )
-});
-
-const BehaviorOutcomeSchema = Schema.Literal("met", "missed", "partial");
-
-const BehaviorAssessmentSchema = Schema.Struct({
-  outcome: BehaviorOutcomeSchema,
-  note: Schema.String,
-  evidence: Schema.Array(EvidenceRefSchema)
-});
-
-const SessionEvaluationSchema = Schema.Struct({
-  interviewBehavior: Schema.Struct({
-    avoidingPitching: BehaviorAssessmentSchema,
-    askingConcreteHistory: BehaviorAssessmentSchema,
-    followingUpOnVagueAnswers: BehaviorAssessmentSchema,
-    resistingCompliments: BehaviorAssessmentSchema,
-    identifyingBadFitPersonas: BehaviorAssessmentSchema,
-    uncoveringWorkaroundsOrDecisionProcess: BehaviorAssessmentSchema
-  }),
-  learningSignal: Schema.Struct({
-    quality: Schema.Literal("high", "medium", "low"),
-    summary: Schema.String,
-    evidence: Schema.Array(EvidenceRefSchema)
-  }),
-  trapResults: Schema.Array(
-    Schema.Struct({
-      trapId: Schema.String,
-      trapLabel: Schema.String,
-      outcome: Schema.Literal("triggered", "avoided", "partial"),
-      detail: Schema.String,
-      evidence: Schema.Array(EvidenceRefSchema)
-    })
-  ),
-  excludedDimensions: Schema.Struct({
-    accent: Schema.Literal("not-scored"),
-    charisma: Schema.Literal("not-scored"),
-    vocalPolish: Schema.Literal("not-scored"),
-    soundingConfident: Schema.Literal("not-scored")
-  })
-});
-
 const GeneratedSessionCaseRowSchema = Schema.Struct({
   id: Schema.String,
   learner_id: Schema.String,
@@ -243,7 +140,7 @@ const GeneratedSessionCaseRowSchema = Schema.Struct({
   report_ready_at: Schema.NullOr(Schema.Date),
   session_report: Schema.NullOr(SessionReportSchema),
   session_transcript: Schema.NullOr(Schema.Array(SessionTranscriptTurnSchema)),
-  session_evaluation: Schema.NullOr(SessionEvaluationSchema)
+  session_evaluation: Schema.NullOr(SessionEvaluationArtifactSchema)
 });
 
 type GeneratedSessionCaseRow = Schema.Schema.Type<
@@ -459,11 +356,13 @@ function decodeGeneratedSessionCaseRowOrThrow(
       reportStatus: decodedRow.report_status,
       reportReadyAt: decodedRow.report_ready_at
     },
-    sessionReport: decodedRow.session_report as SessionReport | null,
-    sessionTranscript:
-      decodedRow.session_transcript as SessionTranscriptTurn[] | null,
-    sessionEvaluation:
-      decodedRow.session_evaluation as SessionEvaluationArtifact | null
+    sessionReport: cloneUnknownOrNull<SessionReport>(decodedRow.session_report),
+    sessionTranscript: cloneUnknownOrNull<SessionTranscriptTurn[]>(
+      decodedRow.session_transcript
+    ),
+    sessionEvaluation: cloneUnknownOrNull<SessionEvaluationArtifact>(
+      decodedRow.session_evaluation
+    )
   };
 }
 
@@ -508,7 +407,9 @@ function decodeWithSchemaOrThrow<T, I>(
   value: unknown,
   operation: "create" | "getForLearner"
 ): T {
-  const decoded = Schema.decodeUnknownEither(schema)(value);
+  const decoded = Schema.decodeUnknownEither(schema)(
+    normalizeNullOptionalTextFields(value)
+  );
 
   if (decoded._tag === "Left") {
     throw new SupabaseRowDecodeError({
@@ -523,4 +424,12 @@ function decodeWithSchemaOrThrow<T, I>(
 
 function assertNeverSessionSource(sessionSource: never): never {
   throw new Error(`Unknown Session source kind: ${String(sessionSource)}`);
+}
+
+function cloneUnknownOrNull<T>(value: unknown): T | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return structuredClone(value) as T;
 }

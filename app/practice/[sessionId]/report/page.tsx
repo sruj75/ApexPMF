@@ -1,11 +1,8 @@
 import { notFound, redirect } from "next/navigation";
-import { getLearnerEntryContext } from "@/src/application/start-session/practice-entry-seam";
+import { resolvePracticeRouteDecision } from "@/src/application/practice-route/practice-route-decision";
 import { SessionReportView } from "./report-view";
 
 export const dynamic = "force-dynamic";
-
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type SessionReportPageProps = {
   params: Promise<{
@@ -18,47 +15,21 @@ export default async function SessionReportPage({
 }: SessionReportPageProps) {
   const { sessionId } = await params;
 
-  if (!uuidPattern.test(sessionId)) {
-    notFound();
-  }
-
-  const context = await getLearnerEntryContext();
-  if (!context.ok) {
-    redirect("/login");
-  }
-
-  const generatedSessionCase = await context.generatedSessionCaseRepository.getForLearner(
-    context.learnerId,
+  const decision = await resolvePracticeRouteDecision({
+    intent: "session-report",
     sessionId
-  );
-
-  if (!generatedSessionCase) {
+  });
+  if (decision.action === "not-found") {
     notFound();
   }
-
-  if (generatedSessionCase.sessionLifecycle.endedReason === "user-quit") {
-    redirect("/dashboard");
+  if (decision.action === "redirect") {
+    redirect(decision.path);
   }
-
-  if (
-    generatedSessionCase.sessionLifecycle.reportStatus ===
-    "insufficient-evidence"
-  ) {
-    redirect("/dashboard");
-  }
-
-  if (generatedSessionCase.sessionLifecycle.reportStatus !== "ready") {
-    redirect(`/practice/${sessionId}/report-generating`);
-  }
-
-  if (!generatedSessionCase.sessionReport || !generatedSessionCase.sessionTranscript) {
-    redirect(`/practice/${sessionId}/report-generating`);
+  if (decision.action !== "render-session-report") {
+    notFound();
   }
 
   return (
-    <SessionReportView
-      report={generatedSessionCase.sessionReport}
-      transcript={generatedSessionCase.sessionTranscript}
-    />
+    <SessionReportView report={decision.report} transcript={decision.transcript} />
   );
 }

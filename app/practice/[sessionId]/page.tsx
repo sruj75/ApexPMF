@@ -1,12 +1,8 @@
 import { notFound, redirect } from "next/navigation";
-import { getLearnerEntryContext } from "@/src/application/start-session/practice-entry-seam";
-import { toStartedSession } from "@/src/domain/session/generated-session-case";
+import { resolvePracticeRouteDecision } from "@/src/application/practice-route/practice-route-decision";
 import { SessionStartView } from "./session-start-view";
 
 export const dynamic = "force-dynamic";
-
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type PracticeSessionPageProps = {
   params: Promise<{
@@ -19,46 +15,19 @@ export default async function PracticeSessionPage({
 }: PracticeSessionPageProps) {
   const { sessionId } = await params;
 
-  if (!uuidPattern.test(sessionId)) {
-    notFound();
-  }
-
-  const context = await getLearnerEntryContext();
-  if (!context.ok) {
-    redirect("/login");
-  }
-
-  const generatedSessionCase = await context.generatedSessionCaseRepository.getForLearner(
-    context.learnerId,
+  const decision = await resolvePracticeRouteDecision({
+    intent: "practice-session",
     sessionId
-  );
-
-  if (!generatedSessionCase) {
+  });
+  if (decision.action === "not-found") {
+    notFound();
+  }
+  if (decision.action === "redirect") {
+    redirect(decision.path);
+  }
+  if (decision.action !== "render-practice-session") {
     notFound();
   }
 
-  if (generatedSessionCase.sessionLifecycle.sessionStatus === "ended") {
-    if (generatedSessionCase.sessionLifecycle.endedReason === "user-quit") {
-      redirect("/dashboard");
-    }
-
-    if (generatedSessionCase.sessionLifecycle.reportStatus === "ready") {
-      redirect(`/practice/${sessionId}/report`);
-    }
-
-    if (
-      generatedSessionCase.sessionLifecycle.reportStatus ===
-      "insufficient-evidence"
-    ) {
-      redirect("/dashboard");
-    }
-
-    redirect(`/practice/${sessionId}/report-generating`);
-  }
-
-  return (
-    <SessionStartView
-      startedSession={toStartedSession(generatedSessionCase)}
-    />
-  );
+  return <SessionStartView startedSession={decision.startedSession} />;
 }

@@ -1,7 +1,5 @@
-import { redirect } from "next/navigation";
-import { createSessionOrchestrator } from "@/src/application/end-session/session-orchestrator";
-import { createReportGenerationCoordinator } from "@/src/application/generate-report/report-generation-coordinator";
-import { getLearnerEntryContext } from "@/src/application/start-session/practice-entry-seam";
+import { notFound, redirect } from "next/navigation";
+import { resolvePracticeRouteDecision } from "@/src/application/practice-route/practice-route-decision";
 
 export const dynamic = "force-dynamic";
 
@@ -16,20 +14,15 @@ export default async function ReportGeneratingPage({
 }: ReportGeneratingPageProps) {
   const { sessionId } = await params;
 
-  const context = await getLearnerEntryContext();
-  if (!context.ok) {
-    redirect("/login");
-  }
-
-  const orchestrator = createSessionOrchestrator({
-    generatedSessionCaseRepository: context.generatedSessionCaseRepository,
-    reportGenerationCoordinator: createReportGenerationCoordinator()
-  });
-
-  const outcome = await orchestrator.runReportGeneratingFlowForLearner({
-    learnerId: context.learnerId,
+  const decision = await resolvePracticeRouteDecision({
+    intent: "report-generating",
     sessionId
   });
-
-  redirect(outcome.nextPath);
+  if (decision.action === "not-found") {
+    notFound();
+  }
+  if (decision.action !== "redirect") {
+    notFound();
+  }
+  redirect(decision.path);
 }

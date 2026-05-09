@@ -1,3 +1,5 @@
+import type { HiddenEvaluationJudge } from "@/src/domain/session/hidden-evaluation-judge";
+
 export type OpenRouterChatMessage = {
   role: "system" | "user" | "assistant";
   content: string;
@@ -20,6 +22,20 @@ export type OpenRouterStructuredJsonCompletion = {
   model: string;
   content: string;
 };
+
+export function createOpenRouterHiddenEvaluationJudge(input: {
+  chatClient: OpenRouterChatClient;
+}): HiddenEvaluationJudge {
+  return {
+    async createStructuredJsonCompletion(request) {
+      const completion =
+        await input.chatClient.createStructuredJsonCompletion(request);
+      return {
+        content: completion.content
+      };
+    }
+  };
+}
 
 export class OpenRouterProviderError extends Error {
   readonly name = "OpenRouterProviderError";

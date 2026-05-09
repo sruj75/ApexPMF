@@ -1,11 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHiddenEvaluationEngine } from "../src/domain/session/hidden-evaluation-engine";
+import {
+  createFallbackHiddenEvaluationPromptSource,
+  createPinnedHiddenEvaluationPromptSource,
+  createStubFailingHiddenEvaluationPromptSource
+} from "../src/domain/session/hidden-evaluation-prompt-source";
 import type { GeneratedSessionCase } from "../src/domain/session/generated-session-case";
 import type { SessionTranscriptTurn } from "../src/domain/session/session-report";
 
 describe("Hidden Evaluation engine", () => {
   it("returns ready from LLM judge JSON for ended non-quit sessions with >=5 turns", async () => {
-    const chatClient = {
+    const judge = {
       createStructuredJsonCompletion: vi.fn(async () => ({
         id: "resp-1",
         model: "test-model",
@@ -13,7 +18,7 @@ describe("Hidden Evaluation engine", () => {
       }))
     };
     const engine = createHiddenEvaluationEngine({
-      chatClient
+      judge
     });
 
     const result = await engine.evaluateEndedSession({
@@ -26,11 +31,11 @@ describe("Hidden Evaluation engine", () => {
       throw new Error("Expected ready evaluation.");
     }
     expect(result.evaluation.trapResults[0]?.outcome).toBe("partial");
-    expect(chatClient.createStructuredJsonCompletion).toHaveBeenCalledTimes(1);
+    expect(judge.createStructuredJsonCompletion).toHaveBeenCalledTimes(1);
   });
 
   it("returns typed insufficient reasons for user-quit, not-ended, short transcript, and missing speakers", async () => {
-    const chatClient = {
+    const judge = {
       createStructuredJsonCompletion: vi.fn(async () => ({
         id: "resp-1",
         model: "test-model",
@@ -38,7 +43,7 @@ describe("Hidden Evaluation engine", () => {
       }))
     };
     const engine = createHiddenEvaluationEngine({
-      chatClient
+      judge
     });
 
     const userQuitCase = makeGeneratedSessionCase("user-quit");
@@ -91,7 +96,7 @@ describe("Hidden Evaluation engine", () => {
   });
 
   it("retries once on invalid judge output and then returns invalid-judge-output when retry is still invalid", async () => {
-    const chatClient = {
+    const judge = {
       createStructuredJsonCompletion: vi
         .fn()
         .mockResolvedValueOnce({
@@ -110,7 +115,7 @@ describe("Hidden Evaluation engine", () => {
         })
     };
     const engine = createHiddenEvaluationEngine({
-      chatClient
+      judge
     });
 
     await expect(
@@ -123,17 +128,17 @@ describe("Hidden Evaluation engine", () => {
       reason: "invalid-judge-output"
     });
 
-    expect(chatClient.createStructuredJsonCompletion).toHaveBeenCalledTimes(2);
+    expect(judge.createStructuredJsonCompletion).toHaveBeenCalledTimes(2);
   });
 
   it("returns provider-failure when judge call throws", async () => {
-    const chatClient = {
+    const judge = {
       createStructuredJsonCompletion: vi.fn(async () => {
         throw new Error("provider unavailable");
       })
     };
     const engine = createHiddenEvaluationEngine({
-      chatClient
+      judge
     });
 
     await expect(
@@ -145,6 +150,110 @@ describe("Hidden Evaluation engine", () => {
       status: "insufficient-evidence",
       reason: "provider-failure"
     });
+  });
+
+  it("builds messages from an injected prompt source", async () => {
+    const promptSource = createPinnedHiddenEvaluationPromptSource({
+      systemPrompt: "TEST SYSTEM",
+      evaluationInstruction: "Evaluate now with custom instruction.",
+      repairInstruction: "Repair in strict JSON."
+    });
+    const judge = {
+      createStructuredJsonCompletion: vi.fn(async () => ({
+        id: "resp-1",
+        model: "test-model",
+        content: JSON.stringify(makeReadyJudgeOutput())
+      }))
+    };
+    const engine = createHiddenEvaluationEngine({
+      judge,
+      promptSource
+    });
+
+    await engine.evaluateEndedSession({
+      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+      transcript: makeTranscript()
+    });
+
+    expect(judge.createStructuredJsonCompletion).toHaveBeenCalledTimes(1);
+    const firstRequest = judge.createStructuredJsonCompletion.mock.calls[0]?.[0];
+    expect(firstRequest?.messages[0]).toEqual({
+      role: "system",
+      content: "TEST SYSTEM"
+    });
+    expect(firstRequest?.messages[1]?.content).toContain(
+      "Evaluate now with custom instruction."
+    );
+  });
+
+  it("uses the injected prompt source repair instruction on retry", async () => {
+    const judge = {
+      createStructuredJsonCompletion: vi
+        .fn()
+        .mockResolvedValueOnce({
+          id: "resp-1",
+          model: "test-model",
+          content: "{invalid-json"
+        })
+        .mockResolvedValueOnce({
+          id: "resp-2",
+          model: "test-model",
+          content: JSON.stringify(makeReadyJudgeOutput())
+        })
+    };
+    const engine = createHiddenEvaluationEngine({
+      judge,
+      promptSource: createPinnedHiddenEvaluationPromptSource({
+        systemPrompt: "SYSTEM FOR RETRY",
+        evaluationInstruction: "Evaluate now.",
+        repairInstruction: "CUSTOM REPAIR MESSAGE"
+      })
+    });
+
+    await engine.evaluateEndedSession({
+      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+      transcript: makeTranscript()
+    });
+
+    expect(judge.createStructuredJsonCompletion).toHaveBeenCalledTimes(2);
+    const secondRequest = judge.createStructuredJsonCompletion.mock.calls[1]?.[0];
+    expect(secondRequest?.messages[3]).toEqual({
+      role: "user",
+      content: "CUSTOM REPAIR MESSAGE"
+    });
+  });
+
+  it("falls back to pinned prompts when primary prompt source fails", async () => {
+    const promptSource = createFallbackHiddenEvaluationPromptSource({
+      primary: createStubFailingHiddenEvaluationPromptSource({
+        failureMessage: "primary prompt source unavailable"
+      }),
+      fallback: createPinnedHiddenEvaluationPromptSource({
+        systemPrompt: "FALLBACK SYSTEM",
+        evaluationInstruction: "FALLBACK EVALUATION",
+        repairInstruction: "FALLBACK REPAIR"
+      })
+    });
+    const judge = {
+      createStructuredJsonCompletion: vi.fn(async () => ({
+        id: "resp-1",
+        model: "test-model",
+        content: JSON.stringify(makeReadyJudgeOutput())
+      }))
+    };
+    const engine = createHiddenEvaluationEngine({
+      judge,
+      promptSource
+    });
+
+    await engine.evaluateEndedSession({
+      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+      transcript: makeTranscript()
+    });
+
+    const firstRequest = judge.createStructuredJsonCompletion.mock.calls[0]?.[0];
+    expect(firstRequest?.messages[0]?.content).toBe("FALLBACK SYSTEM");
+    expect(firstRequest?.messages[1]?.content).toContain("FALLBACK EVALUATION");
   });
 });
 

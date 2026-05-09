@@ -157,6 +157,64 @@ describe("Session Orchestrator", () => {
     });
   });
 
+  it("skips report generation for user-quit Sessions and routes to Practice Dashboard", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    let generationCount = 0;
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        async generateForEndedSession() {
+          generationCount += 1;
+          return makeReadyReportGenerationResult();
+        }
+      }
+    });
+
+    await orchestrator.endSessionForLearner({
+      learnerId,
+      sessionId: sessionIds.userQuit,
+      reason: "user-quit"
+    });
+
+    await expect(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: sessionIds.userQuit
+      })
+    ).resolves.toEqual({
+      reportStatus: "insufficient-evidence",
+      nextPath: "/dashboard"
+    });
+
+    expect(generationCount).toBe(0);
+  });
+
+  it("skips report generation for active Voice Conversation Sessions and preserves route path", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    let generationCount = 0;
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        async generateForEndedSession() {
+          generationCount += 1;
+          return makeReadyReportGenerationResult();
+        }
+      }
+    });
+
+    await expect(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: sessionIds.voiceFailure
+      })
+    ).resolves.toEqual({
+      reportStatus: "insufficient-evidence",
+      nextPath: `/practice/${sessionIds.voiceFailure}`
+    });
+
+    expect(generationCount).toBe(0);
+  });
+
   it("persists structured report artifacts when report output is ready", async () => {
     const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
     const orchestrator = createSessionOrchestrator({
@@ -366,6 +424,27 @@ describe("Session Orchestrator", () => {
     expect(persisted?.sessionReport).not.toBeNull();
     expect(persisted?.sessionTranscript).not.toBeNull();
     expect(persisted?.sessionEvaluation).not.toBeNull();
+  });
+
+  it("returns not-found when report-generating is requested for a missing Session", async () => {
+    const repository = createInMemoryGeneratedSessionCaseRepository();
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        async generateForEndedSession() {
+          return makeReadyReportGenerationResult();
+        }
+      }
+    });
+
+    await expect(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: "00000000-0000-4000-8000-000000000001"
+      })
+    ).resolves.toEqual({
+      reportStatus: "not-found"
+    });
   });
 });
 

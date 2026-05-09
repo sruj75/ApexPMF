@@ -1,11 +1,14 @@
 import type { GeneratedSessionCase } from "@/src/domain/session/generated-session-case";
+import {
+  createNonLiveLlmRuntimePolicy,
+  type NonLiveLlmRuntimePolicy
+} from "@/src/application/non-live-llm-policy";
 import type { ReportBuilder } from "@/src/domain/session/report-builder";
 import { createDeterministicReportBuilder } from "@/src/domain/session/report-builder";
 import type {
   HiddenEvaluationEngine,
   HiddenEvaluationResult
 } from "@/src/domain/session/hidden-evaluation-engine";
-import { createHiddenEvaluationEngine } from "@/src/domain/session/hidden-evaluation-engine";
 import type {
   SessionEvaluationArtifact,
   SessionEvaluationInsufficientReason
@@ -14,7 +17,6 @@ import type {
   SessionReport,
   SessionTranscriptTurn
 } from "@/src/domain/session/session-report";
-import { createOpenRouterChatClient } from "@/src/infrastructure/llm/openrouter";
 
 export type ReportGenerationResult =
   | {
@@ -37,11 +39,15 @@ export type ReportGenerationCoordinator = {
 export function createReportGenerationCoordinator(input?: {
   reportBuilder?: ReportBuilder;
   hiddenEvaluationEngine?: HiddenEvaluationEngine;
+  nonLiveLlmRuntimePolicy?: NonLiveLlmRuntimePolicy;
 }): ReportGenerationCoordinator {
   const reportBuilder =
     input?.reportBuilder ?? createDeterministicReportBuilder();
   const hiddenEvaluationEngine =
-    input?.hiddenEvaluationEngine ?? createProductionHiddenEvaluationEngine();
+    input?.hiddenEvaluationEngine ??
+    (
+      input?.nonLiveLlmRuntimePolicy ?? createNonLiveLlmRuntimePolicy()
+    ).composeHiddenEvaluationEngine();
 
   return {
     async generateForEndedSession({ generatedSessionCase }) {
@@ -97,27 +103,4 @@ function insufficiencyFromEvaluation(
         status: "insufficient-evidence" as const,
         reason: evaluationResult.reason
       };
-}
-
-function createProductionHiddenEvaluationEngine(): HiddenEvaluationEngine {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    return {
-      async evaluateEndedSession() {
-        return {
-          status: "insufficient-evidence",
-          reason: "provider-failure"
-        };
-      }
-    };
-  }
-
-  return createHiddenEvaluationEngine({
-    chatClient: createOpenRouterChatClient({
-      apiKey,
-      model: process.env.OPENROUTER_MODEL ?? "openrouter/free",
-      siteUrl: process.env.OPENROUTER_SITE_URL,
-      appTitle: process.env.OPENROUTER_APP_TITLE ?? "The Mom Test Simulator"
-    })
-  });
 }

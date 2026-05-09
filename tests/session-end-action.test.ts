@@ -1,26 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { endSessionAction } from "../app/practice/[sessionId]/actions";
 
-const { redirect, getLearnerEntryContext, createSessionOrchestrator } = vi.hoisted(
-  () => ({
-    redirect: vi.fn((location: string) => {
-      throw new Error(`REDIRECT:${location}`);
-    }),
-    getLearnerEntryContext: vi.fn(),
-    createSessionOrchestrator: vi.fn()
-  })
-);
+const { redirect, getLearnerSessionRuntime } = vi.hoisted(() => ({
+  redirect: vi.fn((location: string) => {
+    throw new Error(`REDIRECT:${location}`);
+  }),
+  getLearnerSessionRuntime: vi.fn()
+}));
 
 vi.mock("next/navigation", () => ({
   redirect
 }));
 
 vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
-  getLearnerEntryContext
-}));
-
-vi.mock("@/src/application/end-session/session-orchestrator", () => ({
-  createSessionOrchestrator
+  getLearnerSessionRuntime
 }));
 
 describe("End Session action", () => {
@@ -29,7 +22,7 @@ describe("End Session action", () => {
   });
 
   it("redirects unauthenticated Learners to /login", async () => {
-    getLearnerEntryContext.mockResolvedValue({
+    getLearnerSessionRuntime.mockResolvedValue({
       ok: false,
       reason: "unauthenticated"
     });
@@ -48,14 +41,10 @@ describe("End Session action", () => {
       reportStatus: "not-requested"
     }));
 
-    getLearnerEntryContext.mockResolvedValue({
+    getLearnerSessionRuntime.mockResolvedValue({
       ok: true,
-      learnerId: "learner-1",
-      idealCustomerProfileRepository: {},
-      generatedSessionCaseRepository: {}
-    });
-    createSessionOrchestrator.mockReturnValue({
-      endSessionForLearner
+      endSessionForLearner,
+      runReportGeneratingFlowForLearner: vi.fn()
     });
 
     const formData = new FormData();
@@ -63,7 +52,6 @@ describe("End Session action", () => {
 
     await expect(endSessionAction(formData)).rejects.toThrow("REDIRECT:/dashboard");
     expect(endSessionForLearner).toHaveBeenCalledWith({
-      learnerId: "learner-1",
       sessionId: "session-case-abc",
       reason: "user-quit"
     });

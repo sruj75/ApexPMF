@@ -1,26 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ReportGeneratingPage from "../app/practice/[sessionId]/report-generating/page";
+import { defaultPracticeSessionId } from "./support/generated-session-case-fixture";
 
-const { redirect, getLearnerEntryContext, createSessionOrchestrator } = vi.hoisted(
-  () => ({
-    redirect: vi.fn((location: string) => {
-      throw new Error(`REDIRECT:${location}`);
-    }),
-    getLearnerEntryContext: vi.fn(),
-    createSessionOrchestrator: vi.fn()
-  })
-);
+const { redirect, notFound, resolvePracticeRouteDecision } = vi.hoisted(() => ({
+  redirect: vi.fn((location: string) => {
+    throw new Error(`REDIRECT:${location}`);
+  }),
+  notFound: vi.fn(() => {
+    throw new Error("NOT_FOUND");
+  }),
+  resolvePracticeRouteDecision: vi.fn()
+}));
 
 vi.mock("next/navigation", () => ({
-  redirect
+  redirect,
+  notFound
 }));
 
-vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
-  getLearnerEntryContext
-}));
-
-vi.mock("@/src/application/end-session/session-orchestrator", () => ({
-  createSessionOrchestrator
+vi.mock("@/src/application/practice-route/practice-route-decision", () => ({
+  resolvePracticeRouteDecision
 }));
 
 describe("Report generating page", () => {
@@ -28,73 +26,56 @@ describe("Report generating page", () => {
     vi.clearAllMocks();
   });
 
-  it("redirects unauthenticated learners to /login", async () => {
-    getLearnerEntryContext.mockResolvedValue({
-      ok: false,
-      reason: "unauthenticated"
+  it("routes not-found decisions through the Next.js notFound boundary", async () => {
+    resolvePracticeRouteDecision.mockResolvedValue({
+      action: "not-found"
     });
 
     await expect(
       ReportGeneratingPage({
         params: Promise.resolve({
-          sessionId: "session-case-1"
+          sessionId: defaultPracticeSessionId
         })
       })
-    ).rejects.toThrow("REDIRECT:/login");
-  });
-
-  it("routes to Session Report when report output is ready", async () => {
-    const runReportGeneratingFlowForLearner = vi.fn(async () => ({
-      reportStatus: "ready",
-      nextPath: "/practice/session-case-1/report"
-    }));
-
-    getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      idealCustomerProfileRepository: {},
-      generatedSessionCaseRepository: {}
-    });
-    createSessionOrchestrator.mockReturnValue({
-      runReportGeneratingFlowForLearner
-    });
-
-    await expect(
-      ReportGeneratingPage({
-        params: Promise.resolve({
-          sessionId: "session-case-1"
-        })
-      })
-    ).rejects.toThrow("REDIRECT:/practice/session-case-1/report");
-
-    expect(runReportGeneratingFlowForLearner).toHaveBeenCalledWith({
-      learnerId: "learner-1",
-      sessionId: "session-case-1"
+    ).rejects.toThrow("NOT_FOUND");
+    expect(resolvePracticeRouteDecision).toHaveBeenCalledWith({
+      intent: "report-generating",
+      sessionId: defaultPracticeSessionId
     });
   });
 
-  it("routes to Practice Dashboard when report evidence is insufficient", async () => {
-    const runReportGeneratingFlowForLearner = vi.fn(async () => ({
-      reportStatus: "insufficient-evidence",
-      nextPath: "/dashboard"
-    }));
-
-    getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      idealCustomerProfileRepository: {},
-      generatedSessionCaseRepository: {}
-    });
-    createSessionOrchestrator.mockReturnValue({
-      runReportGeneratingFlowForLearner
+  it("routes redirect decisions through the Next.js redirect boundary", async () => {
+    resolvePracticeRouteDecision.mockResolvedValue({
+      action: "redirect",
+      path: `/practice/${defaultPracticeSessionId}/report`
     });
 
     await expect(
       ReportGeneratingPage({
         params: Promise.resolve({
-          sessionId: "session-case-1"
+          sessionId: defaultPracticeSessionId
         })
       })
-    ).rejects.toThrow("REDIRECT:/dashboard");
+    ).rejects.toThrow(`REDIRECT:/practice/${defaultPracticeSessionId}/report`);
+  });
+
+  it("treats non-redirect render decisions as not-found for defensive routing", async () => {
+    resolvePracticeRouteDecision.mockResolvedValue({
+      action: "render-practice-session",
+      startedSession: {
+        sessionId: defaultPracticeSessionId,
+        openingContext: "Opening context",
+        sessionSourceLabel: "Broad Practice Pool",
+        lightPersonaLabel: "Finance operator"
+      }
+    });
+
+    await expect(
+      ReportGeneratingPage({
+        params: Promise.resolve({
+          sessionId: defaultPracticeSessionId
+        })
+      })
+    ).rejects.toThrow("NOT_FOUND");
   });
 });

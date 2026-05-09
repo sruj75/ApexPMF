@@ -1,8 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { createReportGenerationCoordinator } from "../src/application/generate-report/report-generation-coordinator";
+import type { NonLiveLlmRuntimePolicy } from "../src/application/non-live-llm-policy";
 import type { GeneratedSessionCase } from "../src/domain/session/generated-session-case";
 
+const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
+
 describe("Report generation coordinator", () => {
+  afterAll(() => {
+    process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey;
+  });
+
   it("uses real transcript and returns ready artifacts when judge and report builder succeed", async () => {
     const hiddenEvaluationEngine = {
       evaluateEndedSession: vi.fn(async () => ({
@@ -90,6 +97,75 @@ describe("Report generation coordinator", () => {
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "invalid-judge-output"
+    });
+  });
+
+  it("passes through provider-failure reason from hidden evaluation", async () => {
+    const coordinator = createReportGenerationCoordinator({
+      hiddenEvaluationEngine: {
+        evaluateEndedSession: vi.fn(async () => ({
+          status: "insufficient-evidence" as const,
+          reason: "provider-failure" as const
+        }))
+      },
+      reportBuilder: {
+        buildFromEvaluation: vi.fn(async () => ({
+          status: "ready" as const,
+          report: makeReport()
+        }))
+      }
+    });
+
+    await expect(
+      coordinator.generateForEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion")
+      })
+    ).resolves.toEqual({
+      status: "insufficient-evidence",
+      reason: "provider-failure"
+    });
+  });
+
+  it("uses provider-failure fallback engine when OPENROUTER_API_KEY is missing", async () => {
+    delete process.env.OPENROUTER_API_KEY;
+    const coordinator = createReportGenerationCoordinator();
+
+    await expect(
+      coordinator.generateForEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion")
+      })
+    ).resolves.toEqual({
+      status: "insufficient-evidence",
+      reason: "provider-failure"
+    });
+  });
+
+  it("uses injected non-live runtime policy to compose hidden evaluation engine", async () => {
+    const evaluateEndedSession = vi.fn(async () => ({
+      status: "insufficient-evidence" as const,
+      reason: "provider-failure" as const
+    }));
+    const nonLiveLlmRuntimePolicy: NonLiveLlmRuntimePolicy = {
+      composePersonaGenerator: () => ({ generateSessionCase: async () => makeGeneratedSessionCase("natural-conclusion") }),
+      composeHiddenEvaluationEngine: () => ({
+        evaluateEndedSession
+      }),
+      mapStartSessionFailure: (cause) => {
+        throw cause;
+      }
+    };
+    const coordinator = createReportGenerationCoordinator({
+      nonLiveLlmRuntimePolicy
+    });
+
+    const result = await coordinator.generateForEndedSession({
+      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion")
+    });
+
+    expect(evaluateEndedSession).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      status: "insufficient-evidence",
+      reason: "provider-failure"
     });
   });
 });

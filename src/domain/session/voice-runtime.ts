@@ -73,7 +73,7 @@ export function createScriptedVoiceRuntime(
   };
 
   return {
-    async startSession(_input) {
+    async startSession() {
       emit(script.onStart);
     },
     subscribe(listener) {
@@ -82,13 +82,13 @@ export function createScriptedVoiceRuntime(
         listeners.delete(listener);
       };
     },
-    async sendLearnerSpeech(_input) {
+    async sendLearnerSpeech() {
       emit(script.onLearnerSpeech);
     },
-    async interrupt(_input) {
+    async interrupt() {
       emit(script.onInterrupt);
     },
-    async end(_input) {
+    async end() {
       emit(script.onEnd);
     }
   };

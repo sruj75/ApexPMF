@@ -1,9 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createSessionOrchestrator } from "@/src/application/end-session/session-orchestrator";
-import { createReportGenerationCoordinator } from "@/src/application/generate-report/report-generation-coordinator";
-import { getLearnerEntryContext } from "@/src/application/start-session/practice-entry-seam";
+import { getLearnerSessionRuntime } from "@/src/application/start-session/practice-entry-seam";
 
 export async function endSessionAction(formData: FormData) {
   const sessionId = stringFromFormData(formData, "sessionId");
@@ -11,18 +9,12 @@ export async function endSessionAction(formData: FormData) {
     throw new Error("Missing sessionId for endSessionAction.");
   }
 
-  const context = await getLearnerEntryContext();
-  if (!context.ok) {
+  const runtime = await getLearnerSessionRuntime();
+  if (!runtime.ok) {
     redirect("/login");
   }
 
-  const orchestrator = createSessionOrchestrator({
-    generatedSessionCaseRepository: context.generatedSessionCaseRepository,
-    reportGenerationCoordinator: createReportGenerationCoordinator()
-  });
-
-  const outcome = await orchestrator.endSessionForLearner({
-    learnerId: context.learnerId,
+  const outcome = await runtime.endSessionForLearner({
     sessionId,
     reason: "user-quit"
   });

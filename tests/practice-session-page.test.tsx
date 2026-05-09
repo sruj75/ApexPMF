@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import PracticeSessionPage from "../app/practice/[sessionId]/page";
+import { defaultPracticeSessionId } from "./support/generated-session-case-fixture";
 
 const {
   redirect,
   notFound,
-  getLearnerEntryContext,
+  resolvePracticeRouteDecision,
   SessionStartView
 } = vi.hoisted(() => ({
   redirect: vi.fn((location: string) => {
@@ -13,7 +14,7 @@ const {
   notFound: vi.fn(() => {
     throw new Error("NOT_FOUND");
   }),
-  getLearnerEntryContext: vi.fn(),
+  resolvePracticeRouteDecision: vi.fn(),
   SessionStartView: vi.fn(() => null)
 }));
 
@@ -22,8 +23,8 @@ vi.mock("next/navigation", () => ({
   notFound
 }));
 
-vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
-  getLearnerEntryContext
+vi.mock("@/src/application/practice-route/practice-route-decision", () => ({
+  resolvePracticeRouteDecision
 }));
 
 vi.mock("../app/practice/[sessionId]/session-start-view", () => ({
@@ -31,200 +32,66 @@ vi.mock("../app/practice/[sessionId]/session-start-view", () => ({
 }));
 
 describe("Practice session page lifecycle routing", () => {
-  it("routes ended non-quit sessions to Report Generating State", async () => {
-    getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      idealCustomerProfileRepository: {},
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () => ({
-          id: "123e4567-e89b-12d3-a456-426614174000",
-          learnerId: "learner-1",
-          sessionSource: {
-            kind: "broad-practice-pool",
-            label: "Broad Practice Pool"
-          },
-          generationNonce: "nonce-1",
-          createdAt: new Date(),
-          openingContext: "Opening context",
-          customerPersona: {
-            lightPersonaLabel: "Finance operator",
-            interviewRole: "Controller",
-            publicContext: "Owns reporting",
-            privateConstraints: ["Budget owner is VP Finance"]
-          },
-          hiddenBackstory: "Hidden",
-          customerFit: "strong-fit",
-          hiddenTestPlan: {
-            focusAreas: ["Concrete History"],
-            successSignals: ["Asked about recent attempts"],
-            failureSignals: ["Accepted vague praise"]
-          },
-          personaBehavior: {
-            conversationalFriction: [
-              "hesitation",
-              "rambling",
-              "vague-answers",
-              "mild-discomfort",
-              "interruption",
-              "questions-back"
-            ],
-            weakQuestionSocialSignals: [
-              "politeness",
-              "praise",
-              "speculation",
-              "vague-interest"
-            ],
-            strongQuestionTruthAnchors: [
-              "paid-consultant-attempt",
-              "manual-rebuild-weekend"
-            ],
-            trapDelivery: "natural-hidden"
-          },
-          traps: [
-            {
-              id: "trap-1",
-              label: "Compliment Trap",
-              setup: "Persona praises the pitch.",
-              weakBehavior: "Learner accepts praise as validation."
-            }
-          ],
-          generationAudit: {
-            provider: "test",
-            model: "test-model"
-          },
-          sessionLifecycle: {
-            sessionStatus: "ended",
-            endedReason: "credit-exhaustion",
-            endedAt: new Date("2026-05-08T10:00:00.000Z"),
-            reportStatus: "generating",
-            reportReadyAt: null
-          },
-          sessionReport: null,
-          sessionTranscript: null
-        }))
-      }
-    });
-
-    await expect(
-      PracticeSessionPage({
-        params: Promise.resolve({
-          sessionId: "123e4567-e89b-12d3-a456-426614174000"
-        })
-      })
-    ).rejects.toThrow(
-      "REDIRECT:/practice/123e4567-e89b-12d3-a456-426614174000/report-generating"
-    );
-
-    expect(SessionStartView).not.toHaveBeenCalled();
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("routes ended sessions with ready report status directly to Session Report", async () => {
-    getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      idealCustomerProfileRepository: {},
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () => ({
-          id: "123e4567-e89b-12d3-a456-426614174000",
-          learnerId: "learner-1",
-          sessionSource: {
-            kind: "broad-practice-pool",
-            label: "Broad Practice Pool"
-          },
-          generationNonce: "nonce-1",
-          createdAt: new Date(),
-          openingContext: "Opening context",
-          customerPersona: {
-            lightPersonaLabel: "Finance operator",
-            interviewRole: "Controller",
-            publicContext: "Owns reporting",
-            privateConstraints: ["Budget owner is VP Finance"]
-          },
-          hiddenBackstory: "Hidden",
-          customerFit: "strong-fit",
-          hiddenTestPlan: {
-            focusAreas: ["Concrete History"],
-            successSignals: ["Asked about recent attempts"],
-            failureSignals: ["Accepted vague praise"]
-          },
-          personaBehavior: {
-            conversationalFriction: [
-              "hesitation",
-              "rambling",
-              "vague-answers",
-              "mild-discomfort",
-              "interruption",
-              "questions-back"
-            ],
-            weakQuestionSocialSignals: [
-              "politeness",
-              "praise",
-              "speculation",
-              "vague-interest"
-            ],
-            strongQuestionTruthAnchors: [
-              "paid-consultant-attempt",
-              "manual-rebuild-weekend"
-            ],
-            trapDelivery: "natural-hidden"
-          },
-          traps: [
-            {
-              id: "trap-1",
-              label: "Compliment Trap",
-              setup: "Persona praises the pitch.",
-              weakBehavior: "Learner accepts praise as validation."
-            }
-          ],
-          generationAudit: {
-            provider: "test",
-            model: "test-model"
-          },
-          sessionLifecycle: {
-            sessionStatus: "ended",
-            endedReason: "natural-conclusion",
-            endedAt: new Date("2026-05-08T10:00:00.000Z"),
-            reportStatus: "ready",
-            reportReadyAt: new Date("2026-05-08T10:05:00.000Z")
-          },
-          sessionReport: {
-            outcome: {
-              summary: "Session ended with reason: natural-conclusion."
-            },
-            missedSignals: [],
-            badQuestions: [],
-            strongQuestions: [],
-            trapResults: [],
-            skillMovement: [],
-            nextPracticeFocus: {
-              title: "Ask behavior-first follow-ups",
-              description:
-                "After social signals, ask about past behavior before solutions."
-            },
-            sourceContext: "Broad Practice Pool",
-            lightPersonaLabel: "Finance operator",
-            expandableEvidence: []
-          },
-          sessionTranscript: [
-            {
-              sequence: 1,
-              speaker: "learner",
-              text: "What did you try recently?"
-            }
-          ]
-        }))
-      }
+  it("routes not-found decisions through the Next.js notFound boundary", async () => {
+    resolvePracticeRouteDecision.mockResolvedValue({
+      action: "not-found"
     });
 
     await expect(
       PracticeSessionPage({
         params: Promise.resolve({
-          sessionId: "123e4567-e89b-12d3-a456-426614174000"
+          sessionId: defaultPracticeSessionId
         })
       })
-    ).rejects.toThrow(
-      "REDIRECT:/practice/123e4567-e89b-12d3-a456-426614174000/report"
-    );
+    ).rejects.toThrow("NOT_FOUND");
+    expect(resolvePracticeRouteDecision).toHaveBeenCalledWith({
+      intent: "practice-session",
+      sessionId: defaultPracticeSessionId
+    });
+  });
+
+  it("routes redirect decisions through the Next.js redirect boundary", async () => {
+    resolvePracticeRouteDecision.mockResolvedValue({
+      action: "redirect",
+      path: `/practice/${defaultPracticeSessionId}/report-generating`
+    });
+
+    await expect(
+      PracticeSessionPage({
+        params: Promise.resolve({
+          sessionId: defaultPracticeSessionId
+        })
+      })
+    ).rejects.toThrow(`REDIRECT:/practice/${defaultPracticeSessionId}/report-generating`);
+  });
+
+  it("renders the practice view for render decisions", async () => {
+    const startedSession = {
+      sessionId: defaultPracticeSessionId,
+      openingContext: "Opening context",
+      sessionSourceLabel: "Broad Practice Pool",
+      lightPersonaLabel: "Finance operator"
+    };
+    resolvePracticeRouteDecision.mockResolvedValue({
+      action: "render-practice-session",
+      startedSession
+    });
+
+    const result = await PracticeSessionPage({
+      params: Promise.resolve({
+        sessionId: defaultPracticeSessionId
+      })
+    });
+
+    expect(result).toMatchObject({
+      props: {
+        startedSession
+      }
+    });
+    expect((result as { type: unknown }).type).toBe(SessionStartView);
   });
 });

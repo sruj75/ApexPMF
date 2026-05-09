@@ -60,6 +60,7 @@ docs/adr/*
 - UI code in `app/*` renders state and triggers application seams. It does not implement domain rules.
 - `src/application/*` composes workflows and error mapping. It does not own persona truth, reportability, progression logic, or credit policy.
 - Domain contracts (`src/domain/*`) are storage/provider-agnostic at their boundaries and use product language from `CONTEXT.md`.
+- Boundary inputs are parsed into typed domain shapes at ingress (parse, don't validate). Avoid passing unrefined external data plus ad-hoc boolean checks deeper into domain/application layers.
 - Supabase access stays behind repository/adaptor modules in `src/infrastructure/supabase/*`.
 - Non-live LLM transport stays in `src/infrastructure/llm/*`; domain modules own prompt/schema/quality logic for their use cases.
 - Customer Personas are generated fresh per Session from Session Source inputs; they are not fixed fixtures.
@@ -79,13 +80,15 @@ docs/adr/*
 
 `persona generation -> llm transport`: Persona Generation owns system/user prompt content, structured schema contract, decode failures, and quality gates; OpenRouter client owns HTTP protocol concerns only.
 
+`hidden evaluation -> llm transport`: Hidden Evaluation owns judge prompt source, structured response contract, decode and retry policy, and transcript evidence quality gates; OpenRouter adapter owns transport translation only.
+
 `session source -> profile repository`: active profile lookup happens once at Session start; Session Source is snapshotted into Generated Session Case for historical consistency.
 
 `future voice/report/progression seams`: add new modules under `src/domain/*` and `src/application/*` without bypassing the same boundary direction.
 
 ## Cross-cutting Concerns
 
-`Typing and validation`: external data is validated/decoded at boundaries (Supabase row decoders, structured JSON decode paths, safe redirect path checks).
+`Boundary parsing`: external data is parsed/decoded into refined shapes at boundaries (Supabase row decoders, structured JSON decode paths, safe redirect path checks), then consumed as trusted typed values internally.
 
 `Error shaping`: use explicit failure categories for learner entry/start failures so redirects and UX outcomes are deterministic.
 

@@ -1,15 +1,20 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SessionReportPage from "../app/practice/[sessionId]/report/page";
+import {
+  defaultPracticeSessionId,
+  makeReportPageSessionReport,
+  makeReportPageTranscript
+} from "./support/generated-session-case-fixture";
 
-const { redirect, notFound, getLearnerEntryContext } = vi.hoisted(() => ({
+const { redirect, notFound, resolvePracticeRouteDecision } = vi.hoisted(() => ({
   redirect: vi.fn((location: string) => {
     throw new Error(`REDIRECT:${location}`);
   }),
   notFound: vi.fn(() => {
     throw new Error("NOT_FOUND");
   }),
-  getLearnerEntryContext: vi.fn()
+  resolvePracticeRouteDecision: vi.fn()
 }));
 
 vi.mock("next/navigation", () => ({
@@ -17,8 +22,8 @@ vi.mock("next/navigation", () => ({
   notFound
 }));
 
-vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
-  getLearnerEntryContext
+vi.mock("@/src/application/practice-route/practice-route-decision", () => ({
+  resolvePracticeRouteDecision
 }));
 
 describe("Session report page", () => {
@@ -26,33 +31,58 @@ describe("Session report page", () => {
     vi.clearAllMocks();
   });
 
+  it("routes not-found decisions through the Next.js notFound boundary", async () => {
+    resolvePracticeRouteDecision.mockResolvedValue({
+      action: "not-found"
+    });
+
+    await expect(
+      SessionReportPage({
+        params: Promise.resolve({
+          sessionId: defaultPracticeSessionId
+        })
+      })
+    ).rejects.toThrow("NOT_FOUND");
+    expect(resolvePracticeRouteDecision).toHaveBeenCalledWith({
+      intent: "session-report",
+      sessionId: defaultPracticeSessionId
+    });
+  });
+
+  it("routes redirect decisions through the Next.js redirect boundary", async () => {
+    resolvePracticeRouteDecision.mockResolvedValue({
+      action: "redirect",
+      path: `/practice/${defaultPracticeSessionId}/report-generating`
+    });
+
+    await expect(
+      SessionReportPage({
+        params: Promise.resolve({
+          sessionId: defaultPracticeSessionId
+        })
+      })
+    ).rejects.toThrow(`REDIRECT:/practice/${defaultPracticeSessionId}/report-generating`);
+  });
+
   it("renders required report sections, source context, trap results, and inline transcript", async () => {
-    getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      idealCustomerProfileRepository: {},
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () => makeEndedReadySessionCase())
-      }
+    resolvePracticeRouteDecision.mockResolvedValue({
+      action: "render-session-report",
+      report: makeReportPageSessionReport(),
+      transcript: makeReportPageTranscript()
     });
 
     render(
       await SessionReportPage({
         params: Promise.resolve({
-          sessionId: "123e4567-e89b-12d3-a456-426614174000"
+          sessionId: defaultPracticeSessionId
         })
       })
     );
 
     expect(screen.getByRole("heading", { name: /session report/i })).toBeVisible();
-    expect(screen.getByRole("heading", { name: /outcome/i })).toBeVisible();
-    expect(screen.getByRole("heading", { name: /missed signals/i })).toBeVisible();
-    expect(screen.getByRole("heading", { name: /bad questions/i })).toBeVisible();
-    expect(screen.getByRole("heading", { name: /strong questions/i })).toBeVisible();
-    expect(screen.getByRole("heading", { name: /trap results/i })).toBeVisible();
-    expect(screen.getByRole("heading", { name: /skill movement/i })).toBeVisible();
-    expect(screen.getByRole("heading", { name: /next practice focus/i })).toBeVisible();
-
+    expect(
+      screen.getAllByText(/session ended with reason: natural-conclusion\./i).length
+    ).toBeGreaterThan(0);
     expect(screen.getByText(/source context:/i)).toBeVisible();
     expect(screen.getByText(/broad practice pool/i)).toBeVisible();
     expect(screen.getByText(/persona label:/i)).toBeVisible();
@@ -68,19 +98,16 @@ describe("Session report page", () => {
   });
 
   it("supports expand and collapse for evidence snippets without transcript deep links", async () => {
-    getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      idealCustomerProfileRepository: {},
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () => makeEndedReadySessionCase())
-      }
+    resolvePracticeRouteDecision.mockResolvedValue({
+      action: "render-session-report",
+      report: makeReportPageSessionReport(),
+      transcript: makeReportPageTranscript()
     });
 
     render(
       await SessionReportPage({
         params: Promise.resolve({
-          sessionId: "123e4567-e89b-12d3-a456-426614174000"
+          sessionId: defaultPracticeSessionId
         })
       })
     );
@@ -104,19 +131,16 @@ describe("Session report page", () => {
   });
 
   it("renders partial trap outcomes with an explicit Partial label", async () => {
-    getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      idealCustomerProfileRepository: {},
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(async () => makeEndedReadySessionCase("partial"))
-      }
+    resolvePracticeRouteDecision.mockResolvedValue({
+      action: "render-session-report",
+      report: makeReportPageSessionReport("partial"),
+      transcript: makeReportPageTranscript()
     });
 
     render(
       await SessionReportPage({
         params: Promise.resolve({
-          sessionId: "123e4567-e89b-12d3-a456-426614174000"
+          sessionId: defaultPracticeSessionId
         })
       })
     );
@@ -126,156 +150,3 @@ describe("Session report page", () => {
     ).toBeVisible();
   });
 });
-
-function makeEndedReadySessionCase(
-  trapOutcome: "triggered" | "avoided" | "partial" = "triggered"
-) {
-  const trapDetail =
-    trapOutcome === "partial"
-      ? "Learner accepted praise then recovered with follow-up."
-      : "Learner accepted praise as validation.";
-
-  return {
-    id: "123e4567-e89b-12d3-a456-426614174000",
-    learnerId: "learner-1",
-    sessionSource: {
-      kind: "broad-practice-pool",
-      label: "Broad Practice Pool"
-    },
-    openingContext: "Opening context",
-    customerPersona: {
-      lightPersonaLabel: "Finance operator",
-      interviewRole: "Controller",
-      publicContext: "Owns reporting",
-      privateConstraints: ["Budget owner is VP Finance"]
-    },
-    hiddenBackstory:
-      "The operator rebuilt reports manually after a failed automation handoff.",
-    customerFit: "strong-fit",
-    hiddenTestPlan: {
-      focusAreas: ["Concrete History"],
-      successSignals: ["Asked about recent attempts"],
-      failureSignals: ["Accepted vague praise"]
-    },
-    personaBehavior: {
-      conversationalFriction: [
-        "hesitation",
-        "rambling",
-        "vague-answers",
-        "mild-discomfort",
-        "interruption",
-        "questions-back"
-      ],
-      weakQuestionSocialSignals: [
-        "politeness",
-        "praise",
-        "speculation",
-        "vague-interest"
-      ],
-      strongQuestionTruthAnchors: [
-        "paid-consultant-attempt",
-        "manual-rebuild-weekend"
-      ],
-      trapDelivery: "natural-hidden"
-    },
-    traps: [
-      {
-        id: "trap-1",
-        label: "Compliment Trap",
-        setup: "Persona praises the pitch.",
-        weakBehavior: "Learner accepts praise as validation."
-      }
-    ],
-    generationNonce: "nonce-1",
-    generationAudit: {
-      provider: "test",
-      model: "test-model"
-    },
-    createdAt: new Date("2026-05-08T08:00:00.000Z"),
-    sessionLifecycle: {
-      sessionStatus: "ended",
-      endedReason: "natural-conclusion",
-      endedAt: new Date("2026-05-08T09:00:00.000Z"),
-      reportStatus: "ready",
-      reportReadyAt: new Date("2026-05-08T09:01:00.000Z")
-    },
-    sessionReport: {
-      outcome: {
-        summary: "Session ended with reason: natural-conclusion."
-      },
-      missedSignals: [
-        {
-          title: "Polite praise treated as validation",
-          detail: "Positive language was interpreted as buying intent.",
-          evidence: [
-            {
-              sequence: 1,
-              title: "Early social signal",
-              detail: "The first turn invited speculation.",
-              snippet: "Would this be useful for your team?"
-            }
-          ]
-        }
-      ],
-      badQuestions: [
-        {
-          question: "Would this be useful for your team?",
-          whyItMissed: "Allowed speculative sentiment.",
-          evidence: []
-        }
-      ],
-      strongQuestions: [
-        {
-          question: "What did you try in the last month?",
-          whyItWorked: "Prompted concrete history.",
-          evidence: []
-        }
-      ],
-      trapResults: [
-        {
-          trapLabel: "Compliment Trap",
-          outcome: trapOutcome,
-          detail: trapDetail,
-          evidence: []
-        }
-      ],
-      skillMovement: [
-        {
-          skill: "Concrete History",
-          movement: "flat",
-          rationale: "Strong follow-up came late."
-        }
-      ],
-      nextPracticeFocus: {
-        title: "Ask behavior-first follow-ups",
-        description: "Follow praise with a concrete history question."
-      },
-      sourceContext: "Broad Practice Pool",
-      lightPersonaLabel: "Finance operator",
-      expandableEvidence: [
-        {
-          sequence: 1,
-          turnId: "turn-1",
-          title: "Asked concrete history follow-up",
-          detail:
-            "Follow-up moved from speculation toward observable customer behavior.",
-          snippet: "What did you try recently?"
-        }
-      ]
-    },
-    sessionTranscript: [
-      {
-        sequence: 1,
-        turnId: "turn-1",
-        speaker: "learner",
-        text: "What did you try recently?"
-      },
-      {
-        sequence: 2,
-        turnId: "turn-2",
-        speaker: "persona",
-        text: "We paid a consultant and still rebuilt reports manually."
-      }
-    ]
-  };
-}

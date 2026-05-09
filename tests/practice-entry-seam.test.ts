@@ -3,6 +3,9 @@ import {
   getLearnerEntryContext,
   startPracticeFromEntryContext
 } from "../src/application/start-session/practice-entry-seam";
+import type { NonLiveLlmRuntimePolicy } from "../src/application/non-live-llm-policy";
+import { createEntryFailure } from "../src/application/start-session/entry-failure";
+import { OpenRouterProviderError } from "../src/infrastructure/llm/openrouter";
 
 const { getSupabaseLearnerEntryContext, startPracticeForLearner } = vi.hoisted(
   () => ({
@@ -100,5 +103,72 @@ describe("Practice entry seam", () => {
       expect(result.failure.cause).toBeInstanceOf(Error);
       expect((result.failure.cause as Error).message).toBe("downstream failure");
     }
+  });
+
+  it("maps typed OpenRouter provider failures to provider_failure", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-key";
+    startPracticeForLearner.mockRejectedValue(
+      new OpenRouterProviderError({
+        phase: "request_failed",
+        status: 503,
+        statusText: "Service Unavailable",
+        message: "OpenRouter request failed: 503 Service Unavailable"
+      })
+    );
+
+    const result = await startPracticeFromEntryContext({
+      learnerId: "learner-4",
+      idealCustomerProfileRepository: {} as never,
+      generatedSessionCaseRepository: {} as never
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.category).toBe("provider_failure");
+      expect(result.failure.details).toEqual([
+        "phase=request_failed",
+        "status=503",
+        "statusText=Service Unavailable"
+      ]);
+    }
+  });
+
+  it("uses the injected non-live runtime policy contract for persona and failure mapping", async () => {
+    const personaGenerator = {} as never;
+    const mappedFailure = createEntryFailure({
+      category: "input_invalid",
+      message: "mapped by injected non-live policy"
+    });
+    const nonLiveLlmRuntimePolicy: NonLiveLlmRuntimePolicy = {
+      composePersonaGenerator: () => personaGenerator,
+      composeHiddenEvaluationEngine: () => ({
+        evaluateEndedSession: async () => ({
+          status: "insufficient-evidence",
+          reason: "provider-failure"
+        })
+      }),
+      mapStartSessionFailure: () => mappedFailure
+    };
+    startPracticeForLearner.mockRejectedValue(new Error("downstream failure"));
+
+    const result = await startPracticeFromEntryContext(
+      {
+        learnerId: "learner-5",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {} as never
+      },
+      { nonLiveLlmRuntimePolicy }
+    );
+
+    expect(startPracticeForLearner).toHaveBeenCalledWith(
+      "learner-5",
+      expect.objectContaining({
+        personaGenerator
+      })
+    );
+    expect(result).toEqual({
+      ok: false,
+      failure: mappedFailure
+    });
   });
 });

@@ -1,6 +1,11 @@
 import type { ReportGenerationCoordinator } from "@/src/application/generate-report/report-generation-coordinator";
 import type { GeneratedSessionCaseRepository } from "@/src/domain/session/generated-session-case-repository";
 import type { ReportStatus, SessionEndReason } from "@/src/domain/session/session-lifecycle";
+import {
+  resolveReportGeneratingDecision,
+  resolveSessionLifecycleRoute,
+  voiceConversationPath
+} from "./session-lifecycle-route-policy";
 
 export type SessionOrchestrator = {
   endSessionForLearner(input: {
@@ -65,17 +70,13 @@ export function createSessionOrchestrator(input: {
         throw new Error(`Session not found: ${sessionId}`);
       }
 
-      if (reason === "user-quit") {
-        return {
-          nextPath: "/dashboard",
-          sessionStatus: "ended",
-          endedReason: reason,
-          reportStatus: updated.sessionLifecycle.reportStatus
-        };
-      }
+      const route = resolveSessionLifecycleRoute({
+        sessionId,
+        generatedSessionCase: updated
+      });
 
       return {
-        nextPath: reportGeneratingPath(sessionId),
+        nextPath: route.nextPath,
         sessionStatus: "ended",
         endedReason: reason,
         reportStatus: updated.sessionLifecycle.reportStatus
@@ -86,11 +87,11 @@ export function createSessionOrchestrator(input: {
       if (recoverable) {
         return {
           behavior: "resume-voice-conversation",
-          nextPath: `/practice/${sessionId}`
+          nextPath: voiceConversationPath(sessionId)
         };
       }
 
-      await this.endSessionForLearner({
+      const outcome = await this.endSessionForLearner({
         learnerId,
         sessionId,
         reason: "voice-failure"
@@ -98,7 +99,7 @@ export function createSessionOrchestrator(input: {
 
       return {
         behavior: "end-session",
-        nextPath: reportGeneratingPath(sessionId)
+        nextPath: outcome.nextPath
       };
     },
 
@@ -111,36 +112,15 @@ export function createSessionOrchestrator(input: {
         throw new Error(`Session not found: ${sessionId}`);
       }
 
-      if (generatedSessionCase.sessionLifecycle.reportStatus === "ready") {
-        if (
-          generatedSessionCase.sessionReport &&
-          generatedSessionCase.sessionTranscript &&
-          generatedSessionCase.sessionEvaluation
-        ) {
-          return {
-            reportStatus: "ready" as const,
-            nextPath: `/practice/${sessionId}/report`
-          };
-        }
-      }
+      const decision = resolveReportGeneratingDecision({
+        sessionId,
+        generatedSessionCase
+      });
 
-      if (
-        generatedSessionCase.sessionLifecycle.sessionStatus !== "ended" ||
-        generatedSessionCase.sessionLifecycle.endedReason === "user-quit" ||
-        generatedSessionCase.sessionLifecycle.reportStatus ===
-          "insufficient-evidence" ||
-        generatedSessionCase.sessionLifecycle.reportStatus === "not-requested"
-      ) {
+      if (decision.decision === "skip-generation") {
         return {
-          reportStatus: "insufficient-evidence" as const,
-          nextPath: "/dashboard"
-        };
-      }
-
-      if (generatedSessionCase.sessionLifecycle.reportStatus !== "generating") {
-        return {
-          reportStatus: "insufficient-evidence" as const,
-          nextPath: "/dashboard"
+          reportStatus: decision.reportStatus,
+          nextPath: decision.nextPath
         };
       }
 
@@ -148,36 +128,32 @@ export function createSessionOrchestrator(input: {
         generatedSessionCase
       });
 
-      if (result.status === "ready") {
-        await generatedSessionCaseRepository.updateReportArtifactsForLearner({
-          learnerId,
-          sessionCaseId: sessionId,
-          reportStatus: "ready",
-          reportReadyAt: new Date(),
-          sessionReport: result.report,
-          sessionTranscript: result.transcript,
-          sessionEvaluation: result.evaluation
-        });
-
-        return {
-          reportStatus: "ready",
-          nextPath: `/practice/${sessionId}/report`
-        };
-      }
-
-      await generatedSessionCaseRepository.updateReportArtifactsForLearner({
+      const persisted = await generatedSessionCaseRepository.updateReportArtifactsForLearner({
         learnerId,
         sessionCaseId: sessionId,
-        reportStatus: "insufficient-evidence",
-        reportReadyAt: null,
-        sessionReport: null,
-        sessionTranscript: null,
-        sessionEvaluation: null
+        reportStatus: result.status,
+        reportReadyAt: result.status === "ready" ? new Date() : null,
+        sessionReport: result.status === "ready" ? result.report : null,
+        sessionTranscript: result.status === "ready" ? result.transcript : null,
+        sessionEvaluation: result.status === "ready" ? result.evaluation : null
       });
+      if (!persisted) {
+        throw new Error(`Session not found: ${sessionId}`);
+      }
+
+      const persistedDecision = resolveReportGeneratingDecision({
+        sessionId,
+        generatedSessionCase: persisted
+      });
+      if (persistedDecision.decision !== "skip-generation") {
+        throw new Error(
+          `Session lifecycle route unresolved after report persistence: ${sessionId}`
+        );
+      }
 
       return {
-        reportStatus: "insufficient-evidence",
-        nextPath: "/dashboard"
+        reportStatus: persistedDecision.reportStatus,
+        nextPath: persistedDecision.nextPath
       };
     }
   };
@@ -187,6 +163,3 @@ function needsReportGeneration(reason: SessionEndReason): boolean {
   return reason !== "user-quit";
 }
 
-function reportGeneratingPath(sessionId: string): string {
-  return `/practice/${sessionId}/report-generating`;
-}

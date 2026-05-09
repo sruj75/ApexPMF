@@ -1,10 +1,13 @@
-import type { OpenRouterChatClient } from "@/src/infrastructure/llm/openrouter";
 import {
   decodeHiddenEvaluationResponse,
   hiddenEvaluationResponseJsonSchema,
   hiddenEvaluationResponseSchemaName
 } from "./hidden-evaluation-contract";
-import { hiddenEvaluationJudgePrompt } from "./hidden-evaluation-prompt";
+import type { HiddenEvaluationJudge } from "./hidden-evaluation-judge";
+import {
+  createPinnedHiddenEvaluationPromptSource,
+  type HiddenEvaluationPromptSource
+} from "./hidden-evaluation-prompt-source";
 import type { GeneratedSessionCase } from "./generated-session-case";
 import type {
   SessionEvaluationArtifact,
@@ -32,8 +35,12 @@ export type HiddenEvaluationEngine = {
 };
 
 export function createHiddenEvaluationEngine(input: {
-  chatClient: OpenRouterChatClient;
+  judge: HiddenEvaluationJudge;
+  promptSource?: HiddenEvaluationPromptSource;
 }): HiddenEvaluationEngine {
+  const promptSource =
+    input.promptSource ?? createPinnedHiddenEvaluationPromptSource();
+
   return {
     async evaluateEndedSession({ generatedSessionCase, transcript }) {
       if (generatedSessionCase.sessionLifecycle.sessionStatus !== "ended") {
@@ -67,7 +74,8 @@ export function createHiddenEvaluationEngine(input: {
       }
 
       const completion = await requestJudgeCompletion({
-        chatClient: input.chatClient,
+        judge: input.judge,
+        promptSource,
         generatedSessionCase,
         transcript
       });
@@ -84,7 +92,8 @@ export function createHiddenEvaluationEngine(input: {
       }
 
       const repairedCompletion = await requestJudgeCompletion({
-        chatClient: input.chatClient,
+        judge: input.judge,
+        promptSource,
         generatedSessionCase,
         transcript,
         repairContent: completion.content
@@ -106,7 +115,8 @@ export function createHiddenEvaluationEngine(input: {
 }
 
 async function requestJudgeCompletion(input: {
-  chatClient: OpenRouterChatClient;
+  judge: HiddenEvaluationJudge;
+  promptSource: HiddenEvaluationPromptSource;
   generatedSessionCase: GeneratedSessionCase;
   transcript: SessionTranscriptTurn[];
   repairContent?: string;
@@ -122,10 +132,10 @@ async function requestJudgeCompletion(input: {
     }
 > {
   try {
-    const completion = await input.chatClient.createStructuredJsonCompletion({
+    const completion = await input.judge.createStructuredJsonCompletion({
       responseSchemaName: hiddenEvaluationResponseSchemaName,
       responseJsonSchema: hiddenEvaluationResponseJsonSchema,
-      messages: buildMessages(input)
+      messages: await buildMessages(input)
     });
     const decoded = decodeHiddenEvaluationResponse(completion.content);
     if (!decoded.ok) {
@@ -173,16 +183,18 @@ async function requestJudgeCompletion(input: {
   }
 }
 
-function buildMessages(input: {
+async function buildMessages(input: {
+  promptSource: HiddenEvaluationPromptSource;
   generatedSessionCase: GeneratedSessionCase;
   transcript: SessionTranscriptTurn[];
   repairContent?: string;
 }) {
+  const promptBundle = await input.promptSource.getPromptBundle();
   const sessionCaseJson = JSON.stringify(input.generatedSessionCase, null, 2);
   const transcriptJson = JSON.stringify(input.transcript, null, 2);
 
   const baseUserPrompt = [
-    "Evaluate this completed Session.",
+    promptBundle.evaluationInstruction,
     "",
     "<generated_session_case_json>",
     sessionCaseJson,
@@ -197,7 +209,7 @@ function buildMessages(input: {
     return [
       {
         role: "system" as const,
-        content: hiddenEvaluationJudgePrompt
+        content: promptBundle.systemPrompt
       },
       {
         role: "user" as const,
@@ -209,7 +221,7 @@ function buildMessages(input: {
   return [
     {
       role: "system" as const,
-      content: hiddenEvaluationJudgePrompt
+      content: promptBundle.systemPrompt
     },
     {
       role: "user" as const,
@@ -221,8 +233,7 @@ function buildMessages(input: {
     },
     {
       role: "user" as const,
-      content:
-        "Repair your previous response to strict JSON schema compliance only. Keep decisions unchanged where possible. Return JSON only."
+      content: promptBundle.repairInstruction
     }
   ];
 }

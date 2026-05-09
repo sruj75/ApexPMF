@@ -1,17 +1,17 @@
+import { type EntryFailure } from "@/src/application/start-session/entry-failure";
 import {
-  classifyEntryFailure,
-  createEntryFailure,
-  type EntryFailure
-} from "@/src/application/start-session/entry-failure";
-import { createOpenRouterPersonaGenerator } from "@/src/domain/persona/openrouter-persona-generator";
+  createNonLiveLlmRuntimePolicy,
+  type NonLiveLlmRuntimePolicy
+} from "@/src/application/non-live-llm-policy";
+import { createSessionOrchestrator } from "@/src/application/end-session/session-orchestrator";
+import type { SessionOrchestrator } from "@/src/application/end-session/session-orchestrator";
+import { createReportGenerationCoordinator } from "@/src/application/generate-report/report-generation-coordinator";
+import type { SessionEndReason } from "@/src/domain/session/session-lifecycle";
 import { startPracticeForLearner } from "@/src/application/start-session/start-practice";
-import { createOpenRouterChatClient } from "@/src/infrastructure/llm/openrouter";
 import {
   getSupabaseLearnerEntryContext,
   type SupabaseLearnerEntryContextResult
 } from "@/src/infrastructure/supabase/learner-entry-context";
-
-const defaultOpenRouterModel = "openrouter/free";
 
 export type LearnerEntryContextResult =
   | {
@@ -45,6 +45,57 @@ export async function getLearnerEntryContext(): Promise<LearnerEntryContextResul
   return getSupabaseLearnerEntryContext();
 }
 
+export type LearnerSessionRuntimeResult =
+  | {
+      ok: false;
+      reason: "unauthenticated";
+    }
+  | {
+      ok: true;
+      endSessionForLearner(input: {
+        sessionId: string;
+        reason: SessionEndReason;
+      }): ReturnType<SessionOrchestrator["endSessionForLearner"]>;
+      runReportGeneratingFlowForLearner(input: {
+        sessionId: string;
+      }): ReturnType<SessionOrchestrator["runReportGeneratingFlowForLearner"]>;
+    };
+
+/**
+ * Learner-scoped Session Orchestrator wiring for end-session and report-generating flows.
+ * Call sites use this instead of assembling repositories and coordinators directly.
+ */
+export async function getLearnerSessionRuntime(): Promise<LearnerSessionRuntimeResult> {
+  const context = await getLearnerEntryContext();
+  if (!context.ok) {
+    return { ok: false, reason: "unauthenticated" };
+  }
+
+  const orchestrator = createSessionOrchestrator({
+    generatedSessionCaseRepository: context.generatedSessionCaseRepository,
+    reportGenerationCoordinator: createReportGenerationCoordinator()
+  });
+
+  const { learnerId } = context;
+
+  return {
+    ok: true,
+    endSessionForLearner({ sessionId, reason }) {
+      return orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId,
+        reason
+      });
+    },
+    runReportGeneratingFlowForLearner({ sessionId }) {
+      return orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId
+      });
+    }
+  };
+}
+
 export async function startPracticeFromEntryContext(context: {
   learnerId: string;
   idealCustomerProfileRepository: Extract<
@@ -55,12 +106,18 @@ export async function startPracticeFromEntryContext(context: {
     LearnerEntryContextResult,
     { ok: true }
   >["generatedSessionCaseRepository"];
+},
+input?: {
+  nonLiveLlmRuntimePolicy?: NonLiveLlmRuntimePolicy;
 }): Promise<StartPracticeSeamResult> {
+  const nonLiveLlmRuntimePolicy =
+    input?.nonLiveLlmRuntimePolicy ?? createNonLiveLlmRuntimePolicy();
+
   try {
     const startedSession = await startPracticeForLearner(context.learnerId, {
       idealCustomerProfileRepository: context.idealCustomerProfileRepository,
       generatedSessionCaseRepository: context.generatedSessionCaseRepository,
-      personaGenerator: createProductionPersonaGenerator()
+      personaGenerator: nonLiveLlmRuntimePolicy.composePersonaGenerator()
     });
 
     return {
@@ -70,28 +127,7 @@ export async function startPracticeFromEntryContext(context: {
   } catch (cause) {
     return {
       ok: false,
-      failure: classifyEntryFailure(cause)
+      failure: nonLiveLlmRuntimePolicy.mapStartSessionFailure(cause)
     };
   }
-}
-
-function createProductionPersonaGenerator() {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-
-  if (!apiKey) {
-    throw createEntryFailure({
-      category: "provider_failure",
-      message: "OPENROUTER_API_KEY is required to Start Practice."
-    });
-  }
-
-  return createOpenRouterPersonaGenerator({
-    chatClient: createOpenRouterChatClient({
-      apiKey,
-      model: process.env.OPENROUTER_MODEL ?? defaultOpenRouterModel,
-      siteUrl: process.env.OPENROUTER_SITE_URL,
-      appTitle:
-        process.env.OPENROUTER_APP_TITLE ?? "The Mom Test Simulator"
-    })
-  });
 }

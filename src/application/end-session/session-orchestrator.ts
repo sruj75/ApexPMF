@@ -35,10 +35,15 @@ export type SessionOrchestrator = {
   runReportGeneratingFlowForLearner(input: {
     learnerId: string;
     sessionId: string;
-  }): Promise<{
-    reportStatus: "ready" | "insufficient-evidence";
-    nextPath: string;
-  }>;
+  }): Promise<
+    | {
+        reportStatus: "not-found";
+      }
+    | {
+        reportStatus: "ready" | "insufficient-evidence";
+        nextPath: string;
+      }
+  >;
 };
 
 export function createSessionOrchestrator(input: {
@@ -109,7 +114,9 @@ export function createSessionOrchestrator(input: {
         sessionId
       );
       if (!generatedSessionCase) {
-        throw new Error(`Session not found: ${sessionId}`);
+        return {
+          reportStatus: "not-found"
+        };
       }
 
       const decision = resolveReportGeneratingDecision({
@@ -138,7 +145,9 @@ export function createSessionOrchestrator(input: {
         sessionEvaluation: result.status === "ready" ? result.evaluation : null
       });
       if (!persisted) {
-        throw new Error(`Session not found: ${sessionId}`);
+        return {
+          reportStatus: "not-found"
+        };
       }
 
       const persistedDecision = resolveReportGeneratingDecision({
@@ -162,4 +171,3 @@ export function createSessionOrchestrator(input: {
 function needsReportGeneration(reason: SessionEndReason): boolean {
   return reason !== "user-quit";
 }
-

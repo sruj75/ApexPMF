@@ -425,6 +425,27 @@ describe("Session Orchestrator", () => {
     expect(persisted?.sessionTranscript).not.toBeNull();
     expect(persisted?.sessionEvaluation).not.toBeNull();
   });
+
+  it("returns not-found when report-generating is requested for a missing Session", async () => {
+    const repository = createInMemoryGeneratedSessionCaseRepository();
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        async generateForEndedSession() {
+          return makeReadyReportGenerationResult();
+        }
+      }
+    });
+
+    await expect(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: "00000000-0000-4000-8000-000000000001"
+      })
+    ).resolves.toEqual({
+      reportStatus: "not-found"
+    });
+  });
 });
 
 async function createRepositoryWithEndedSessionFixtures(): Promise<{

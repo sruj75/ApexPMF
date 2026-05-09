@@ -365,6 +365,27 @@ describe("Practice route decision module", () => {
       }
     );
   });
+
+  it("returns not-found when report-generating runtime flow resolves missing Session", async () => {
+    const deps = makeDependencies();
+    deps.getLearnerSessionRuntime.mockResolvedValue({
+      ok: true,
+      runReportGeneratingFlowForLearner: vi.fn(async () => ({
+        reportStatus: "not-found" as const
+      }))
+    });
+
+    await expectDecision(
+      {
+        intent: "report-generating",
+        sessionId: defaultPracticeSessionId
+      },
+      deps,
+      {
+        action: "not-found"
+      }
+    );
+  });
 });
 
 async function expectDecision(

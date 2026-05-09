@@ -5,6 +5,11 @@ import type {
   GeneratedSessionCase
 } from "@/src/domain/session/generated-session-case";
 import type { GeneratedSessionCaseRepository } from "@/src/domain/session/generated-session-case-repository";
+import type {
+  SessionReport,
+  SessionTranscriptTurn
+} from "@/src/domain/session/session-report";
+import type { SessionEvaluationArtifact } from "@/src/domain/session/session-evaluation";
 import {
   SessionEvaluationArtifactSchema,
   SessionReportSchema,
@@ -351,9 +356,13 @@ function decodeGeneratedSessionCaseRowOrThrow(
       reportStatus: decodedRow.report_status,
       reportReadyAt: decodedRow.report_ready_at
     },
-    sessionReport: decodedRow.session_report,
-    sessionTranscript: decodedRow.session_transcript,
-    sessionEvaluation: decodedRow.session_evaluation
+    sessionReport: cloneUnknownOrNull<SessionReport>(decodedRow.session_report),
+    sessionTranscript: cloneUnknownOrNull<SessionTranscriptTurn[]>(
+      decodedRow.session_transcript
+    ),
+    sessionEvaluation: cloneUnknownOrNull<SessionEvaluationArtifact>(
+      decodedRow.session_evaluation
+    )
   };
 }
 
@@ -415,4 +424,12 @@ function decodeWithSchemaOrThrow<T, I>(
 
 function assertNeverSessionSource(sessionSource: never): never {
   throw new Error(`Unknown Session source kind: ${String(sessionSource)}`);
+}
+
+function cloneUnknownOrNull<T>(value: unknown): T | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return structuredClone(value) as T;
 }

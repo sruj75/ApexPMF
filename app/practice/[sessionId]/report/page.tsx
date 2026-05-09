@@ -25,6 +25,9 @@ export default async function SessionReportPage({
   if (decision.action === "redirect") {
     redirect(decision.path);
   }
+  if (decision.action !== "render-session-report") {
+    notFound();
+  }
 
   return (
     <SessionReportView report={decision.report} transcript={decision.transcript} />

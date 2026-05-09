@@ -25,6 +25,9 @@ export default async function PracticeSessionPage({
   if (decision.action === "redirect") {
     redirect(decision.path);
   }
+  if (decision.action !== "render-practice-session") {
+    notFound();
+  }
 
   return <SessionStartView startedSession={decision.startedSession} />;
 }

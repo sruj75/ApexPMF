@@ -5,7 +5,8 @@ import PracticeSessionPage from "../app/practice/[sessionId]/page";
 const {
   redirect,
   notFound,
-  getLearnerEntryContext
+  getLearnerEntryContext,
+  getLearnerSessionRuntime
 } = vi.hoisted(() => ({
   redirect: vi.fn((location: string) => {
     throw new Error(`REDIRECT:${location}`);
@@ -13,7 +14,8 @@ const {
   notFound: vi.fn(() => {
     throw new Error("NOT_FOUND");
   }),
-  getLearnerEntryContext: vi.fn()
+  getLearnerEntryContext: vi.fn(),
+  getLearnerSessionRuntime: vi.fn()
 }));
 
 vi.mock("next/navigation", () => ({
@@ -22,13 +24,18 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
-  getLearnerEntryContext
+  getLearnerEntryContext,
+  getLearnerSessionRuntime
 }));
 
 describe("Entry pages auth guard parity", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getLearnerEntryContext.mockResolvedValue({
+      ok: false,
+      reason: "unauthenticated"
+    });
+    getLearnerSessionRuntime.mockResolvedValue({
       ok: false,
       reason: "unauthenticated"
     });

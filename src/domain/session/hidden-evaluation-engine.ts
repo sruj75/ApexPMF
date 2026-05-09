@@ -75,14 +75,12 @@ export function createHiddenEvaluationEngine(input: {
           };
         }
 
-        const completion = yield* Effect.promise(() =>
-          requestJudgeCompletion({
-            judge: input.judge,
-            promptSource,
-            generatedSessionCase,
-            transcript
-          })
-        );
+        const completion = yield* requestJudgeCompletion({
+          judge: input.judge,
+          promptSource,
+          generatedSessionCase,
+          transcript
+        });
 
         if (completion.ok) {
           return completion.value;
@@ -95,15 +93,13 @@ export function createHiddenEvaluationEngine(input: {
           };
         }
 
-        const repairedCompletion = yield* Effect.promise(() =>
-          requestJudgeCompletion({
-            judge: input.judge,
-            promptSource,
-            generatedSessionCase,
-            transcript,
-            repairContent: completion.content
-          })
-        );
+        const repairedCompletion = yield* requestJudgeCompletion({
+          judge: input.judge,
+          promptSource,
+          generatedSessionCase,
+          transcript,
+          repairContent: completion.content
+        });
 
         if (repairedCompletion.ok) {
           return repairedCompletion.value;
@@ -121,13 +117,13 @@ export function createHiddenEvaluationEngine(input: {
   };
 }
 
-async function requestJudgeCompletion(input: {
+function requestJudgeCompletion(input: {
   judge: HiddenEvaluationJudge;
   promptSource: HiddenEvaluationPromptSource;
   generatedSessionCase: GeneratedSessionCase;
   transcript: SessionTranscriptTurn[];
   repairContent?: string;
-}): Promise<
+}): Effect.Effect<
   | {
       ok: true;
       value: HiddenEvaluationResult;
@@ -138,12 +134,17 @@ async function requestJudgeCompletion(input: {
       content?: string;
     }
 > {
-  try {
-    const completion = await input.judge.createStructuredJsonCompletion({
-      responseSchemaName: hiddenEvaluationResponseSchemaName,
-      responseJsonSchema: hiddenEvaluationResponseJsonSchema,
-      messages: await buildMessages(input)
-    });
+  return Effect.gen(function* () {
+    const messages = yield* buildMessages(input).pipe(
+      Effect.catchAll(() => Effect.fail("provider-failure" as const))
+    );
+    const completion = yield* input.judge
+      .createStructuredJsonCompletion({
+        responseSchemaName: hiddenEvaluationResponseSchemaName,
+        responseJsonSchema: hiddenEvaluationResponseJsonSchema,
+        messages
+      })
+      .pipe(Effect.catchAll(() => Effect.fail("provider-failure" as const)));
     const decoded = decodeHiddenEvaluationResponse(completion.content);
     if (!decoded.ok) {
       return {
@@ -182,67 +183,75 @@ async function requestJudgeCompletion(input: {
         reason: decoded.value.reason
       }
     };
-  } catch {
-    return {
-      ok: false,
-      reason: "provider-failure"
-    };
-  }
+  }).pipe(
+    Effect.catchAll((reason) =>
+      Effect.succeed({
+        ok: false as const,
+        reason
+      })
+    )
+  );
 }
 
-async function buildMessages(input: {
+function buildMessages(input: {
   promptSource: HiddenEvaluationPromptSource;
   generatedSessionCase: GeneratedSessionCase;
   transcript: SessionTranscriptTurn[];
   repairContent?: string;
 }) {
-  const promptBundle = await input.promptSource.getPromptBundle();
-  const sessionCaseJson = JSON.stringify(input.generatedSessionCase, null, 2);
-  const transcriptJson = JSON.stringify(input.transcript, null, 2);
+  return Effect.tryPromise({
+    try: () => input.promptSource.getPromptBundle(),
+    catch: (cause) => cause
+  }).pipe(
+    Effect.map((promptBundle) => {
+      const sessionCaseJson = JSON.stringify(input.generatedSessionCase, null, 2);
+      const transcriptJson = JSON.stringify(input.transcript, null, 2);
 
-  const baseUserPrompt = [
-    promptBundle.evaluationInstruction,
-    "",
-    "<generated_session_case_json>",
-    sessionCaseJson,
-    "</generated_session_case_json>",
-    "",
-    "<session_transcript_json>",
-    transcriptJson,
-    "</session_transcript_json>"
-  ].join("\n");
+      const baseUserPrompt = [
+        promptBundle.evaluationInstruction,
+        "",
+        "<generated_session_case_json>",
+        sessionCaseJson,
+        "</generated_session_case_json>",
+        "",
+        "<session_transcript_json>",
+        transcriptJson,
+        "</session_transcript_json>"
+      ].join("\n");
 
-  if (!input.repairContent) {
-    return [
-      {
-        role: "system" as const,
-        content: promptBundle.systemPrompt
-      },
-      {
-        role: "user" as const,
-        content: baseUserPrompt
+      if (!input.repairContent) {
+        return [
+          {
+            role: "system" as const,
+            content: promptBundle.systemPrompt
+          },
+          {
+            role: "user" as const,
+            content: baseUserPrompt
+          }
+        ];
       }
-    ];
-  }
 
-  return [
-    {
-      role: "system" as const,
-      content: promptBundle.systemPrompt
-    },
-    {
-      role: "user" as const,
-      content: baseUserPrompt
-    },
-    {
-      role: "assistant" as const,
-      content: input.repairContent
-    },
-    {
-      role: "user" as const,
-      content: promptBundle.repairInstruction
-    }
-  ];
+      return [
+        {
+          role: "system" as const,
+          content: promptBundle.systemPrompt
+        },
+        {
+          role: "user" as const,
+          content: baseUserPrompt
+        },
+        {
+          role: "assistant" as const,
+          content: input.repairContent
+        },
+        {
+          role: "user" as const,
+          content: promptBundle.repairInstruction
+        }
+      ];
+    })
+  );
 }
 
 function allSequencesExist(

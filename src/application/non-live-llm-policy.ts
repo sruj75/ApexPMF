@@ -3,10 +3,6 @@ import {
   createEntryFailure,
   type EntryFailure
 } from "@/src/application/start-session/entry-failure";
-import {
-  StartPracticePersonaGenerationError,
-  StartPracticeSessionSourceError
-} from "@/src/application/start-session/start-practice";
 import { createOpenRouterPersonaGenerator } from "@/src/domain/persona/openrouter-persona-generator";
 import {
   PersonaGenerationProviderError,
@@ -24,7 +20,7 @@ import {
   OpenRouterProviderError,
   type OpenRouterChatClient
 } from "@/src/infrastructure/llm/openrouter";
-import { Data, Either, Effect } from "effect";
+import { Data, Effect } from "effect";
 
 const defaultOpenRouterModel = "openrouter/free";
 const defaultOpenRouterAppTitle = "The Mom Test Simulator";
@@ -68,7 +64,7 @@ export type NonLiveLlmRuntimePolicy = {
     NonLiveLlmProviderUnavailableError,
     never
   >;
-  composeHiddenEvaluationEngine(): HiddenEvaluationEngine;
+  composeHiddenEvaluationEngine(): Effect.Effect<HiddenEvaluationEngine, never, never>;
   mapStartSessionFailure(cause: unknown): EntryFailure;
 };
 
@@ -98,26 +94,24 @@ export function createNonLiveLlmRuntimePolicy(input?: {
       );
     },
     composeHiddenEvaluationEngine() {
-      const accessResult = Effect.runSync(Effect.either(nonLiveLlmAccess));
-      if (Either.isLeft(accessResult)) {
-        return createUnavailableHiddenEvaluationEngine(accessResult.left);
-      }
-
-      return hiddenEvaluationEngineFactory({
-        judge: createOpenRouterHiddenEvaluationJudge({
-          chatClient: accessResult.right.chatClient
-        })
-      });
+      return nonLiveLlmAccess.pipe(
+        Effect.map((access) =>
+          hiddenEvaluationEngineFactory({
+            judge: createOpenRouterHiddenEvaluationJudge({
+              chatClient: access.chatClient
+            })
+          })
+        ),
+        Effect.catchAll((failure) =>
+          Effect.succeed(createUnavailableHiddenEvaluationEngine(failure))
+        )
+      );
     },
     mapStartSessionFailure(cause) {
-      const normalizedCause = unwrapStartSessionCause(cause);
-      if (normalizedCause instanceof NonLiveLlmProviderUnavailableError) {
-        return mapNonLiveLlmFailureToEntryFailure(normalizedCause);
-      }
-      const nonLiveLlmFailure = classifyNonLiveLlmFailure(normalizedCause);
+      const nonLiveLlmFailure = classifyNonLiveLlmFailure(cause);
       return nonLiveLlmFailure
         ? mapNonLiveLlmFailureToEntryFailure(nonLiveLlmFailure)
-        : classifyEntryFailure(normalizedCause);
+        : classifyEntryFailure(cause);
     }
   };
 }
@@ -205,7 +199,10 @@ export function mapNonLiveLlmFailureToHiddenEvaluationReason(
   }
 }
 
-function missingOpenRouterApiKeyFailure(): NonLiveLlmProviderUnavailableError {
+function missingOpenRouterApiKeyFailure(): Extract<
+  NonLiveLlmFailure,
+  NonLiveLlmProviderUnavailableError
+> {
   return new NonLiveLlmProviderUnavailableError({
     category: "provider_unavailable",
     missingEnvVar: "OPENROUTER_API_KEY",
@@ -241,15 +238,4 @@ function toOpenRouterProviderError(
   }
 
   return null;
-}
-
-function unwrapStartSessionCause(cause: unknown): unknown {
-  if (
-    cause instanceof StartPracticePersonaGenerationError ||
-    cause instanceof StartPracticeSessionSourceError
-  ) {
-    return cause.cause;
-  }
-
-  return cause;
 }

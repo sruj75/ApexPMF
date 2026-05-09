@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createSupabaseGeneratedSessionCaseRepository } from "../src/infrastructure/supabase/generated-session-cases";
-import { Either, Effect } from "effect";
+import { runEffectOrThrow } from "../src/application/effect-boundary-runner";
 
 describe("Generated Session Case Supabase mapping", () => {
   it("preserves broad-practice-pool label from source_snapshot on readback", async () => {
@@ -751,28 +751,18 @@ function toPromiseRepository(
     create: (
       learnerId: Parameters<typeof repository.create>[0],
       input: Parameters<typeof repository.create>[1]
-    ) => runEffect(repository.create(learnerId, input)),
+    ) => runEffectOrThrow(repository.create(learnerId, input)),
     getForLearner: (
       learnerId: Parameters<typeof repository.getForLearner>[0],
       sessionCaseId: Parameters<typeof repository.getForLearner>[1]
-    ) => runEffect(repository.getForLearner(learnerId, sessionCaseId)),
+    ) => runEffectOrThrow(repository.getForLearner(learnerId, sessionCaseId)),
     updateSessionLifecycleForLearner: (
       input: Parameters<typeof repository.updateSessionLifecycleForLearner>[0]
-    ) => runEffect(repository.updateSessionLifecycleForLearner(input)),
+    ) => runEffectOrThrow(repository.updateSessionLifecycleForLearner(input)),
     updateReportArtifactsForLearner: (
       input: Parameters<typeof repository.updateReportArtifactsForLearner>[0]
-    ) => runEffect(repository.updateReportArtifactsForLearner(input))
+    ) => runEffectOrThrow(repository.updateReportArtifactsForLearner(input))
   };
-}
-
-async function runEffect<Success, Error>(
-  effect: Effect.Effect<Success, Error, never>
-): Promise<Success> {
-  const result = await Effect.runPromise(Effect.either(effect));
-  if (Either.isLeft(result)) {
-    throw result.left;
-  }
-  return result.right;
 }
 
 const validGeneratedSessionCaseRow = {

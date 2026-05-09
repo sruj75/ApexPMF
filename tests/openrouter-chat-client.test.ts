@@ -117,7 +117,9 @@ describe("OpenRouter hidden evaluation judge adapter", () => {
       chatClient
     });
 
-    const completion = await judge.createStructuredJsonCompletion(validRequest);
+    const completion = await Effect.runPromise(
+      judge.createStructuredJsonCompletion(validRequest)
+    );
 
     expect(chatClient.createStructuredJsonCompletion).toHaveBeenCalledTimes(1);
     expect(chatClient.createStructuredJsonCompletion).toHaveBeenCalledWith(
@@ -141,9 +143,9 @@ describe("OpenRouter hidden evaluation judge adapter", () => {
       }
     });
 
-    const thrown = await judge
-      .createStructuredJsonCompletion(validRequest)
-      .catch((error) => error);
+    const thrown = await Effect.runPromise(
+      judge.createStructuredJsonCompletion(validRequest).pipe(Effect.flip)
+    );
     expect(thrown).toBe(providerError);
   });
 });

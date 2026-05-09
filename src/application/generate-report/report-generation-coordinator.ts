@@ -4,32 +4,17 @@ import {
   createNonLiveLlmRuntimePolicy,
   type NonLiveLlmRuntimePolicy
 } from "@/src/application/non-live-llm-policy";
+import {
+  type ReportGenerationResult,
+  insufficientReportGenerationResult,
+  readyReportGenerationResult
+} from "./report-generation-outcomes";
 import type { ReportBuilder } from "@/src/domain/session/report-builder";
 import { createDeterministicReportBuilder } from "@/src/domain/session/report-builder";
 import type {
   HiddenEvaluationEngine,
   HiddenEvaluationResult
 } from "@/src/domain/session/hidden-evaluation-engine";
-import type {
-  SessionEvaluationArtifact,
-  SessionEvaluationInsufficientReason
-} from "@/src/domain/session/session-evaluation";
-import type {
-  SessionReport,
-  SessionTranscriptTurn
-} from "@/src/domain/session/session-report";
-
-export type ReportGenerationResult =
-  | {
-      status: "ready";
-      report: SessionReport;
-      transcript: SessionTranscriptTurn[];
-      evaluation: SessionEvaluationArtifact;
-    }
-  | {
-      status: "insufficient-evidence";
-      reason: SessionEvaluationInsufficientReason;
-    };
 
 export class ReportGenerationCoordinatorDependencyError extends Data.TaggedError(
   "ReportGenerationCoordinatorDependencyError"
@@ -54,21 +39,19 @@ export function createReportGenerationCoordinator(input?: {
 }): ReportGenerationCoordinator {
   const reportBuilder =
     input?.reportBuilder ?? createDeterministicReportBuilder();
-  const hiddenEvaluationEngine =
-    input?.hiddenEvaluationEngine ??
-    (
-      input?.nonLiveLlmRuntimePolicy ?? createNonLiveLlmRuntimePolicy()
-    ).composeHiddenEvaluationEngine();
+  const hiddenEvaluationEngineEffect = input?.hiddenEvaluationEngine
+    ? Effect.succeed(input.hiddenEvaluationEngine)
+    : (
+        input?.nonLiveLlmRuntimePolicy ?? createNonLiveLlmRuntimePolicy()
+      ).composeHiddenEvaluationEngine();
 
   return {
     generateForEndedSession({ generatedSessionCase }) {
       return Effect.gen(function* () {
+        const hiddenEvaluationEngine = yield* hiddenEvaluationEngineEffect;
         const transcript = generatedSessionCase.sessionTranscript;
         if (!transcript) {
-          return {
-            status: "insufficient-evidence",
-            reason: "transcript-too-short"
-          };
+          return insufficientReportGenerationResult("transcript-too-short");
         }
 
         const evaluationResult = yield* hiddenEvaluationEngine
@@ -109,18 +92,14 @@ export function createReportGenerationCoordinator(input?: {
           );
 
         if (reportResult.status !== "ready") {
-          return {
-            status: "insufficient-evidence",
-            reason: "invalid-judge-output"
-          };
+          return insufficientReportGenerationResult("invalid-judge-output");
         }
 
-        return {
-          status: "ready",
+        return readyReportGenerationResult({
           report: reportResult.report,
           transcript,
           evaluation: evaluationResult.evaluation
-        };
+        });
       });
     }
   };
@@ -130,12 +109,6 @@ function insufficiencyFromEvaluation(
   evaluationResult: HiddenEvaluationResult
 ) {
   return evaluationResult.status === "ready"
-    ? {
-        status: "insufficient-evidence" as const,
-        reason: "invalid-judge-output" as const
-      }
-    : {
-        status: "insufficient-evidence" as const,
-        reason: evaluationResult.reason
-      };
+    ? insufficientReportGenerationResult("invalid-judge-output")
+    : insufficientReportGenerationResult(evaluationResult.reason);
 }

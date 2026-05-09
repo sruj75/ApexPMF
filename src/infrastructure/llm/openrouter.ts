@@ -29,21 +29,11 @@ export function createOpenRouterHiddenEvaluationJudge(input: {
 }): HiddenEvaluationJudge {
   return {
     createStructuredJsonCompletion(request) {
-      return Effect.runPromise(
-        Effect.either(
-          input.chatClient.createStructuredJsonCompletion(request).pipe(
-            Effect.map((completion) => ({
-              content: completion.content
-            }))
-          )
-        )
-      ).then((result) => {
-        if (result._tag === "Left") {
-          throw result.left;
-        }
-
-        return result.right;
-      });
+      return input.chatClient.createStructuredJsonCompletion(request).pipe(
+        Effect.map((completion) => ({
+          content: completion.content
+        }))
+      );
     }
   };
 }

@@ -180,9 +180,10 @@ describe("Report generation coordinator", () => {
           generateSessionCase: () =>
             Effect.succeed(makeGeneratedSessionCase("natural-conclusion"))
         }),
-      composeHiddenEvaluationEngine: () => ({
-        evaluateEndedSession
-      }),
+      composeHiddenEvaluationEngine: () =>
+        Effect.succeed({
+          evaluateEndedSession
+        }),
       mapStartSessionFailure: (cause) => {
         throw cause;
       }

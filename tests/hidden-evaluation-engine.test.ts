@@ -12,11 +12,13 @@ import { Effect } from "effect";
 describe("Hidden Evaluation engine", () => {
   it("returns ready from LLM judge JSON for ended non-quit sessions with >=5 turns", async () => {
     const judge = {
-      createStructuredJsonCompletion: vi.fn(async () => ({
+      createStructuredJsonCompletion: vi.fn(() =>
+        Effect.succeed({
         id: "resp-1",
         model: "test-model",
         content: JSON.stringify(makeReadyJudgeOutput())
-      }))
+        })
+      )
     };
     const engine = createHiddenEvaluationEngine({
       judge
@@ -39,11 +41,13 @@ describe("Hidden Evaluation engine", () => {
 
   it("returns typed insufficient reasons for user-quit, not-ended, short transcript, and missing speakers", async () => {
     const judge = {
-      createStructuredJsonCompletion: vi.fn(async () => ({
+      createStructuredJsonCompletion: vi.fn(() =>
+        Effect.succeed({
         id: "resp-1",
         model: "test-model",
         content: JSON.stringify(makeReadyJudgeOutput())
-      }))
+        })
+      )
     };
     const engine = createHiddenEvaluationEngine({
       judge
@@ -110,12 +114,15 @@ describe("Hidden Evaluation engine", () => {
     const judge = {
       createStructuredJsonCompletion: vi
         .fn()
-        .mockResolvedValueOnce({
+        .mockReturnValueOnce(
+          Effect.succeed({
           id: "resp-1",
           model: "test-model",
           content: "{invalid-json"
-        })
-        .mockResolvedValueOnce({
+          })
+        )
+        .mockReturnValueOnce(
+          Effect.succeed({
           id: "resp-2",
           model: "test-model",
           content: JSON.stringify({
@@ -123,7 +130,8 @@ describe("Hidden Evaluation engine", () => {
             reasonIfInsufficient: null,
             evaluation: null
           })
-        })
+          })
+        )
     };
     const engine = createHiddenEvaluationEngine({
       judge
@@ -146,9 +154,9 @@ describe("Hidden Evaluation engine", () => {
 
   it("returns provider-failure when judge call throws", async () => {
     const judge = {
-      createStructuredJsonCompletion: vi.fn(async () => {
-        throw new Error("provider unavailable");
-      })
+      createStructuredJsonCompletion: vi.fn(() =>
+        Effect.fail(new Error("provider unavailable"))
+      )
     };
     const engine = createHiddenEvaluationEngine({
       judge
@@ -174,11 +182,13 @@ describe("Hidden Evaluation engine", () => {
       repairInstruction: "Repair in strict JSON."
     });
     const judge = {
-      createStructuredJsonCompletion: vi.fn(async () => ({
+      createStructuredJsonCompletion: vi.fn(() =>
+        Effect.succeed({
         id: "resp-1",
         model: "test-model",
         content: JSON.stringify(makeReadyJudgeOutput())
-      }))
+        })
+      )
     };
     const engine = createHiddenEvaluationEngine({
       judge,
@@ -207,16 +217,20 @@ describe("Hidden Evaluation engine", () => {
     const judge = {
       createStructuredJsonCompletion: vi
         .fn()
-        .mockResolvedValueOnce({
+        .mockReturnValueOnce(
+          Effect.succeed({
           id: "resp-1",
           model: "test-model",
           content: "{invalid-json"
-        })
-        .mockResolvedValueOnce({
+          })
+        )
+        .mockReturnValueOnce(
+          Effect.succeed({
           id: "resp-2",
           model: "test-model",
           content: JSON.stringify(makeReadyJudgeOutput())
-        })
+          })
+        )
     };
     const engine = createHiddenEvaluationEngine({
       judge,
@@ -254,11 +268,13 @@ describe("Hidden Evaluation engine", () => {
       })
     });
     const judge = {
-      createStructuredJsonCompletion: vi.fn(async () => ({
+      createStructuredJsonCompletion: vi.fn(() =>
+        Effect.succeed({
         id: "resp-1",
         model: "test-model",
         content: JSON.stringify(makeReadyJudgeOutput())
-      }))
+        })
+      )
     };
     const engine = createHiddenEvaluationEngine({
       judge,

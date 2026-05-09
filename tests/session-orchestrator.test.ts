@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createSessionOrchestrator } from "../src/application/end-session/session-orchestrator";
+import {
+  SessionCaseNotFoundError,
+  createSessionOrchestrator
+} from "../src/application/end-session/session-orchestrator";
 import { createInMemoryGeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
 import type { GeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
 import { Effect } from "effect";
@@ -463,7 +466,7 @@ describe("Session Orchestrator", () => {
     expect(persisted?.sessionEvaluation).not.toBeNull();
   });
 
-  it("returns not-found when report-generating is requested for a missing Session", async () => {
+  it("fails with SessionCaseNotFoundError when report-generating is requested for a missing Session", async () => {
     const repository = createInMemoryGeneratedSessionCaseRepository();
     const orchestrator = createSessionOrchestrator({
       generatedSessionCaseRepository: repository,
@@ -474,16 +477,61 @@ describe("Session Orchestrator", () => {
       }
     });
 
-    await expect(
-      Effect.runPromise(
-        orchestrator.runReportGeneratingFlowForLearner({
+    const result = await Effect.runPromise(
+      orchestrator
+        .runReportGeneratingFlowForLearner({
           learnerId,
           sessionId: "00000000-0000-4000-8000-000000000001"
         })
-      )
-    ).resolves.toEqual({
-      reportStatus: "not-found"
+        .pipe(Effect.either)
+    );
+
+    expect(result._tag).toBe("Left");
+    if (result._tag !== "Left") {
+      throw new Error("Expected SessionCaseNotFoundError.");
+    }
+    expect(result.left).toBeInstanceOf(SessionCaseNotFoundError);
+  });
+
+  it("uses injected Effect clock dependency for deterministic lifecycle timestamps", async () => {
+    const fixedEndedAt = new Date("2026-05-08T10:00:00.000Z");
+    const fixedReportReadyAt = new Date("2026-05-08T10:30:00.000Z");
+    const timestamps = [fixedEndedAt, fixedReportReadyAt];
+    const now = () => Effect.succeed(timestamps.shift() ?? fixedReportReadyAt);
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
+        }
+      },
+      now
     });
+
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion,
+        reason: "natural-conclusion"
+      })
+    );
+    await Effect.runPromise(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion
+      })
+    );
+
+    const persisted = await Effect.runPromise(
+      repository.getForLearner(learnerId, sessionIds.naturalConclusion)
+    );
+    expect(persisted?.sessionLifecycle.endedAt?.toISOString()).toBe(
+      "2026-05-08T10:00:00.000Z"
+    );
+    expect(persisted?.sessionLifecycle.reportReadyAt?.toISOString()).toBe(
+      "2026-05-08T10:30:00.000Z"
+    );
   });
 });
 

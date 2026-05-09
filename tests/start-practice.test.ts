@@ -127,8 +127,7 @@ describe("Start Practice", () => {
 
     const started = await Effect.runPromise(
       startPracticeForLearner(learnerId, {
-        idealCustomerProfileRepository:
-          createInMemoryIdealCustomerProfileRepository(),
+        idealCustomerProfileRepository: createInMemoryIdealCustomerProfileRepository(),
         generatedSessionCaseRepository:
           createInMemoryGeneratedSessionCaseRepository(),
         personaGenerator,
@@ -186,7 +185,6 @@ function createRecordingPersonaGenerator(): PersonaGenerator & {
     inputs,
     generateSessionCase(input) {
       inputs.push(input);
-
       return Effect.succeed({
         openingContext:
           "You are speaking with a finance operator who recently tried to improve month-end close.",

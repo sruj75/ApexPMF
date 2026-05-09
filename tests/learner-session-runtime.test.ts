@@ -4,11 +4,13 @@ import { Effect } from "effect";
 const {
   getSupabaseLearnerEntryContext,
   createSessionOrchestrator,
-  createReportGenerationCoordinator
+  createReportGenerationCoordinator,
+  SessionCaseNotFoundError
 } = vi.hoisted(() => ({
   getSupabaseLearnerEntryContext: vi.fn(),
   createSessionOrchestrator: vi.fn(),
-  createReportGenerationCoordinator: vi.fn()
+  createReportGenerationCoordinator: vi.fn(),
+  SessionCaseNotFoundError: class SessionCaseNotFoundError extends Error {}
 }));
 
 vi.mock("@/src/infrastructure/supabase/learner-entry-context", () => ({
@@ -16,7 +18,8 @@ vi.mock("@/src/infrastructure/supabase/learner-entry-context", () => ({
 }));
 
 vi.mock("@/src/application/end-session/session-orchestrator", () => ({
-  createSessionOrchestrator
+  createSessionOrchestrator,
+  SessionCaseNotFoundError
 }));
 
 vi.mock("@/src/application/generate-report/report-generation-coordinator", () => ({
@@ -104,6 +107,45 @@ describe("Learner session runtime seam", () => {
     expect(runReportGeneratingFlowForLearner).toHaveBeenCalledWith({
       learnerId: "learner-42",
       sessionId: "session-case-1"
+    });
+  });
+
+  it("maps report-generating missing-session errors into boundary not-found outcomes", async () => {
+    const endSessionForLearner = vi.fn(() =>
+      Effect.succeed({
+        nextPath: "/dashboard",
+        sessionStatus: "ended" as const,
+        endedReason: "user-quit" as const,
+        reportStatus: "not-requested" as const
+      })
+    );
+    const runReportGeneratingFlowForLearner = vi.fn(() =>
+      Effect.fail(new SessionCaseNotFoundError())
+    );
+
+    getSupabaseLearnerEntryContext.mockResolvedValue({
+      ok: true,
+      learnerId: "learner-42",
+      idealCustomerProfileRepository: {} as never,
+      generatedSessionCaseRepository: {} as never
+    });
+    createReportGenerationCoordinator.mockReturnValue({});
+    createSessionOrchestrator.mockReturnValue({
+      endSessionForLearner,
+      runReportGeneratingFlowForLearner
+    });
+
+    const runtime = await getLearnerSessionRuntime();
+    if (!runtime.ok) {
+      throw new Error("expected authenticated runtime");
+    }
+
+    await expect(
+      runtime.runReportGeneratingFlowForLearner({
+        sessionId: "session-case-missing"
+      })
+    ).resolves.toEqual({
+      reportStatus: "not-found"
     });
   });
 });

@@ -44,6 +44,17 @@ export type StartPracticeError =
   | StartPracticePersonaGenerationError
   | GeneratedSessionCaseRepositoryError;
 
+export function normalizeStartPracticeFailure(cause: unknown): unknown {
+  if (
+    cause instanceof StartPracticePersonaGenerationError ||
+    cause instanceof StartPracticeSessionSourceError
+  ) {
+    return cause.cause;
+  }
+
+  return cause;
+}
+
 export function startPracticeForLearner(
   learnerId: string,
   dependencies: StartPracticeDependencies

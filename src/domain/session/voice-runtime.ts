@@ -137,7 +137,7 @@ export function createScriptedVoiceRuntime(
   return {
     startSession() {
       return Effect.sync(() => {
-      emit(script.onStart);
+        emit(script.onStart);
       });
     },
     subscribe(listener) {
@@ -148,17 +148,17 @@ export function createScriptedVoiceRuntime(
     },
     sendLearnerSpeech() {
       return Effect.sync(() => {
-      emit(script.onLearnerSpeech);
+        emit(script.onLearnerSpeech);
       });
     },
     interrupt() {
       return Effect.sync(() => {
-      emit(script.onInterrupt);
+        emit(script.onInterrupt);
       });
     },
     end() {
       return Effect.sync(() => {
-      emit(script.onEnd);
+        emit(script.onEnd);
       });
     }
   };

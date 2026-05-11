@@ -12,6 +12,19 @@ export type IdealCustomerProfileRepositoryOperation =
   | "selectActive"
   | "clearActive";
 
+export type IdealCustomerProfileRepositoryDecodeOperation = Extract<
+  IdealCustomerProfileRepositoryOperation,
+  "listForLearner" | "getActiveForLearner" | "create" | "update"
+>;
+
+export type IdealCustomerProfileRepositoryDecodeDetail = {
+  _tag: "IdealCustomerProfileRepositoryDecodeDetail";
+  adapter: "ideal_customer_profiles";
+  operation: IdealCustomerProfileRepositoryDecodeOperation;
+  rowIndex?: number;
+  details: readonly string[];
+};
+
 export class IdealCustomerProfileRepositoryPersistenceError extends Data.TaggedError(
   "IdealCustomerProfileRepositoryPersistenceError"
 )<{
@@ -23,7 +36,7 @@ export class IdealCustomerProfileRepositoryDecodeError extends Data.TaggedError(
   "IdealCustomerProfileRepositoryDecodeError"
 )<{
   operation: IdealCustomerProfileRepositoryOperation;
-  cause: unknown;
+  cause: IdealCustomerProfileRepositoryDecodeDetail;
 }> {}
 
 export class IdealCustomerProfileRepositoryNotFoundError extends Data.TaggedError(

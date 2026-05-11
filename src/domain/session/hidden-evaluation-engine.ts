@@ -93,6 +93,10 @@ export function createHiddenEvaluationEngine(input: {
           };
         }
 
+        yield* Effect.logDebug("hidden-evaluation.repair_attempt", {
+          sessionCaseId: generatedSessionCase.id,
+          firstFailureReason: completion.reason
+        });
         const repairedCompletion = yield* requestJudgeCompletion({
           judge: input.judge,
           promptSource,
@@ -199,10 +203,7 @@ function buildMessages(input: {
   transcript: SessionTranscriptTurn[];
   repairContent?: string;
 }) {
-  return Effect.tryPromise({
-    try: () => input.promptSource.getPromptBundle(),
-    catch: (cause) => cause
-  }).pipe(
+  return input.promptSource.getPromptBundle().pipe(
     Effect.map((promptBundle) => {
       const sessionCaseJson = JSON.stringify(input.generatedSessionCase, null, 2);
       const transcriptJson = JSON.stringify(input.transcript, null, 2);

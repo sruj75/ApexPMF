@@ -1,5 +1,29 @@
 import type { HiddenEvaluationJudge } from "@/src/domain/session/hidden-evaluation-judge";
-import { Effect } from "effect";
+import { Effect, Schedule } from "effect";
+import { withNonLiveLlmResilience } from "@/src/application/non-live-llm-resilience";
+
+const defaultRetryableStatusCodes: ReadonlySet<number> = new Set([408, 429]);
+
+export function isOpenRouterErrorRetryable(error: OpenRouterProviderError): boolean {
+  if (error.phase === "invalid_response") {
+    return false;
+  }
+  if (error.status === undefined) {
+    return true;
+  }
+  if (defaultRetryableStatusCodes.has(error.status)) {
+    return true;
+  }
+  if (error.status === 501) {
+    return false;
+  }
+  return error.status >= 500 && error.status <= 599;
+}
+
+export const defaultOpenRouterRetrySchedule = Schedule.exponential("200 millis").pipe(
+  Schedule.jittered,
+  Schedule.intersect(Schedule.recurs(2))
+);
 
 export type OpenRouterChatMessage = {
   role: "system" | "user" | "assistant";
@@ -71,7 +95,11 @@ type OpenRouterChatClientOptions = {
   appTitle?: string;
   siteUrl?: string;
   fetch?: FetchLike;
+  retrySchedule?: Schedule.Schedule<unknown, OpenRouterProviderError>;
+  attemptTimeoutMillis?: number;
 };
+
+const defaultAttemptTimeoutMillis = 30_000;
 
 type OpenRouterCompletionResponse = {
   id?: unknown;
@@ -84,11 +112,13 @@ export function createOpenRouterChatClient({
   model,
   appTitle,
   siteUrl,
-  fetch: fetchImplementation = fetch
+  fetch: fetchImplementation = fetch,
+  retrySchedule = defaultOpenRouterRetrySchedule,
+  attemptTimeoutMillis = defaultAttemptTimeoutMillis
 }: OpenRouterChatClientOptions): OpenRouterChatClient {
   return {
     createStructuredJsonCompletion(request) {
-      return Effect.tryPromise({
+      const attempt = Effect.tryPromise({
         try: async () => {
           let response: Response;
 
@@ -153,6 +183,35 @@ export function createOpenRouterChatClient({
                 cause
               })
       });
+
+      return withNonLiveLlmResilience(attempt, {
+        attemptTimeoutMillis,
+        retrySchedule,
+        isRetryable: isOpenRouterErrorRetryable,
+        timeoutFailure: () =>
+          new OpenRouterProviderError({
+            phase: "request_failed",
+            message: `OpenRouter request timed out after ${attemptTimeoutMillis}ms.`
+          }),
+        attemptFailureAttributes: (error) => ({
+          provider: "openrouter",
+          phase: error.phase,
+          status: error.status
+        }),
+        finalFailureAttributes: (error) => ({
+          provider: "openrouter",
+          phase: error.phase,
+          status: error.status,
+          message: error.message
+        })
+      }).pipe(
+        Effect.withSpan("openrouter.create_structured_json_completion", {
+          attributes: {
+            model,
+            responseSchemaName: request.responseSchemaName
+          }
+        })
+      );
     }
   };
 }

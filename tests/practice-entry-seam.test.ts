@@ -2,9 +2,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getLearnerEntryContext,
   startPracticeFromEntryContext
-} from "../src/application/start-session/practice-entry-seam";
-import type { NonLiveLlmRuntimePolicy } from "../src/application/non-live-llm-policy";
-import { createEntryFailure } from "../src/application/start-session/entry-failure";
+} from "../src/application/start-session/practice-entry-web-adapter";
 import { OpenRouterProviderError } from "../src/infrastructure/llm/openrouter";
 import {
   StartPracticePersonaGenerationError,
@@ -16,6 +14,10 @@ import {
   GeneratedSessionCaseRepositoryPersistenceError
 } from "../src/domain/session/generated-session-case-repository";
 import { SessionSourceResolutionError } from "../src/domain/persona/session-source";
+import {
+  IdealCustomerProfileRepositoryNotFoundError
+} from "../src/domain/persona/ideal-customer-profile-repository";
+import { LearnerEntryContextAuthQueryError } from "../src/infrastructure/supabase/learner-entry-context";
 import { Effect } from "effect";
 
 const { getSupabaseLearnerEntryContextEffect, startPracticeForLearner } = vi.hoisted(
@@ -25,9 +27,15 @@ const { getSupabaseLearnerEntryContextEffect, startPracticeForLearner } = vi.hoi
   })
 );
 
-vi.mock("@/src/infrastructure/supabase/learner-entry-context", () => ({
-  getSupabaseLearnerEntryContextEffect
-}));
+vi.mock("@/src/infrastructure/supabase/learner-entry-context", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("@/src/infrastructure/supabase/learner-entry-context")
+  >();
+  return {
+    ...actual,
+    getSupabaseLearnerEntryContextEffect
+  };
+});
 
 vi.mock("@/src/application/start-session/start-practice", async (importOriginal) => {
   const actual = await importOriginal<
@@ -65,6 +73,16 @@ describe("Practice entry seam", () => {
     });
   });
 
+  it("propagates Learner entry auth query errors through the web adapter", async () => {
+    const failure = new LearnerEntryContextAuthQueryError({
+      operation: "resolve-auth-user",
+      message: "Auth service failed."
+    });
+    getSupabaseLearnerEntryContextEffect.mockReturnValue(Effect.fail(failure));
+
+    await expect(getLearnerEntryContext()).rejects.toThrow("Auth service failed.");
+  });
+
   it("returns a started Session id when Start Practice succeeds", async () => {
     process.env.OPENROUTER_API_KEY = "openrouter-key";
     startPracticeForLearner.mockReturnValue(
@@ -87,8 +105,7 @@ describe("Practice entry seam", () => {
       "learner-1",
       expect.objectContaining({
         idealCustomerProfileRepository: expect.any(Object),
-        generatedSessionCaseRepository: expect.any(Object),
-        personaGenerator: expect.any(Object)
+        generatedSessionCaseRepository: expect.any(Object)
       })
     );
   });
@@ -268,6 +285,44 @@ describe("Practice entry seam", () => {
     }
   });
 
+  it("maps wrapped Ideal Customer Profile not-found failures to persistence_failure", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-key";
+    startPracticeForLearner.mockReturnValue(
+      Effect.fail(
+        new StartPracticeSessionSourceError({
+          learnerId: "learner-8",
+          cause: new SessionSourceResolutionError({
+            learnerId: "learner-8",
+            cause: new IdealCustomerProfileRepositoryNotFoundError({
+              learnerId: "learner-8",
+              profileId: "missing-profile",
+              operation: "selectActive"
+            })
+          })
+        })
+      )
+    );
+
+    const result = await startPracticeFromEntryContext({
+      learnerId: "learner-8",
+      idealCustomerProfileRepository: {} as never,
+      generatedSessionCaseRepository: {} as never
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.category).toBe("persistence_failure");
+      expect(result.failure.cause).toMatchObject({
+        _tag: "IdealCustomerProfileRepositoryNotFoundError",
+        operation: "selectActive"
+      });
+      expect(result.failure.details).toEqual([
+        "operation=selectActive",
+        "profileId=missing-profile"
+      ]);
+    }
+  });
+
   it("maps typed OpenRouter provider failures to provider_failure", async () => {
     process.env.OPENROUTER_API_KEY = "openrouter-key";
     startPracticeForLearner.mockReturnValue(
@@ -298,46 +353,4 @@ describe("Practice entry seam", () => {
     }
   });
 
-  it("uses the injected non-live runtime policy contract for persona and failure mapping", async () => {
-    const personaGenerator = {} as never;
-    const mappedFailure = createEntryFailure({
-      category: "input_invalid",
-      message: "mapped by injected non-live policy"
-    });
-    const nonLiveLlmRuntimePolicy: NonLiveLlmRuntimePolicy = {
-      composePersonaGenerator: () => Effect.succeed(personaGenerator),
-      composeHiddenEvaluationEngine: () =>
-        Effect.succeed({
-          evaluateEndedSession: () =>
-            Effect.succeed({
-              status: "insufficient-evidence",
-              reason: "provider-failure"
-            })
-        }),
-      mapStartSessionFailure: () => mappedFailure
-    };
-    startPracticeForLearner.mockReturnValue(
-      Effect.fail(new Error("downstream failure"))
-    );
-
-    const result = await startPracticeFromEntryContext(
-      {
-        learnerId: "learner-5",
-        idealCustomerProfileRepository: {} as never,
-        generatedSessionCaseRepository: {} as never
-      },
-      { nonLiveLlmRuntimePolicy }
-    );
-
-    expect(startPracticeForLearner).toHaveBeenCalledWith(
-      "learner-5",
-      expect.objectContaining({
-        personaGenerator
-      })
-    );
-    expect(result).toEqual({
-      ok: false,
-      failure: mappedFailure
-    });
-  });
 });

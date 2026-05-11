@@ -6,6 +6,8 @@ import type {
 } from "@/src/domain/persona/ideal-customer-profile";
 import {
   IdealCustomerProfileRepositoryDecodeError,
+  type IdealCustomerProfileRepositoryDecodeDetail,
+  type IdealCustomerProfileRepositoryDecodeOperation,
   IdealCustomerProfileRepositoryNotFoundError,
   IdealCustomerProfileRepositoryPersistenceError,
   type IdealCustomerProfileRepository,
@@ -137,7 +139,7 @@ export function createSupabaseIdealCustomerProfileRepository(
       }).pipe(Effect.asVoid);
     },
 
-    clearActive(_learnerId) {
+    clearActive() {
       return queryIdealCustomerProfiles({
         operation: "clearActive",
         run: () => supabase.rpc("clear_active_ideal_customer_profile")
@@ -193,7 +195,7 @@ function decodeRows(
 
 function decodeRow(
   row: unknown,
-  operation: "listForLearner" | "getActiveForLearner" | "create" | "update",
+  operation: IdealCustomerProfileRepositoryDecodeOperation,
   rowIndex?: number
 ): Effect.Effect<IdealCustomerProfileRow, IdealCustomerProfileRepositoryDecodeError> {
   const decoded = Schema.decodeUnknownEither(IdealCustomerProfileRowSchema)(row);
@@ -201,17 +203,30 @@ function decodeRow(
     return Effect.fail(
       new IdealCustomerProfileRepositoryDecodeError({
         operation,
-        cause: {
-          adapter: adapterName,
+        cause: decodeDetail({
           operation,
           rowIndex,
           details: formatParseErrorDetails(decoded.left)
-        }
+        })
       })
     );
   }
 
   return Effect.succeed(decoded.right);
+}
+
+function decodeDetail(input: {
+  operation: IdealCustomerProfileRepositoryDecodeOperation;
+  rowIndex?: number;
+  details: readonly string[];
+}): IdealCustomerProfileRepositoryDecodeDetail {
+  return {
+    _tag: "IdealCustomerProfileRepositoryDecodeDetail",
+    adapter: adapterName,
+    operation: input.operation,
+    ...(typeof input.rowIndex === "number" ? { rowIndex: input.rowIndex } : {}),
+    details: input.details
+  };
 }
 
 function toIdealCustomerProfile(row: IdealCustomerProfileRow): IdealCustomerProfile {

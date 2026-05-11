@@ -5,6 +5,13 @@ import {
   PersonaGenerationProviderError
 } from "@/src/domain/persona/persona-generation";
 import {
+  IdealCustomerProfileRepositoryDecodeError,
+  IdealCustomerProfileRepositoryNotFoundError,
+  IdealCustomerProfileRepositoryPersistenceError
+} from "@/src/domain/persona/ideal-customer-profile-repository";
+import { SessionSourceResolutionError } from "@/src/domain/persona/session-source";
+import { NonLiveLlmProviderUnavailableError } from "@/src/application/non-live-llm-policy";
+import {
   GeneratedSessionCaseRepositoryDecodeError,
   GeneratedSessionCaseRepositoryPersistenceError
 } from "@/src/domain/session/generated-session-case-repository";
@@ -47,6 +54,14 @@ export function createEntryFailure(input: {
 export function classifyEntryFailure(cause: unknown): EntryFailure {
   if (cause instanceof EntryFailure) {
     return cause;
+  }
+
+  if (cause instanceof NonLiveLlmProviderUnavailableError) {
+    return createEntryFailure({
+      category: "provider_failure",
+      message: cause.message,
+      cause
+    });
   }
 
   if (isOpenRouterProviderError(cause)) {
@@ -93,6 +108,12 @@ export function classifyEntryFailure(cause: unknown): EntryFailure {
     });
   }
 
+  if (isSessionSourceResolutionError(cause)) {
+    if (isIdealCustomerProfileRepositoryError(cause.cause)) {
+      return classifyEntryFailure(cause.cause);
+    }
+  }
+
   if (isGeneratedSessionCaseRepositoryDecodeError(cause)) {
     return createEntryFailure({
       category: "decode_failure",
@@ -108,6 +129,40 @@ export function classifyEntryFailure(cause: unknown): EntryFailure {
       message: "Generated Session Case persistence failed.",
       cause,
       details: [`operation=${cause.operation}`]
+    });
+  }
+
+  if (isIdealCustomerProfileRepositoryDecodeError(cause)) {
+    return createEntryFailure({
+      category: "decode_failure",
+      message: "Ideal Customer Profile decode failed.",
+      cause,
+      details: [
+        `adapter=${cause.cause.adapter}`,
+        `operation=${cause.cause.operation}`,
+        ...(typeof cause.cause.rowIndex === "number"
+          ? [`rowIndex=${cause.cause.rowIndex}`]
+          : []),
+        ...cause.cause.details
+      ]
+    });
+  }
+
+  if (isIdealCustomerProfileRepositoryPersistenceError(cause)) {
+    return createEntryFailure({
+      category: "persistence_failure",
+      message: "Ideal Customer Profile persistence failed.",
+      cause,
+      details: [`operation=${cause.operation}`]
+    });
+  }
+
+  if (isIdealCustomerProfileRepositoryNotFoundError(cause)) {
+    return createEntryFailure({
+      category: "persistence_failure",
+      message: "Ideal Customer Profile was not found.",
+      cause,
+      details: [`operation=${cause.operation}`, `profileId=${cause.profileId}`]
     });
   }
 
@@ -217,6 +272,43 @@ function isGeneratedSessionCaseRepositoryPersistenceError(
   value: unknown
 ): value is GeneratedSessionCaseRepositoryPersistenceError {
   return isTaggedError(value, "GeneratedSessionCaseRepositoryPersistenceError");
+}
+
+function isSessionSourceResolutionError(
+  value: unknown
+): value is SessionSourceResolutionError {
+  return value instanceof SessionSourceResolutionError;
+}
+
+function isIdealCustomerProfileRepositoryError(
+  value: unknown
+): value is
+  | IdealCustomerProfileRepositoryDecodeError
+  | IdealCustomerProfileRepositoryPersistenceError
+  | IdealCustomerProfileRepositoryNotFoundError {
+  return (
+    isIdealCustomerProfileRepositoryDecodeError(value) ||
+    isIdealCustomerProfileRepositoryPersistenceError(value) ||
+    isIdealCustomerProfileRepositoryNotFoundError(value)
+  );
+}
+
+function isIdealCustomerProfileRepositoryDecodeError(
+  value: unknown
+): value is IdealCustomerProfileRepositoryDecodeError {
+  return isTaggedError(value, "IdealCustomerProfileRepositoryDecodeError");
+}
+
+function isIdealCustomerProfileRepositoryPersistenceError(
+  value: unknown
+): value is IdealCustomerProfileRepositoryPersistenceError {
+  return isTaggedError(value, "IdealCustomerProfileRepositoryPersistenceError");
+}
+
+function isIdealCustomerProfileRepositoryNotFoundError(
+  value: unknown
+): value is IdealCustomerProfileRepositoryNotFoundError {
+  return isTaggedError(value, "IdealCustomerProfileRepositoryNotFoundError");
 }
 
 function isSupabaseRowDecodeError(

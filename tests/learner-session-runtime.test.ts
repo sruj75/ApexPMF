@@ -26,7 +26,7 @@ vi.mock("@/src/application/generate-report/report-generation-coordinator", () =>
   createReportGenerationCoordinator
 }));
 
-import { getLearnerSessionRuntime } from "../src/application/start-session/practice-entry-seam";
+import { getLearnerSessionRuntime } from "../src/application/start-session/practice-entry-web-adapter";
 
 describe("Learner session runtime seam", () => {
   beforeEach(() => {
@@ -71,7 +71,8 @@ describe("Learner session runtime seam", () => {
         generatedSessionCaseRepository: {} as never
       })
     );
-    createReportGenerationCoordinator.mockReturnValue({});
+    const reportGenerationCoordinator = {};
+    createReportGenerationCoordinator.mockReturnValue(reportGenerationCoordinator);
     createSessionOrchestrator.mockReturnValue({
       endSessionForLearner,
       runReportGeneratingFlowForLearner
@@ -111,6 +112,10 @@ describe("Learner session runtime seam", () => {
     expect(runReportGeneratingFlowForLearner).toHaveBeenCalledWith({
       learnerId: "learner-42",
       sessionId: "session-case-1"
+    });
+    expect(createSessionOrchestrator).toHaveBeenCalledWith({
+      generatedSessionCaseRepository: {},
+      reportGenerationCoordinator
     });
   });
 

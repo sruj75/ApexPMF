@@ -3,7 +3,8 @@ import { createHiddenEvaluationEngine } from "../src/domain/session/hidden-evalu
 import {
   createFallbackHiddenEvaluationPromptSource,
   createPinnedHiddenEvaluationPromptSource,
-  createStubFailingHiddenEvaluationPromptSource
+  createStubFailingHiddenEvaluationPromptSource,
+  HiddenEvaluationPromptSourceError
 } from "../src/domain/session/hidden-evaluation-prompt-source";
 import type { GeneratedSessionCase } from "../src/domain/session/generated-session-case";
 import type { SessionTranscriptTurn } from "../src/domain/session/session-report";
@@ -291,6 +292,16 @@ describe("Hidden Evaluation engine", () => {
     const firstRequest = judge.createStructuredJsonCompletion.mock.calls[0]?.[0];
     expect(firstRequest?.messages[0]?.content).toBe("FALLBACK SYSTEM");
     expect(firstRequest?.messages[1]?.content).toContain("FALLBACK EVALUATION");
+  });
+
+  it("exposes prompt source failures as typed Effect failures", async () => {
+    const promptSource = createStubFailingHiddenEvaluationPromptSource({
+      failureMessage: "primary prompt source unavailable"
+    });
+
+    await expect(
+      Effect.runPromise(Effect.flip(promptSource.getPromptBundle()))
+    ).resolves.toBeInstanceOf(HiddenEvaluationPromptSourceError);
   });
 });
 

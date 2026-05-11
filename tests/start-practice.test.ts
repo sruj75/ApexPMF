@@ -1,13 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { makeIdealCustomerProfile } from "./fixtures/ideal-customer-profile";
-import { startPracticeForLearner } from "../src/application/start-session/start-practice";
+import {
+  StartPracticeNonce,
+  startPracticeForLearner
+} from "../src/application/start-session/start-practice";
 import { createInMemoryIdealCustomerProfileRepository } from "../src/domain/persona/ideal-customer-profile-repository";
 import type {
   PersonaGenerationInput,
   PersonaGenerator
 } from "../src/domain/persona/persona-generation";
 import { createInMemoryGeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
-import { Effect } from "effect";
+import { PersonaGenerationCapability } from "../src/application/llm-runtime/llm-runtime-layers";
+import { Effect, Layer } from "effect";
+
+const provideStartPracticeServices = (
+  generator: PersonaGenerator,
+  nonce: string
+) =>
+  Effect.provide(
+    Layer.mergeAll(
+      Layer.succeed(PersonaGenerationCapability, generator),
+      Layer.succeed(StartPracticeNonce, {
+        create: () => nonce
+      })
+    )
+  );
 
 const learnerId = "learner-1";
 
@@ -19,10 +36,8 @@ describe("Start Practice", () => {
     const started = await Effect.runPromise(
       startPracticeForLearner(learnerId, {
         idealCustomerProfileRepository: createInMemoryIdealCustomerProfileRepository(),
-        generatedSessionCaseRepository: generatedSessionCases,
-        personaGenerator,
-        createNonce: () => "nonce-1"
-      })
+        generatedSessionCaseRepository: generatedSessionCases
+      }).pipe(provideStartPracticeServices(personaGenerator, "nonce-1"))
     );
 
     expect(started).toEqual({
@@ -89,10 +104,8 @@ describe("Start Practice", () => {
       startPracticeForLearner(learnerId, {
         idealCustomerProfileRepository:
           createInMemoryIdealCustomerProfileRepository([profile]),
-        generatedSessionCaseRepository: generatedSessionCases,
-        personaGenerator,
-        createNonce: () => "nonce-profile"
-      })
+        generatedSessionCaseRepository: generatedSessionCases
+      }).pipe(provideStartPracticeServices(personaGenerator, "nonce-profile"))
     );
 
     expect(started.sessionSourceLabel).toBe("Clinical operators");
@@ -129,10 +142,8 @@ describe("Start Practice", () => {
       startPracticeForLearner(learnerId, {
         idealCustomerProfileRepository: createInMemoryIdealCustomerProfileRepository(),
         generatedSessionCaseRepository:
-          createInMemoryGeneratedSessionCaseRepository(),
-        personaGenerator,
-        createNonce: () => "nonce-broad"
-      })
+          createInMemoryGeneratedSessionCaseRepository()
+      }).pipe(provideStartPracticeServices(personaGenerator, "nonce-broad"))
     );
 
     expect(started.sessionSourceLabel).toBe("Broad Practice Pool");
@@ -151,13 +162,24 @@ describe("Start Practice", () => {
         createInMemoryIdealCustomerProfileRepository([
           makeIdealCustomerProfile({ isActive: true })
         ]),
-      generatedSessionCaseRepository: generatedSessionCases,
-      personaGenerator,
-      createNonce: () => nonces.shift() ?? "unexpected-nonce"
+      generatedSessionCaseRepository: generatedSessionCases
     };
+    const nonceLayer = Layer.succeed(StartPracticeNonce, {
+      create: () => nonces.shift() ?? "unexpected-nonce"
+    });
 
-    const first = await Effect.runPromise(startPracticeForLearner(learnerId, deps));
-    const second = await Effect.runPromise(startPracticeForLearner(learnerId, deps));
+    const first = await Effect.runPromise(
+      startPracticeForLearner(learnerId, deps).pipe(
+        Effect.provide(nonceLayer),
+        Effect.provide(Layer.succeed(PersonaGenerationCapability, personaGenerator))
+      )
+    );
+    const second = await Effect.runPromise(
+      startPracticeForLearner(learnerId, deps).pipe(
+        Effect.provide(nonceLayer),
+        Effect.provide(Layer.succeed(PersonaGenerationCapability, personaGenerator))
+      )
+    );
 
     expect(first.sessionId).not.toBe(second.sessionId);
     expect(personaGenerator.inputs.map((input) => input.generationNonce)).toEqual(

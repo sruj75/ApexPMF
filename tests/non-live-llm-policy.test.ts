@@ -2,13 +2,11 @@ import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
 import {
   classifyNonLiveLlmFailure,
-  createNonLiveLlmRuntimePolicy,
   mapNonLiveLlmFailureToEntryFailure,
   mapNonLiveLlmFailureToHiddenEvaluationReason,
   resolveNonLiveLlmAccess
 } from "../src/application/non-live-llm-policy";
 import { OpenRouterProviderError } from "../src/infrastructure/llm/openrouter";
-import { PersonaGenerationProviderError } from "../src/domain/persona/persona-generation";
 
 describe("Non-live LLM policy", () => {
   it("returns typed unavailable failure when OPENROUTER_API_KEY is missing", async () => {
@@ -99,93 +97,4 @@ describe("Non-live LLM policy", () => {
     ]);
   });
 
-  it("composes persona generation and hidden evaluation via Effect-based runtime composition", async () => {
-    const personaGenerator = {
-      generateSessionCase: () =>
-        Effect.fail(
-          new PersonaGenerationProviderError({
-            message: "not expected in test",
-            cause: new Error("not expected in test")
-          })
-        )
-    };
-    const hiddenEvaluationEngine = {
-      evaluateEndedSession: () =>
-        Effect.succeed({
-          status: "insufficient-evidence" as const,
-          reason: "provider-failure" as const
-        })
-    };
-
-    const policy = createNonLiveLlmRuntimePolicy({
-      env: {
-        OPENROUTER_API_KEY: "openrouter-key"
-      },
-      createPersonaGenerator: () => personaGenerator,
-      createHiddenEvaluationEngine: () => hiddenEvaluationEngine
-    });
-
-    await expect(
-      Effect.runPromise(policy.composePersonaGenerator())
-    ).resolves.toBe(personaGenerator);
-    await expect(
-      Effect.runPromise(policy.composeHiddenEvaluationEngine())
-    ).resolves.toBe(hiddenEvaluationEngine);
-  });
-
-  it("falls back to unavailable hidden-evaluation engine when OPENROUTER_API_KEY is missing", async () => {
-    const policy = createNonLiveLlmRuntimePolicy({
-      env: {}
-    });
-
-    await expect(
-      Effect.runPromise(policy.composePersonaGenerator().pipe(Effect.flip))
-    ).resolves.toMatchObject({
-      _tag: "NonLiveLlmProviderUnavailableError",
-      missingEnvVar: "OPENROUTER_API_KEY"
-    });
-
-    const hiddenEvaluationEngine = await Effect.runPromise(
-      policy.composeHiddenEvaluationEngine()
-    );
-    await expect(
-      Effect.runPromise(
-        hiddenEvaluationEngine.evaluateEndedSession({
-          generatedSessionCase: {} as never,
-          transcript: []
-        })
-      )
-    ).resolves.toEqual({
-      status: "insufficient-evidence",
-      reason: "provider-failure"
-    });
-  });
-
-  it("maps start-session causes through policy classification only", () => {
-    const policy = createNonLiveLlmRuntimePolicy({
-      env: {
-        OPENROUTER_API_KEY: "openrouter-key"
-      }
-    });
-
-    const providerFailure = policy.mapStartSessionFailure(
-      new OpenRouterProviderError({
-        phase: "request_failed",
-        status: 429,
-        statusText: "Too Many Requests",
-        message: "OpenRouter request failed: 429 Too Many Requests"
-      })
-    );
-    expect(providerFailure.category).toBe("provider_failure");
-    expect(providerFailure.details).toEqual([
-      "phase=request_failed",
-      "status=429",
-      "statusText=Too Many Requests"
-    ]);
-
-    const persistenceFailure = policy.mapStartSessionFailure(
-      new Error("downstream failure")
-    );
-    expect(persistenceFailure.category).toBe("persistence_failure");
-  });
 });

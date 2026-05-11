@@ -6,6 +6,7 @@ import PracticeSessionPage from "../app/practice/[sessionId]/page";
 const {
   redirect,
   notFound,
+  getProfilePageData,
   getLearnerEntryContext,
   getLearnerSessionRuntime,
   getLearnerEntryContextEffect,
@@ -17,6 +18,7 @@ const {
   notFound: vi.fn(() => {
     throw new Error("NOT_FOUND");
   }),
+  getProfilePageData: vi.fn(),
   getLearnerEntryContext: vi.fn(),
   getLearnerSessionRuntime: vi.fn(),
   getLearnerEntryContextEffect: vi.fn(),
@@ -28,9 +30,13 @@ vi.mock("next/navigation", () => ({
   notFound
 }));
 
-vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
+vi.mock("@/src/application/start-session/practice-entry-web-adapter", () => ({
+  getProfilePageData,
   getLearnerEntryContext,
-  getLearnerSessionRuntime,
+  getLearnerSessionRuntime
+}));
+
+vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
   getLearnerEntryContextEffect,
   getLearnerSessionRuntimeEffect
 }));
@@ -38,6 +44,10 @@ vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
 describe("Entry pages auth guard parity", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getProfilePageData.mockResolvedValue({
+      ok: false,
+      reason: "unauthenticated"
+    });
     getLearnerEntryContext.mockResolvedValue({
       ok: false,
       reason: "unauthenticated"

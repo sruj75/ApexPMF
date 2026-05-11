@@ -7,14 +7,17 @@ import {
   mapProfileFailureToRedirectPath
 } from "@/src/application/start-session/entry-failure";
 import {
-  getLearnerEntryContext
-} from "@/src/application/start-session/practice-entry-seam";
-import { parseIdealCustomerProfileInput } from "@/src/domain/persona/ideal-customer-profile";
-import { Effect } from "effect";
+  getLearnerEntryContext,
+  parseProfileInput,
+  createIdealCustomerProfileForLearner,
+  updateIdealCustomerProfileForLearner,
+  selectActiveIdealCustomerProfileForLearner,
+  clearActiveIdealCustomerProfileForLearner
+} from "@/src/application/start-session/practice-entry-web-adapter";
 
 export async function createIdealCustomerProfileAction(formData: FormData) {
   const { learnerId, repository } = await getProfileSettingsContext();
-  const parsed = parseIdealCustomerProfileInput(inputFromFormData(formData));
+  const parsed = parseProfileInput(inputFromFormData(formData));
 
   if (!parsed.ok) {
     redirectWithEntryFailure(
@@ -25,14 +28,14 @@ export async function createIdealCustomerProfileAction(formData: FormData) {
     );
   }
 
-  await Effect.runPromise(repository.create(learnerId, parsed.value));
+  await createIdealCustomerProfileForLearner(learnerId, repository, parsed.value);
   revalidatePath("/profile");
 }
 
 export async function updateIdealCustomerProfileAction(formData: FormData) {
   const profileId = stringFromFormData(formData, "profileId");
   const { learnerId, repository } = await getProfileSettingsContext();
-  const parsed = parseIdealCustomerProfileInput(inputFromFormData(formData));
+  const parsed = parseProfileInput(inputFromFormData(formData));
 
   if (!profileId) {
     redirectWithEntryFailure(
@@ -52,7 +55,7 @@ export async function updateIdealCustomerProfileAction(formData: FormData) {
     );
   }
 
-  await Effect.runPromise(repository.update(learnerId, profileId, parsed.value));
+  await updateIdealCustomerProfileForLearner(learnerId, repository, profileId, parsed.value);
   revalidatePath("/profile");
 }
 
@@ -69,14 +72,14 @@ export async function selectActiveIdealCustomerProfileAction(formData: FormData)
     );
   }
 
-  await Effect.runPromise(repository.selectActive(learnerId, profileId));
+  await selectActiveIdealCustomerProfileForLearner(learnerId, repository, profileId);
   revalidatePath("/profile");
 }
 
 export async function clearActiveIdealCustomerProfileAction(_formData: FormData) {
   void _formData;
   const { learnerId, repository } = await getProfileSettingsContext();
-  await Effect.runPromise(repository.clearActive(learnerId));
+  await clearActiveIdealCustomerProfileForLearner(learnerId, repository);
   revalidatePath("/profile");
 }
 

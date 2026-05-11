@@ -4,6 +4,9 @@ import {
   createScriptedVoiceRuntime,
   VoiceRuntimeConfigurationError,
   VoiceRuntimeConnectionError,
+  VoiceRuntimeGracefulEndError,
+  VoiceRuntimeInterruptionError,
+  VoiceRuntimeSpeechSendError,
   type VoiceRuntimeEvent
 } from "../src/domain/session/voice-runtime";
 import { createGeminiVoiceRuntime } from "../src/infrastructure/gemini/voice-runtime";
@@ -186,38 +189,61 @@ describe("Voice Runtime boundary", () => {
       apiKey: ""
     });
 
-    await expect(
-      Effect.runPromiseExit(
-        runtime.startSession({
-          sessionId: "session-case-4"
-        })
-      )
-    ).resolves.toMatchObject({
-      _tag: "Failure",
-      cause: {
-        _tag: "Fail",
-        failure: expect.any(VoiceRuntimeConfigurationError)
-      }
-    });
+    const failures = await Promise.all([
+      Effect.runPromise(
+        Effect.flip(runtime.startSession({ sessionId: "session-case-4" }))
+      ),
+      Effect.runPromise(
+        Effect.flip(runtime.sendLearnerSpeech({ text: "Hello?" }))
+      ),
+      Effect.runPromise(Effect.flip(runtime.interrupt({ reason: "learner" }))),
+      Effect.runPromise(Effect.flip(runtime.end({ reason: "user-quit" })))
+    ]);
+
+    expect(failures).toHaveLength(4);
+    for (const failure of failures) {
+      expect(failure).toBeInstanceOf(VoiceRuntimeConfigurationError);
+      expect(failure).toMatchObject({
+        operation: "configuration"
+      });
+    }
   });
 
-  it("keeps Gemini transport unimplemented behind a typed connection failure", async () => {
+  it("keeps Gemini placeholder failures typed by runtime operation", async () => {
     const runtime = createGeminiVoiceRuntime({
       apiKey: "test-key"
     });
 
-    await expect(
-      Effect.runPromiseExit(
-        runtime.startSession({
-          sessionId: "session-case-5"
-        })
-      )
-    ).resolves.toMatchObject({
-      _tag: "Failure",
-      cause: {
-        _tag: "Fail",
-        failure: expect.any(VoiceRuntimeConnectionError)
+    const cases = [
+      {
+        effect: runtime.startSession({ sessionId: "session-case-5" }),
+        error: VoiceRuntimeConnectionError,
+        operation: "start-session"
+      },
+      {
+        effect: runtime.sendLearnerSpeech({ text: "Tell me more." }),
+        error: VoiceRuntimeSpeechSendError,
+        operation: "send-learner-speech"
+      },
+      {
+        effect: runtime.interrupt({ reason: "learner" }),
+        error: VoiceRuntimeInterruptionError,
+        operation: "interrupt"
+      },
+      {
+        effect: runtime.end({ reason: "user-quit" }),
+        error: VoiceRuntimeGracefulEndError,
+        operation: "end"
       }
-    });
+    ];
+
+    for (const testCase of cases) {
+      const failure = await Effect.runPromise(Effect.flip(testCase.effect));
+
+      expect(failure).toBeInstanceOf(testCase.error);
+      expect(failure).toMatchObject({
+        operation: testCase.operation
+      });
+    }
   });
 });

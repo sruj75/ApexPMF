@@ -8,7 +8,7 @@ import {
 import {
   getLearnerEntryContext,
   startPracticeFromEntryContext
-} from "@/src/application/start-session/practice-entry-seam";
+} from "@/src/application/start-session/practice-entry-web-adapter";
 
 export async function startPracticeAction(_formData: FormData) {
   void _formData;

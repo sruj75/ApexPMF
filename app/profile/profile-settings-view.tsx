@@ -1,4 +1,4 @@
-import type { IdealCustomerProfile } from "@/src/domain/persona/ideal-customer-profile";
+import type { IdealCustomerProfile } from "@/src/application/start-session/practice-entry-web-adapter";
 import type { PresentedSessionSource } from "@/src/application/start-session/session-source-presentation";
 
 type ProfileSettingsViewProps = {

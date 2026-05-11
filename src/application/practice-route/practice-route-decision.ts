@@ -9,6 +9,9 @@ import {
 } from "@/src/application/start-session/practice-entry-seam";
 import { toStartedSession, type StartedSession } from "@/src/domain/session/generated-session-case";
 import type { SessionReport, SessionTranscriptTurn } from "@/src/domain/session/session-report";
+
+export type { StartedSession } from "@/src/domain/session/generated-session-case";
+export type { SessionReport, SessionTranscriptTurn } from "@/src/domain/session/session-report";
 import { Data, Effect } from "effect";
 
 export type PracticeRouteIntent =

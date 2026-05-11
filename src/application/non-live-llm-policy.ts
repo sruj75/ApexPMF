@@ -1,22 +1,11 @@
 import {
-  classifyEntryFailure,
   createEntryFailure,
   type EntryFailure
 } from "@/src/application/start-session/entry-failure";
-import { createOpenRouterPersonaGenerator } from "@/src/domain/persona/openrouter-persona-generator";
-import {
-  PersonaGenerationProviderError,
-  type PersonaGenerator
-} from "@/src/domain/persona/persona-generation";
-import {
-  createHiddenEvaluationEngine,
-  type HiddenEvaluationEngine
-} from "@/src/domain/session/hidden-evaluation-engine";
-import type { HiddenEvaluationJudge } from "@/src/domain/session/hidden-evaluation-judge";
+import { PersonaGenerationProviderError } from "@/src/domain/persona/persona-generation";
 import type { SessionEvaluationInsufficientReason } from "@/src/domain/session/session-evaluation";
 import {
   createOpenRouterChatClient,
-  createOpenRouterHiddenEvaluationJudge,
   OpenRouterProviderError,
   type OpenRouterChatClient
 } from "@/src/infrastructure/llm/openrouter";
@@ -57,64 +46,6 @@ export type NonLiveLlmAccess = {
   };
   chatClient: OpenRouterChatClient;
 };
-
-export type NonLiveLlmRuntimePolicy = {
-  composePersonaGenerator(): Effect.Effect<
-    PersonaGenerator,
-    NonLiveLlmProviderUnavailableError,
-    never
-  >;
-  composeHiddenEvaluationEngine(): Effect.Effect<HiddenEvaluationEngine, never, never>;
-  mapStartSessionFailure(cause: unknown): EntryFailure;
-};
-
-export function createNonLiveLlmRuntimePolicy(input?: {
-  env?: NodeJS.ProcessEnv;
-  createPersonaGenerator?: (input: {
-    chatClient: OpenRouterChatClient;
-  }) => PersonaGenerator;
-  createHiddenEvaluationEngine?: (input: {
-    judge: HiddenEvaluationJudge;
-  }) => HiddenEvaluationEngine;
-}): NonLiveLlmRuntimePolicy {
-  const nonLiveLlmAccess = resolveNonLiveLlmAccess(input?.env);
-  const personaGeneratorFactory =
-    input?.createPersonaGenerator ?? createOpenRouterPersonaGenerator;
-  const hiddenEvaluationEngineFactory =
-    input?.createHiddenEvaluationEngine ?? createHiddenEvaluationEngine;
-
-  return {
-    composePersonaGenerator() {
-      return nonLiveLlmAccess.pipe(
-        Effect.map((access) =>
-          personaGeneratorFactory({
-            chatClient: access.chatClient
-          })
-        )
-      );
-    },
-    composeHiddenEvaluationEngine() {
-      return nonLiveLlmAccess.pipe(
-        Effect.map((access) =>
-          hiddenEvaluationEngineFactory({
-            judge: createOpenRouterHiddenEvaluationJudge({
-              chatClient: access.chatClient
-            })
-          })
-        ),
-        Effect.catchAll((failure) =>
-          Effect.succeed(createUnavailableHiddenEvaluationEngine(failure))
-        )
-      );
-    },
-    mapStartSessionFailure(cause) {
-      const nonLiveLlmFailure = classifyNonLiveLlmFailure(cause);
-      return nonLiveLlmFailure
-        ? mapNonLiveLlmFailureToEntryFailure(nonLiveLlmFailure)
-        : classifyEntryFailure(cause);
-    }
-  };
-}
 
 export function resolveNonLiveLlmAccess(
   env: NodeJS.ProcessEnv = process.env
@@ -208,19 +139,6 @@ function missingOpenRouterApiKeyFailure(): Extract<
     missingEnvVar: "OPENROUTER_API_KEY",
     message: "OPENROUTER_API_KEY is required for non-live LLM flows."
   });
-}
-
-function createUnavailableHiddenEvaluationEngine(
-  failure: NonLiveLlmFailure
-): HiddenEvaluationEngine {
-  return {
-    evaluateEndedSession() {
-      return Effect.succeed({
-        status: "insufficient-evidence",
-        reason: mapNonLiveLlmFailureToHiddenEvaluationReason(failure)
-      });
-    }
-  };
 }
 
 function toOpenRouterProviderError(

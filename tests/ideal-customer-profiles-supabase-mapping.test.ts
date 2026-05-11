@@ -74,8 +74,15 @@ describe("Ideal Customer Profiles Supabase mapping", () => {
 
     expect(error).toMatchObject({
       _tag: "IdealCustomerProfileRepositoryDecodeError",
-      operation: "listForLearner"
+      operation: "listForLearner",
+      cause: {
+        _tag: "IdealCustomerProfileRepositoryDecodeDetail",
+        adapter: "ideal_customer_profiles",
+        operation: "listForLearner",
+        rowIndex: 1
+      }
     });
+    expect(error.cause.details[0]).toContain("updated_at");
   });
 
   it("throws typed decode error for getActiveForLearner on invalid row shapes", async () => {
@@ -92,8 +99,15 @@ describe("Ideal Customer Profiles Supabase mapping", () => {
 
     expect(error).toMatchObject({
       _tag: "IdealCustomerProfileRepositoryDecodeError",
-      operation: "getActiveForLearner"
+      operation: "getActiveForLearner",
+      cause: {
+        _tag: "IdealCustomerProfileRepositoryDecodeDetail",
+        adapter: "ideal_customer_profiles",
+        operation: "getActiveForLearner"
+      }
     });
+    expect(error.cause.rowIndex).toBeUndefined();
+    expect(error.cause.details[0]).toContain("notes");
   });
 
   it("maps Supabase query failures into typed persistence errors", async () => {

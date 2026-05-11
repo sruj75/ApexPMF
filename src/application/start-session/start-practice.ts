@@ -1,7 +1,6 @@
 import type { IdealCustomerProfileRepository } from "@/src/domain/persona/ideal-customer-profile-repository";
 import type {
-  PersonaGenerationError,
-  PersonaGenerator
+  PersonaGenerationError
 } from "@/src/domain/persona/persona-generation";
 import {
   resolveNextSessionSource,
@@ -13,7 +12,19 @@ import type {
   GeneratedSessionCaseRepository,
   GeneratedSessionCaseRepositoryError
 } from "@/src/domain/session/generated-session-case-repository";
-import { Data, Effect } from "effect";
+import { PersonaGenerationCapability } from "@/src/application/llm-runtime/llm-runtime-layers";
+import { Context, Data, Effect, Layer } from "effect";
+
+export class StartPracticeNonce extends Context.Tag("StartPracticeNonce")<
+  StartPracticeNonce,
+  {
+    create(): string;
+  }
+>() {}
+
+export const defaultStartPracticeNonceLayer = Layer.succeed(StartPracticeNonce, {
+  create: () => globalThis.crypto.randomUUID()
+});
 
 export type StartPracticeDependencies = {
   idealCustomerProfileRepository: Pick<
@@ -21,8 +32,6 @@ export type StartPracticeDependencies = {
     "getActiveForLearner"
   >;
   generatedSessionCaseRepository: GeneratedSessionCaseRepository;
-  personaGenerator: PersonaGenerator;
-  createNonce?: () => string;
 };
 
 export class StartPracticeSessionSourceError extends Data.TaggedError(
@@ -58,10 +67,15 @@ export function normalizeStartPracticeFailure(cause: unknown): unknown {
 export function startPracticeForLearner(
   learnerId: string,
   dependencies: StartPracticeDependencies
-): Effect.Effect<StartedSession, StartPracticeError, never> {
+): Effect.Effect<
+  StartedSession,
+  StartPracticeError,
+  PersonaGenerationCapability | StartPracticeNonce
+> {
   return Effect.gen(function* () {
-    const generationNonce =
-      dependencies.createNonce?.() ?? globalThis.crypto.randomUUID();
+    const personaGenerator = yield* PersonaGenerationCapability;
+    const nonce = yield* StartPracticeNonce;
+    const generationNonce = nonce.create();
     const sessionSource = yield* resolveNextSessionSource(
       learnerId,
       dependencies.idealCustomerProfileRepository
@@ -74,7 +88,7 @@ export function startPracticeForLearner(
           })
       )
     );
-    const generatedDraft = yield* dependencies.personaGenerator
+    const generatedDraft = yield* personaGenerator
       .generateSessionCase({
         sessionSource,
         generationNonce

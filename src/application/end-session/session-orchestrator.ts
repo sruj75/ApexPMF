@@ -2,6 +2,7 @@ import {
   type ReportGenerationCoordinator,
   type ReportGenerationCoordinatorError
 } from "@/src/application/generate-report/report-generation-coordinator";
+import type { HiddenEvaluationCapability } from "@/src/application/llm-runtime/llm-runtime-layers";
 import {
   type GeneratedSessionCaseRepository,
   type GeneratedSessionCaseRepositoryError
@@ -59,7 +60,11 @@ export type SessionOrchestrator = {
   runReportGeneratingFlowForLearner(input: {
     learnerId: string;
     sessionId: string;
-  }): Effect.Effect<ReportGeneratingFlowOutcome, SessionOrchestratorError, never>;
+  }): Effect.Effect<
+    ReportGeneratingFlowOutcome,
+    SessionOrchestratorError,
+    HiddenEvaluationCapability
+  >;
 };
 
 export function createSessionOrchestrator(input: {

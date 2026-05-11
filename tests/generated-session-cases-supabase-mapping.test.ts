@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createSupabaseGeneratedSessionCaseRepository } from "../src/infrastructure/supabase/generated-session-cases";
-import { runEffectOrThrow } from "../src/application/effect-boundary-runner";
+import { Effect } from "effect";
 
 describe("Generated Session Case Supabase mapping", () => {
   it("preserves broad-practice-pool label from source_snapshot on readback", async () => {
@@ -763,6 +763,16 @@ function toPromiseRepository(
       input: Parameters<typeof repository.updateReportArtifactsForLearner>[0]
     ) => runEffectOrThrow(repository.updateReportArtifactsForLearner(input))
   };
+}
+
+async function runEffectOrThrow<Success, Error>(
+  effect: Effect.Effect<Success, Error, never>
+): Promise<Success> {
+  const result = await Effect.runPromise(Effect.either(effect));
+  if (result._tag === "Left") {
+    throw result.left;
+  }
+  return result.right;
 }
 
 const validGeneratedSessionCaseRow = {

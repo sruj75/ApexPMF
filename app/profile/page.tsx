@@ -30,7 +30,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
   const repository = context.idealCustomerProfileRepository;
   const [profiles, sessionSource, params] = await Promise.all([
-    repository.listForLearner(context.learnerId),
+    Effect.runPromise(repository.listForLearner(context.learnerId)),
     Effect.runPromise(resolveNextSessionSource(context.learnerId, repository)),
     searchParams
   ]);

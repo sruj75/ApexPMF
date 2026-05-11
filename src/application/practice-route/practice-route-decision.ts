@@ -4,8 +4,8 @@ import {
   resolveSessionLifecycleRoute
 } from "@/src/application/end-session/session-lifecycle-route-policy";
 import {
-  getLearnerEntryContext,
-  getLearnerSessionRuntime
+  getLearnerEntryContextEffect,
+  getLearnerSessionRuntimeEffect
 } from "@/src/application/start-session/practice-entry-seam";
 import { toStartedSession, type StartedSession } from "@/src/domain/session/generated-session-case";
 import type { SessionReport, SessionTranscriptTurn } from "@/src/domain/session/session-report";
@@ -35,13 +35,13 @@ export type PracticeRouteDecision =
     };
 
 export type PracticeRouteDecisionDependencies = {
-  getLearnerEntryContext: () => ReturnType<typeof getLearnerEntryContext>;
-  getLearnerSessionRuntime: () => ReturnType<typeof getLearnerSessionRuntime>;
+  getLearnerEntryContext: () => ReturnType<typeof getLearnerEntryContextEffect>;
+  getLearnerSessionRuntime: () => ReturnType<typeof getLearnerSessionRuntimeEffect>;
 };
 
 const defaultDependencies: PracticeRouteDecisionDependencies = {
-  getLearnerEntryContext,
-  getLearnerSessionRuntime
+  getLearnerEntryContext: getLearnerEntryContextEffect,
+  getLearnerSessionRuntime: getLearnerSessionRuntimeEffect
 };
 
 const loginPath = "/login";
@@ -181,14 +181,16 @@ function resolvePracticeRouteDecisionEffect(
 
 function tryDependency<T>(
   operation: string,
-  run: () => Promise<T>
+  run: () => Effect.Effect<T, unknown, never>
 ): Effect.Effect<T, PracticeRouteDecisionDependencyError> {
-  return Effect.tryPromise({
-    try: run,
-    catch: (cause) =>
-      new PracticeRouteDecisionDependencyError({
-        operation,
-        cause
-      })
-  });
+  return Effect.suspend(run).pipe(
+    Effect.catchAllCause((cause) =>
+      Effect.fail(
+        new PracticeRouteDecisionDependencyError({
+          operation,
+          cause
+        })
+      )
+    )
+  );
 }

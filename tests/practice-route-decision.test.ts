@@ -28,10 +28,12 @@ describe("Practice route decision module", () => {
 
   it("returns login redirect when practice/session-report entry context is unauthenticated", async () => {
     const deps = makeDependencies();
-    deps.getLearnerEntryContext.mockResolvedValue({
-      ok: false,
-      reason: "unauthenticated"
-    });
+    deps.getLearnerEntryContext.mockReturnValue(
+      Effect.succeed({
+        ok: false,
+        reason: "unauthenticated"
+      })
+    );
 
     await expectDecision(
       {
@@ -45,13 +47,16 @@ describe("Practice route decision module", () => {
 
   it("returns not-found when generated session does not exist for learner", async () => {
     const deps = makeDependencies();
-    deps.getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(() => Effect.succeed(null))
-      }
-    });
+    deps.getLearnerEntryContext.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-1",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {
+          getForLearner: vi.fn(() => Effect.succeed(null))
+        }
+      })
+    );
 
     await expectDecision(
       {
@@ -65,24 +70,27 @@ describe("Practice route decision module", () => {
 
   it("redirects practice-session intent when lifecycle route is report-generating", async () => {
     const deps = makeDependencies();
-    deps.getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(() =>
-          Effect.succeed(
-            makeGeneratedSessionCase({
-              id: defaultPracticeSessionId,
-              sessionLifecycle: {
-                sessionStatus: "ended",
-                endedReason: "natural-conclusion",
-                reportStatus: "generating"
-              }
-            })
+    deps.getLearnerEntryContext.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-1",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {
+          getForLearner: vi.fn(() =>
+            Effect.succeed(
+              makeGeneratedSessionCase({
+                id: defaultPracticeSessionId,
+                sessionLifecycle: {
+                  sessionStatus: "ended",
+                  endedReason: "natural-conclusion",
+                  reportStatus: "generating"
+                }
+              })
+            )
           )
-        )
-      }
-    });
+        }
+      })
+    );
 
     await expectDecision(
       {
@@ -99,27 +107,30 @@ describe("Practice route decision module", () => {
 
   it("redirects practice-session intent when lifecycle route is session-report", async () => {
     const deps = makeDependencies();
-    deps.getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(() =>
-          Effect.succeed(
-            makeGeneratedSessionCase({
-              id: defaultPracticeSessionId,
-              sessionLifecycle: {
-                sessionStatus: "ended",
-                endedReason: "natural-conclusion",
-                reportStatus: "ready"
-              },
-              sessionReport: makeSessionReport(),
-              sessionTranscript: [{ sequence: 1, speaker: "learner", text: "What changed?" }],
-              sessionEvaluation: makeSessionEvaluation()
-            })
+    deps.getLearnerEntryContext.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-1",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {
+          getForLearner: vi.fn(() =>
+            Effect.succeed(
+              makeGeneratedSessionCase({
+                id: defaultPracticeSessionId,
+                sessionLifecycle: {
+                  sessionStatus: "ended",
+                  endedReason: "natural-conclusion",
+                  reportStatus: "ready"
+                },
+                sessionReport: makeSessionReport(),
+                sessionTranscript: [{ sequence: 1, speaker: "learner", text: "What changed?" }],
+                sessionEvaluation: makeSessionEvaluation()
+              })
+            )
           )
-        )
-      }
-    });
+        }
+      })
+    );
 
     await expectDecision(
       {
@@ -136,22 +147,25 @@ describe("Practice route decision module", () => {
 
   it("returns a practice render decision when lifecycle route stays on voice conversation", async () => {
     const deps = makeDependencies();
-    deps.getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(() =>
-          Effect.succeed(
-            makeGeneratedSessionCase({
-              id: defaultPracticeSessionId,
-              sessionLifecycle: {
-                sessionStatus: "voice-conversation"
-              }
-            })
+    deps.getLearnerEntryContext.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-1",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {
+          getForLearner: vi.fn(() =>
+            Effect.succeed(
+              makeGeneratedSessionCase({
+                id: defaultPracticeSessionId,
+                sessionLifecycle: {
+                  sessionStatus: "voice-conversation"
+                }
+              })
+            )
           )
-        )
-      }
-    });
+        }
+      })
+    );
 
     await expectDecision(
       {
@@ -173,24 +187,27 @@ describe("Practice route decision module", () => {
 
   it("redirects session-report intent when lifecycle route is still report-generating", async () => {
     const deps = makeDependencies();
-    deps.getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(() =>
-          Effect.succeed(
-            makeGeneratedSessionCase({
-              id: defaultPracticeSessionId,
-              sessionLifecycle: {
-                sessionStatus: "ended",
-                endedReason: "credit-exhaustion",
-                reportStatus: "generating"
-              }
-            })
+    deps.getLearnerEntryContext.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-1",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {
+          getForLearner: vi.fn(() =>
+            Effect.succeed(
+              makeGeneratedSessionCase({
+                id: defaultPracticeSessionId,
+                sessionLifecycle: {
+                  sessionStatus: "ended",
+                  endedReason: "credit-exhaustion",
+                  reportStatus: "generating"
+                }
+              })
+            )
           )
-        )
-      }
-    });
+        }
+      })
+    );
 
     await expectDecision(
       {
@@ -207,24 +224,27 @@ describe("Practice route decision module", () => {
 
   it("redirects session-report intent to dashboard when lifecycle route is practice-dashboard", async () => {
     const deps = makeDependencies();
-    deps.getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(() =>
-          Effect.succeed(
-            makeGeneratedSessionCase({
-              id: defaultPracticeSessionId,
-              sessionLifecycle: {
-                sessionStatus: "ended",
-                endedReason: "user-quit",
-                reportStatus: "insufficient-evidence"
-              }
-            })
+    deps.getLearnerEntryContext.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-1",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {
+          getForLearner: vi.fn(() =>
+            Effect.succeed(
+              makeGeneratedSessionCase({
+                id: defaultPracticeSessionId,
+                sessionLifecycle: {
+                  sessionStatus: "ended",
+                  endedReason: "user-quit",
+                  reportStatus: "insufficient-evidence"
+                }
+              })
+            )
           )
-        )
-      }
-    });
+        }
+      })
+    );
 
     await expectDecision(
       {
@@ -241,27 +261,30 @@ describe("Practice route decision module", () => {
 
   it("redirects session-report intent to report-generating when ready artifacts are incomplete", async () => {
     const deps = makeDependencies();
-    deps.getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(() =>
-          Effect.succeed(
-            makeGeneratedSessionCase({
-              id: defaultPracticeSessionId,
-              sessionLifecycle: {
-                sessionStatus: "ended",
-                endedReason: "natural-conclusion",
-                reportStatus: "ready"
-              },
-              sessionReport: makeSessionReport(),
-              sessionTranscript: null,
-              sessionEvaluation: makeSessionEvaluation()
-            })
+    deps.getLearnerEntryContext.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-1",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {
+          getForLearner: vi.fn(() =>
+            Effect.succeed(
+              makeGeneratedSessionCase({
+                id: defaultPracticeSessionId,
+                sessionLifecycle: {
+                  sessionStatus: "ended",
+                  endedReason: "natural-conclusion",
+                  reportStatus: "ready"
+                },
+                sessionReport: makeSessionReport(),
+                sessionTranscript: null,
+                sessionEvaluation: makeSessionEvaluation()
+              })
+            )
           )
-        )
-      }
-    });
+        }
+      })
+    );
 
     await expectDecision(
       {
@@ -278,27 +301,30 @@ describe("Practice route decision module", () => {
 
   it("returns report render decision when session report artifacts are routable", async () => {
     const deps = makeDependencies();
-    deps.getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(() =>
-          Effect.succeed(
-            makeGeneratedSessionCase({
-              id: defaultPracticeSessionId,
-              sessionLifecycle: {
-                sessionStatus: "ended",
-                endedReason: "natural-conclusion",
-                reportStatus: "ready"
-              },
-              sessionReport: makeSessionReport(),
-              sessionTranscript: [{ sequence: 1, speaker: "learner", text: "What changed?" }],
-              sessionEvaluation: makeSessionEvaluation()
-            })
+    deps.getLearnerEntryContext.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-1",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {
+          getForLearner: vi.fn(() =>
+            Effect.succeed(
+              makeGeneratedSessionCase({
+                id: defaultPracticeSessionId,
+                sessionLifecycle: {
+                  sessionStatus: "ended",
+                  endedReason: "natural-conclusion",
+                  reportStatus: "ready"
+                },
+                sessionReport: makeSessionReport(),
+                sessionTranscript: [{ sequence: 1, speaker: "learner", text: "What changed?" }],
+                sessionEvaluation: makeSessionEvaluation()
+              })
+            )
           )
-        )
-      }
-    });
+        }
+      })
+    );
 
     await expectDecision(
       {
@@ -316,10 +342,12 @@ describe("Practice route decision module", () => {
 
   it("returns login redirect when report-generating runtime is unauthenticated", async () => {
     const deps = makeDependencies();
-    deps.getLearnerSessionRuntime.mockResolvedValue({
-      ok: false,
-      reason: "unauthenticated"
-    });
+    deps.getLearnerSessionRuntime.mockReturnValue(
+      Effect.succeed({
+        ok: false,
+        reason: "unauthenticated"
+      })
+    );
 
     await expectDecision(
       {
@@ -333,14 +361,18 @@ describe("Practice route decision module", () => {
 
   it("returns report-generating redirect from learner runtime flow outcome", async () => {
     const deps = makeDependencies();
-    const runReportGeneratingFlowForLearner = vi.fn(async () => ({
-      reportStatus: "ready" as const,
-      nextPath: `/practice/${defaultPracticeSessionId}/report`
-    }));
-    deps.getLearnerSessionRuntime.mockResolvedValue({
-      ok: true,
-      runReportGeneratingFlowForLearner
-    });
+    const runReportGeneratingFlowForLearner = vi.fn(() =>
+      Effect.succeed({
+        reportStatus: "ready" as const,
+        nextPath: `/practice/${defaultPracticeSessionId}/report`
+      })
+    );
+    deps.getLearnerSessionRuntime.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        runReportGeneratingFlowForLearner
+      })
+    );
 
     await expectDecision(
       {
@@ -360,13 +392,17 @@ describe("Practice route decision module", () => {
 
   it("returns dashboard redirect when report-generating flow outcome is insufficient-evidence", async () => {
     const deps = makeDependencies();
-    deps.getLearnerSessionRuntime.mockResolvedValue({
-      ok: true,
-      runReportGeneratingFlowForLearner: vi.fn(async () => ({
-        reportStatus: "insufficient-evidence",
-        nextPath: "/dashboard"
-      }))
-    });
+    deps.getLearnerSessionRuntime.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        runReportGeneratingFlowForLearner: vi.fn(() =>
+          Effect.succeed({
+            reportStatus: "insufficient-evidence",
+            nextPath: "/dashboard"
+          })
+        )
+      })
+    );
 
     await expectDecision(
       {
@@ -383,12 +419,16 @@ describe("Practice route decision module", () => {
 
   it("returns not-found when report-generating runtime flow resolves missing Session", async () => {
     const deps = makeDependencies();
-    deps.getLearnerSessionRuntime.mockResolvedValue({
-      ok: true,
-      runReportGeneratingFlowForLearner: vi.fn(async () => ({
-        reportStatus: "not-found" as const
-      }))
-    });
+    deps.getLearnerSessionRuntime.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        runReportGeneratingFlowForLearner: vi.fn(() =>
+          Effect.succeed({
+            reportStatus: "not-found" as const
+          })
+        )
+      })
+    );
 
     await expectDecision(
       {
@@ -413,26 +453,33 @@ async function expectDecision(
 
 function makeDependencies(): PracticeRouteDecisionDependencies {
   return {
-    getLearnerEntryContext: vi.fn(async () => ({
-      ok: true,
-      learnerId: "learner-1",
-      generatedSessionCaseRepository: {
-        getForLearner: vi.fn(() =>
-          Effect.succeed(
-            makeGeneratedSessionCase({
-              id: defaultPracticeSessionId,
-              sessionLifecycle: { sessionStatus: "voice-conversation" }
-            })
+    getLearnerEntryContext: vi.fn(() =>
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-1",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {
+          getForLearner: vi.fn(() =>
+            Effect.succeed(
+              makeGeneratedSessionCase({
+                id: defaultPracticeSessionId,
+                sessionLifecycle: { sessionStatus: "voice-conversation" }
+              })
+            )
           )
+        }
+      })
+    ),
+    getLearnerSessionRuntime: vi.fn(() =>
+      Effect.succeed({
+        ok: true,
+        runReportGeneratingFlowForLearner: vi.fn(() =>
+          Effect.succeed({
+            reportStatus: "ready" as const,
+            nextPath: `/practice/${defaultPracticeSessionId}/report`
+          })
         )
-      }
-    })),
-    getLearnerSessionRuntime: vi.fn(async () => ({
-      ok: true,
-      runReportGeneratingFlowForLearner: vi.fn(async () => ({
-        reportStatus: "ready" as const,
-        nextPath: `/practice/${defaultPracticeSessionId}/report`
-      }))
-    }))
+      })
+    )
   };
 }

@@ -6,7 +6,7 @@ import {
 
 export function querySupabase<T>(input: {
   operation: GeneratedSessionCaseRepositoryOperation;
-  run: () => Promise<{ data: T; error: { message: string } | null }>;
+  run: () => PromiseLike<{ data: T; error: { message: string } | null }>;
 }): Effect.Effect<
   { data: T; error: { message: string } | null },
   GeneratedSessionCaseRepositoryPersistenceError,

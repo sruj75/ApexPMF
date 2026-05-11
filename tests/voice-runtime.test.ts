@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { Effect } from "effect";
 import {
   createScriptedVoiceRuntime,
+  VoiceRuntimeConfigurationError,
+  VoiceRuntimeConnectionError,
   type VoiceRuntimeEvent
 } from "../src/domain/session/voice-runtime";
+import { createGeminiVoiceRuntime } from "../src/infrastructure/gemini/voice-runtime";
 
 describe("Voice Runtime boundary", () => {
   it("emits speech, persona, transcript, interruption, latency, and failure events through the public contract", async () => {
@@ -50,18 +54,22 @@ describe("Voice Runtime boundary", () => {
       events.push(event);
     });
 
-    await runtime.startSession({
-      sessionId: "session-case-1"
-    });
-    await runtime.sendLearnerSpeech({
-      text: "Tell me about your last workflow."
-    });
-    await runtime.interrupt({
-      reason: "learner"
-    });
-    await runtime.end({
-      reason: "user-quit"
-    });
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        yield* runtime.startSession({
+          sessionId: "session-case-1"
+        });
+        yield* runtime.sendLearnerSpeech({
+          text: "Tell me about your last workflow."
+        });
+        yield* runtime.interrupt({
+          reason: "learner"
+        });
+        yield* runtime.end({
+          reason: "user-quit"
+        });
+      })
+    );
 
     expect(events.map((event) => event.type)).toEqual([
       "learner-speech-input",
@@ -97,12 +105,16 @@ describe("Voice Runtime boundary", () => {
       events.push(event);
     });
 
-    await runtime.startSession({
-      sessionId: "session-case-2"
-    });
-    await runtime.interrupt({
-      reason: "learner"
-    });
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        yield* runtime.startSession({
+          sessionId: "session-case-2"
+        });
+        yield* runtime.interrupt({
+          reason: "learner"
+        });
+      })
+    );
 
     expect(events).toEqual([
       {
@@ -143,12 +155,16 @@ describe("Voice Runtime boundary", () => {
       events.push(event);
     });
 
-    await runtime.startSession({
-      sessionId: "session-case-3"
-    });
-    await runtime.sendLearnerSpeech({
-      text: "How are you doing this now?"
-    });
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        yield* runtime.startSession({
+          sessionId: "session-case-3"
+        });
+        yield* runtime.sendLearnerSpeech({
+          text: "How are you doing this now?"
+        });
+      })
+    );
 
     expect(events).toEqual([
       {
@@ -163,5 +179,45 @@ describe("Voice Runtime boundary", () => {
         message: "audio output reconnecting"
       }
     ]);
+  });
+
+  it("returns typed configuration failure for missing Gemini credentials", async () => {
+    const runtime = createGeminiVoiceRuntime({
+      apiKey: ""
+    });
+
+    await expect(
+      Effect.runPromiseExit(
+        runtime.startSession({
+          sessionId: "session-case-4"
+        })
+      )
+    ).resolves.toMatchObject({
+      _tag: "Failure",
+      cause: {
+        _tag: "Fail",
+        failure: expect.any(VoiceRuntimeConfigurationError)
+      }
+    });
+  });
+
+  it("keeps Gemini transport unimplemented behind a typed connection failure", async () => {
+    const runtime = createGeminiVoiceRuntime({
+      apiKey: "test-key"
+    });
+
+    await expect(
+      Effect.runPromiseExit(
+        runtime.startSession({
+          sessionId: "session-case-5"
+        })
+      )
+    ).resolves.toMatchObject({
+      _tag: "Failure",
+      cause: {
+        _tag: "Fail",
+        failure: expect.any(VoiceRuntimeConnectionError)
+      }
+    });
   });
 });

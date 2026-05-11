@@ -1,3 +1,5 @@
+import { Data, Effect } from "effect";
+
 export type VoiceRuntimeEvent =
   | {
       type: "learner-speech-input";
@@ -44,12 +46,72 @@ export type VoiceRuntimeEndInput = {
   reason: "user-quit" | "natural-conclusion" | "voice-failure" | "credit-exhaustion";
 };
 
+export type VoiceRuntimeOperation =
+  | "configuration"
+  | "start-session"
+  | "send-learner-speech"
+  | "interrupt"
+  | "end";
+
+export class VoiceRuntimeConfigurationError extends Data.TaggedError(
+  "VoiceRuntimeConfigurationError"
+)<{
+  operation: "configuration";
+  message: string;
+  cause?: unknown;
+}> {}
+
+export class VoiceRuntimeConnectionError extends Data.TaggedError(
+  "VoiceRuntimeConnectionError"
+)<{
+  operation: "start-session";
+  message: string;
+  cause?: unknown;
+}> {}
+
+export class VoiceRuntimeSpeechSendError extends Data.TaggedError(
+  "VoiceRuntimeSpeechSendError"
+)<{
+  operation: "send-learner-speech";
+  message: string;
+  cause?: unknown;
+}> {}
+
+export class VoiceRuntimeInterruptionError extends Data.TaggedError(
+  "VoiceRuntimeInterruptionError"
+)<{
+  operation: "interrupt";
+  message: string;
+  cause?: unknown;
+}> {}
+
+export class VoiceRuntimeGracefulEndError extends Data.TaggedError(
+  "VoiceRuntimeGracefulEndError"
+)<{
+  operation: "end";
+  message: string;
+  cause?: unknown;
+}> {}
+
+export type VoiceRuntimeError =
+  | VoiceRuntimeConfigurationError
+  | VoiceRuntimeConnectionError
+  | VoiceRuntimeSpeechSendError
+  | VoiceRuntimeInterruptionError
+  | VoiceRuntimeGracefulEndError;
+
 export type VoiceRuntime = {
-  startSession(input: VoiceRuntimeStartInput): Promise<void>;
+  startSession(
+    input: VoiceRuntimeStartInput
+  ): Effect.Effect<void, VoiceRuntimeError, never>;
   subscribe(listener: (event: VoiceRuntimeEvent) => void): () => void;
-  sendLearnerSpeech(input: VoiceRuntimeSpeechInput): Promise<void>;
-  interrupt(input: VoiceRuntimeInterruptInput): Promise<void>;
-  end(input: VoiceRuntimeEndInput): Promise<void>;
+  sendLearnerSpeech(
+    input: VoiceRuntimeSpeechInput
+  ): Effect.Effect<void, VoiceRuntimeError, never>;
+  interrupt(
+    input: VoiceRuntimeInterruptInput
+  ): Effect.Effect<void, VoiceRuntimeError, never>;
+  end(input: VoiceRuntimeEndInput): Effect.Effect<void, VoiceRuntimeError, never>;
 };
 
 type ScriptedVoiceRuntimeScript = {
@@ -73,8 +135,10 @@ export function createScriptedVoiceRuntime(
   };
 
   return {
-    async startSession() {
+    startSession() {
+      return Effect.sync(() => {
       emit(script.onStart);
+      });
     },
     subscribe(listener) {
       listeners.add(listener);
@@ -82,14 +146,20 @@ export function createScriptedVoiceRuntime(
         listeners.delete(listener);
       };
     },
-    async sendLearnerSpeech() {
+    sendLearnerSpeech() {
+      return Effect.sync(() => {
       emit(script.onLearnerSpeech);
+      });
     },
-    async interrupt() {
+    interrupt() {
+      return Effect.sync(() => {
       emit(script.onInterrupt);
+      });
     },
-    async end() {
+    end() {
+      return Effect.sync(() => {
       emit(script.onEnd);
+      });
     }
   };
 }

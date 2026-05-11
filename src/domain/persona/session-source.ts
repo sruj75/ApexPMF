@@ -1,5 +1,8 @@
 import type { IdealCustomerProfile } from "./ideal-customer-profile";
-import type { IdealCustomerProfileRepository } from "./ideal-customer-profile-repository";
+import type {
+  IdealCustomerProfileRepository,
+  IdealCustomerProfileRepositoryError
+} from "./ideal-customer-profile-repository";
 import { Data, Effect } from "effect";
 
 const broadPracticePoolDefaultLabel = "Broad Practice Pool";
@@ -31,7 +34,7 @@ export class SessionSourceResolutionError extends Data.TaggedError(
   "SessionSourceResolutionError"
 )<{
   learnerId: string;
-  cause: unknown;
+  cause: IdealCustomerProfileRepositoryError;
 }> {}
 
 export function createBroadPracticePoolSessionSource(input?: {
@@ -68,14 +71,14 @@ export function resolveNextSessionSource(
   learnerId: string,
   repository: Pick<IdealCustomerProfileRepository, "getActiveForLearner">
 ): Effect.Effect<SessionSource, SessionSourceResolutionError, never> {
-  return Effect.tryPromise({
-    try: () => repository.getActiveForLearner(learnerId),
-    catch: (cause) =>
+  return repository.getActiveForLearner(learnerId).pipe(
+    Effect.mapError(
+      (cause) =>
       new SessionSourceResolutionError({
         learnerId,
         cause
       })
-  }).pipe(
+    ),
     Effect.map((activeProfile) =>
       activeProfile
         ? {

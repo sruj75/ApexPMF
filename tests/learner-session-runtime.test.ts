@@ -2,19 +2,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
 
 const {
-  getSupabaseLearnerEntryContext,
+  getSupabaseLearnerEntryContextEffect,
   createSessionOrchestrator,
   createReportGenerationCoordinator,
   SessionCaseNotFoundError
 } = vi.hoisted(() => ({
-  getSupabaseLearnerEntryContext: vi.fn(),
+  getSupabaseLearnerEntryContextEffect: vi.fn(),
   createSessionOrchestrator: vi.fn(),
   createReportGenerationCoordinator: vi.fn(),
   SessionCaseNotFoundError: class SessionCaseNotFoundError extends Error {}
 }));
 
 vi.mock("@/src/infrastructure/supabase/learner-entry-context", () => ({
-  getSupabaseLearnerEntryContext
+  getSupabaseLearnerEntryContextEffect
 }));
 
 vi.mock("@/src/application/end-session/session-orchestrator", () => ({
@@ -34,10 +34,12 @@ describe("Learner session runtime seam", () => {
   });
 
   it("returns unauthenticated when Learner entry context is not signed in", async () => {
-    getSupabaseLearnerEntryContext.mockResolvedValue({
-      ok: false,
-      reason: "unauthenticated"
-    });
+    getSupabaseLearnerEntryContextEffect.mockReturnValue(
+      Effect.succeed({
+        ok: false,
+        reason: "unauthenticated"
+      })
+    );
 
     await expect(getLearnerSessionRuntime()).resolves.toEqual({
       ok: false,
@@ -61,12 +63,14 @@ describe("Learner session runtime seam", () => {
       })
     );
 
-    getSupabaseLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-42",
-      idealCustomerProfileRepository: {} as never,
-      generatedSessionCaseRepository: {} as never
-    });
+    getSupabaseLearnerEntryContextEffect.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-42",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {} as never
+      })
+    );
     createReportGenerationCoordinator.mockReturnValue({});
     createSessionOrchestrator.mockReturnValue({
       endSessionForLearner,
@@ -123,12 +127,14 @@ describe("Learner session runtime seam", () => {
       Effect.fail(new SessionCaseNotFoundError())
     );
 
-    getSupabaseLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-42",
-      idealCustomerProfileRepository: {} as never,
-      generatedSessionCaseRepository: {} as never
-    });
+    getSupabaseLearnerEntryContextEffect.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-42",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {} as never
+      })
+    );
     createReportGenerationCoordinator.mockReturnValue({});
     createSessionOrchestrator.mockReturnValue({
       endSessionForLearner,

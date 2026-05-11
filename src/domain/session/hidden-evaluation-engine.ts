@@ -148,8 +148,8 @@ function requestJudgeCompletion(input: {
     const decoded = decodeHiddenEvaluationResponse(completion.content);
     if (!decoded.ok) {
       return {
-        ok: false,
-        reason: "invalid-judge-output",
+        ok: false as const,
+        reason: "invalid-judge-output" as const,
         content: completion.content
       };
     }
@@ -162,24 +162,24 @@ function requestJudgeCompletion(input: {
         )
       ) {
         return {
-          ok: false,
-          reason: "invalid-judge-output",
+          ok: false as const,
+          reason: "invalid-judge-output" as const,
           content: completion.content
         };
       }
       return {
-        ok: true,
+        ok: true as const,
         value: {
-          status: "ready",
+          status: "ready" as const,
           evaluation: decoded.value.evaluation
         }
       };
     }
 
     return {
-      ok: true,
+      ok: true as const,
       value: {
-        status: "insufficient-evidence",
+        status: "insufficient-evidence" as const,
         reason: decoded.value.reason
       }
     };

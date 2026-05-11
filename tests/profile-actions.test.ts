@@ -3,6 +3,7 @@ import {
   clearActiveIdealCustomerProfileAction,
   createIdealCustomerProfileAction
 } from "../app/profile/actions";
+import { Effect } from "effect";
 
 const {
   redirect,
@@ -44,8 +45,8 @@ describe("Profile Settings actions", () => {
       idealCustomerProfileRepository: repository,
       generatedSessionCaseRepository: {}
     });
-    repository.create.mockResolvedValue(undefined);
-    repository.clearActive.mockResolvedValue(undefined);
+    repository.create.mockReturnValue(Effect.void);
+    repository.clearActive.mockReturnValue(Effect.void);
   });
 
   it("creates an Ideal Customer Profile and revalidates /profile", async () => {

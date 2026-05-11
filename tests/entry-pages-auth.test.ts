@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Effect } from "effect";
 import ProfilePage from "../app/profile/page";
 import PracticeSessionPage from "../app/practice/[sessionId]/page";
 
@@ -6,7 +7,9 @@ const {
   redirect,
   notFound,
   getLearnerEntryContext,
-  getLearnerSessionRuntime
+  getLearnerSessionRuntime,
+  getLearnerEntryContextEffect,
+  getLearnerSessionRuntimeEffect
 } = vi.hoisted(() => ({
   redirect: vi.fn((location: string) => {
     throw new Error(`REDIRECT:${location}`);
@@ -15,7 +18,9 @@ const {
     throw new Error("NOT_FOUND");
   }),
   getLearnerEntryContext: vi.fn(),
-  getLearnerSessionRuntime: vi.fn()
+  getLearnerSessionRuntime: vi.fn(),
+  getLearnerEntryContextEffect: vi.fn(),
+  getLearnerSessionRuntimeEffect: vi.fn()
 }));
 
 vi.mock("next/navigation", () => ({
@@ -25,7 +30,9 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
   getLearnerEntryContext,
-  getLearnerSessionRuntime
+  getLearnerSessionRuntime,
+  getLearnerEntryContextEffect,
+  getLearnerSessionRuntimeEffect
 }));
 
 describe("Entry pages auth guard parity", () => {
@@ -39,6 +46,18 @@ describe("Entry pages auth guard parity", () => {
       ok: false,
       reason: "unauthenticated"
     });
+    getLearnerEntryContextEffect.mockReturnValue(
+      Effect.succeed({
+        ok: false,
+        reason: "unauthenticated"
+      })
+    );
+    getLearnerSessionRuntimeEffect.mockReturnValue(
+      Effect.succeed({
+        ok: false,
+        reason: "unauthenticated"
+      })
+    );
   });
 
   it("redirects Profile Settings to /login when unauthenticated", async () => {

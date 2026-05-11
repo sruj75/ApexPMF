@@ -18,15 +18,15 @@ import {
 import { SessionSourceResolutionError } from "../src/domain/persona/session-source";
 import { Effect } from "effect";
 
-const { getSupabaseLearnerEntryContext, startPracticeForLearner } = vi.hoisted(
+const { getSupabaseLearnerEntryContextEffect, startPracticeForLearner } = vi.hoisted(
   () => ({
-    getSupabaseLearnerEntryContext: vi.fn(),
+    getSupabaseLearnerEntryContextEffect: vi.fn(),
     startPracticeForLearner: vi.fn()
   })
 );
 
 vi.mock("@/src/infrastructure/supabase/learner-entry-context", () => ({
-  getSupabaseLearnerEntryContext
+  getSupabaseLearnerEntryContextEffect
 }));
 
 vi.mock("@/src/application/start-session/start-practice", async (importOriginal) => {
@@ -52,10 +52,12 @@ describe("Practice entry seam", () => {
   });
 
   it("returns an unauthenticated context result when no Learner is signed in", async () => {
-    getSupabaseLearnerEntryContext.mockResolvedValue({
-      ok: false,
-      reason: "unauthenticated"
-    });
+    getSupabaseLearnerEntryContextEffect.mockReturnValue(
+      Effect.succeed({
+        ok: false,
+        reason: "unauthenticated"
+      })
+    );
 
     await expect(getLearnerEntryContext()).resolves.toEqual({
       ok: false,

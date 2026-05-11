@@ -27,9 +27,17 @@ export class LearnerEntryContextDependencyError extends Data.TaggedError(
   cause: unknown;
 }> {}
 
+export class LearnerEntryContextAuthQueryError extends Data.TaggedError(
+  "LearnerEntryContextAuthQueryError"
+)<{
+  operation: "resolve-auth-user";
+  message: string;
+}> {}
+
 export type SupabaseLearnerEntryContextError =
   | SupabaseServerClientError
-  | LearnerEntryContextDependencyError;
+  | LearnerEntryContextDependencyError
+  | LearnerEntryContextAuthQueryError;
 
 export function getSupabaseLearnerEntryContextEffect(): Effect.Effect<
   SupabaseLearnerEntryContextResult,
@@ -39,13 +47,23 @@ export function getSupabaseLearnerEntryContextEffect(): Effect.Effect<
   return Effect.gen(function* () {
     const supabase = yield* createSupabaseServerClientEffect();
     const authResult = yield* Effect.tryPromise({
-      try: () => supabase.auth.getUser(),
+      try: async () => supabase.auth.getUser(),
       catch: (cause) =>
         new LearnerEntryContextDependencyError({
           operation: "resolve-auth-user",
           cause
         })
     });
+
+    if (authResult.error) {
+      return yield* Effect.fail(
+        new LearnerEntryContextAuthQueryError({
+          operation: "resolve-auth-user",
+          message: authResult.error.message
+        })
+      );
+    }
+
     const user = authResult.data.user;
 
     if (!user) {

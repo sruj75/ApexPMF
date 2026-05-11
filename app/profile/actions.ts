@@ -10,6 +10,7 @@ import {
   getLearnerEntryContext
 } from "@/src/application/start-session/practice-entry-seam";
 import { parseIdealCustomerProfileInput } from "@/src/domain/persona/ideal-customer-profile";
+import { Effect } from "effect";
 
 export async function createIdealCustomerProfileAction(formData: FormData) {
   const { learnerId, repository } = await getProfileSettingsContext();
@@ -24,7 +25,7 @@ export async function createIdealCustomerProfileAction(formData: FormData) {
     );
   }
 
-  await repository.create(learnerId, parsed.value);
+  await Effect.runPromise(repository.create(learnerId, parsed.value));
   revalidatePath("/profile");
 }
 
@@ -51,7 +52,7 @@ export async function updateIdealCustomerProfileAction(formData: FormData) {
     );
   }
 
-  await repository.update(learnerId, profileId, parsed.value);
+  await Effect.runPromise(repository.update(learnerId, profileId, parsed.value));
   revalidatePath("/profile");
 }
 
@@ -68,14 +69,14 @@ export async function selectActiveIdealCustomerProfileAction(formData: FormData)
     );
   }
 
-  await repository.selectActive(learnerId, profileId);
+  await Effect.runPromise(repository.selectActive(learnerId, profileId));
   revalidatePath("/profile");
 }
 
 export async function clearActiveIdealCustomerProfileAction(_formData: FormData) {
   void _formData;
   const { learnerId, repository } = await getProfileSettingsContext();
-  await repository.clearActive(learnerId);
+  await Effect.runPromise(repository.clearActive(learnerId));
   revalidatePath("/profile");
 }
 

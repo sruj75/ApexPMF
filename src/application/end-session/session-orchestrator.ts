@@ -3,6 +3,9 @@ import {
   type ReportGenerationCoordinatorError
 } from "@/src/application/generate-report/report-generation-coordinator";
 import type { HiddenEvaluationCapability } from "@/src/application/llm-runtime/llm-runtime-layers";
+import { finalizeSessionCredits } from "@/src/application/end-session/finalize-session-credits";
+import type { SessionCreditContext } from "@/src/domain/credits/credit-ledger";
+import type { CreditLedgerRepository, CreditLedgerRepositoryError } from "@/src/domain/credits/credit-ledger-repository";
 import {
   type GeneratedSessionCaseRepository,
   type GeneratedSessionCaseRepositoryError
@@ -43,19 +46,29 @@ export class SessionLifecycleRouteResolutionError extends Data.TaggedError(
 export type SessionOrchestratorError =
   | GeneratedSessionCaseRepositoryError
   | ReportGenerationCoordinatorError
+  | CreditLedgerRepositoryError
   | SessionCaseNotFoundError
   | SessionLifecycleRouteResolutionError;
+
+export type CreditFinalizationInput = {
+  sessionCreditContext: SessionCreditContext;
+  actualDurationMinutes: number;
+  usableDurationMinutes: number;
+  creditLedgerRepository: CreditLedgerRepository;
+};
 
 export type SessionOrchestrator = {
   endSessionForLearner(input: {
     learnerId: string;
     sessionId: string;
     reason: SessionEndReason;
+    creditFinalization?: CreditFinalizationInput;
   }): Effect.Effect<SessionEndOutcome, SessionOrchestratorError, never>;
   handleVoiceFailureForLearner(input: {
     learnerId: string;
     sessionId: string;
     recoverable: boolean;
+    creditFinalization?: CreditFinalizationInput;
   }): Effect.Effect<VoiceFailureOutcome, SessionOrchestratorError, never>;
   runReportGeneratingFlowForLearner(input: {
     learnerId: string;
@@ -78,7 +91,8 @@ export function createSessionOrchestrator(input: {
   const endSessionForLearner: SessionOrchestrator["endSessionForLearner"] = ({
     learnerId,
     sessionId,
-    reason
+    reason,
+    creditFinalization
   }) =>
     Effect.gen(function* () {
       const endedAt = yield* now();
@@ -110,6 +124,18 @@ export function createSessionOrchestrator(input: {
         );
       }
 
+      let creditChargeResult;
+      if (creditFinalization) {
+        creditChargeResult = yield* finalizeSessionCredits({
+          learnerId,
+          sessionCreditContext: creditFinalization.sessionCreditContext,
+          reason,
+          actualDurationMinutes: creditFinalization.actualDurationMinutes,
+          usableDurationMinutes: creditFinalization.usableDurationMinutes,
+          creditLedgerRepository: creditFinalization.creditLedgerRepository
+        });
+      }
+
       const route = resolveSessionLifecycleRoute({
         sessionId,
         generatedSessionCase: updated
@@ -118,12 +144,13 @@ export function createSessionOrchestrator(input: {
       return sessionEndOutcome({
         nextPath: route.nextPath,
         endedReason: reason,
-        reportStatus: updated.sessionLifecycle.reportStatus
+        reportStatus: updated.sessionLifecycle.reportStatus,
+        creditChargeResult
       });
     });
 
   const handleVoiceFailureForLearner: SessionOrchestrator["handleVoiceFailureForLearner"] =
-    ({ learnerId, sessionId, recoverable }) => {
+    ({ learnerId, sessionId, recoverable, creditFinalization }) => {
       if (recoverable) {
         return Effect.succeed(resumeVoiceConversationOutcome(voiceConversationPath(sessionId)));
       }
@@ -131,7 +158,8 @@ export function createSessionOrchestrator(input: {
       return endSessionForLearner({
         learnerId,
         sessionId,
-        reason: "voice-failure"
+        reason: "voice-failure",
+        creditFinalization
       }).pipe(
         Effect.map((outcome) => endSessionVoiceFailureOutcome(outcome.nextPath))
       );

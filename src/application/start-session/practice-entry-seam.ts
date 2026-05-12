@@ -37,6 +37,10 @@ export type LearnerEntryContextResult =
         SupabaseLearnerEntryContextResult,
         { ok: true }
       >["generatedSessionCaseRepository"];
+      creditLedgerRepository: Extract<
+        SupabaseLearnerEntryContextResult,
+        { ok: true }
+      >["creditLedgerRepository"];
     }
   | {
       ok: false;
@@ -156,6 +160,10 @@ export type StartPracticeEntryContext = {
     LearnerEntryContextResult,
     { ok: true }
   >["generatedSessionCaseRepository"];
+  creditLedgerRepository: Extract<
+    LearnerEntryContextResult,
+    { ok: true }
+  >["creditLedgerRepository"];
 };
 
 export function startPracticeFromEntryContextEffect(
@@ -167,7 +175,8 @@ export function startPracticeFromEntryContextEffect(
     const result = yield* Effect.either(
       startPracticeForLearner(context.learnerId, {
         idealCustomerProfileRepository: context.idealCustomerProfileRepository,
-        generatedSessionCaseRepository: context.generatedSessionCaseRepository
+        generatedSessionCaseRepository: context.generatedSessionCaseRepository,
+        creditLedgerRepository: context.creditLedgerRepository
       }).pipe(
         Effect.provide(defaultStartPracticeNonceLayer),
         Effect.provide(personaLayer)

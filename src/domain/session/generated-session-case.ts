@@ -27,22 +27,35 @@ export type CreateGeneratedSessionCaseInput = GeneratedSessionCaseDraft & {
   generationNonce: string;
 };
 
+export type StartedSessionCreditContext =
+  | { kind: "free-trial" }
+  | { kind: "paid"; estimatedCredits: number };
+
 export type StartedSession = {
   sessionId: string;
   openingContext: string;
   sessionSourceLabel: string;
   lightPersonaLabel: string;
+  creditContext: StartedSessionCreditContext;
 };
 
 export function toStartedSession(
-  generatedSessionCase: GeneratedSessionCase
+  generatedSessionCase: GeneratedSessionCase,
+  creditContext?: { kind: "free-trial" } | { kind: "paid"; estimatedCredits: number; availableCredits: number }
 ): StartedSession {
+  const resolvedCreditContext: StartedSessionCreditContext = creditContext
+    ? creditContext.kind === "free-trial"
+      ? { kind: "free-trial" }
+      : { kind: "paid", estimatedCredits: creditContext.estimatedCredits }
+    : { kind: "free-trial" };
+
   return {
     sessionId: generatedSessionCase.id,
     openingContext: generatedSessionCase.openingContext,
     sessionSourceLabel: sessionSourceLabel(generatedSessionCase.sessionSource),
     lightPersonaLabel:
-      generatedSessionCase.customerPersona.lightPersonaLabel
+      generatedSessionCase.customerPersona.lightPersonaLabel,
+    creditContext: resolvedCreditContext
   };
 }
 

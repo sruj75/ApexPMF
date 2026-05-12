@@ -8,6 +8,7 @@ import {
 import { PersonaGenerationDecodeError } from "../src/domain/persona/openrouter-persona-generator";
 import { OpenRouterProviderError } from "../src/infrastructure/llm/openrouter";
 import { SupabaseRowDecodeError } from "../src/infrastructure/supabase/supabase-row-decode-error";
+import { StartPracticeInsufficientCreditsError } from "../src/application/start-session/start-practice";
 
 describe("Entry failure seam", () => {
   it("classifies OpenRouter provider transport errors as provider_failure", () => {
@@ -53,6 +54,21 @@ describe("Entry failure seam", () => {
     expect(failure.category).toBe("persistence_failure");
     expect(mapStartPracticeFailureToRedirectPath(failure)).toBe(
       "/practice?error=session_creation_failed"
+    );
+  });
+
+  it("classifies insufficient Credits as insufficient_credits and redirects to dashboard", () => {
+    const failure = classifyEntryFailure(
+      new StartPracticeInsufficientCreditsError({
+        learnerId: "learner-1",
+        availableCredits: 0,
+        minimumRequired: 1
+      })
+    );
+
+    expect(failure.category).toBe("insufficient_credits");
+    expect(mapStartPracticeFailureToRedirectPath(failure)).toBe(
+      "/dashboard?error=insufficient_credits"
     );
   });
 

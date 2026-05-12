@@ -12,6 +12,13 @@ import type {
   GeneratedSessionCaseRepository,
   GeneratedSessionCaseRepositoryError
 } from "@/src/domain/session/generated-session-case-repository";
+import {
+  resolveSessionCreditContext
+} from "@/src/domain/credits/credit-ledger";
+import type {
+  CreditLedgerRepository,
+  CreditLedgerRepositoryError
+} from "@/src/domain/credits/credit-ledger-repository";
 import { PersonaGenerationCapability } from "@/src/application/llm-runtime/llm-runtime-layers";
 import { Context, Data, Effect, Layer } from "effect";
 
@@ -32,6 +39,7 @@ export type StartPracticeDependencies = {
     "getActiveForLearner"
   >;
   generatedSessionCaseRepository: GeneratedSessionCaseRepository;
+  creditLedgerRepository: CreditLedgerRepository;
 };
 
 export class StartPracticeSessionSourceError extends Data.TaggedError(
@@ -48,10 +56,20 @@ export class StartPracticePersonaGenerationError extends Data.TaggedError(
   cause: PersonaGenerationError;
 }> {}
 
+export class StartPracticeInsufficientCreditsError extends Data.TaggedError(
+  "StartPracticeInsufficientCreditsError"
+)<{
+  learnerId: string;
+  availableCredits: number;
+  minimumRequired: number;
+}> {}
+
 export type StartPracticeError =
   | StartPracticeSessionSourceError
   | StartPracticePersonaGenerationError
-  | GeneratedSessionCaseRepositoryError;
+  | StartPracticeInsufficientCreditsError
+  | GeneratedSessionCaseRepositoryError
+  | CreditLedgerRepositoryError;
 
 export function normalizeStartPracticeFailure(cause: unknown): unknown {
   if (
@@ -59,6 +77,10 @@ export function normalizeStartPracticeFailure(cause: unknown): unknown {
     cause instanceof StartPracticeSessionSourceError
   ) {
     return cause.cause;
+  }
+
+  if (cause instanceof StartPracticeInsufficientCreditsError) {
+    return cause;
   }
 
   return cause;
@@ -73,6 +95,21 @@ export function startPracticeForLearner(
   PersonaGenerationCapability | StartPracticeNonce
 > {
   return Effect.gen(function* () {
+    const ledger = yield* dependencies.creditLedgerRepository.getOrInitializeForLearner(
+      learnerId
+    );
+    const creditContext = resolveSessionCreditContext(ledger);
+
+    if (creditContext.kind === "insufficient-credits") {
+      return yield* Effect.fail(
+        new StartPracticeInsufficientCreditsError({
+          learnerId,
+          availableCredits: creditContext.availableCredits,
+          minimumRequired: creditContext.minimumRequired
+        })
+      );
+    }
+
     const personaGenerator = yield* PersonaGenerationCapability;
     const nonce = yield* StartPracticeNonce;
     const generationNonce = nonce.create();
@@ -109,6 +146,10 @@ export function startPracticeForLearner(
         generationNonce
       });
 
-    return toStartedSession(generatedSessionCase);
+    if (creditContext.kind === "free-trial") {
+      yield* dependencies.creditLedgerRepository.markFreeTrialUsed(learnerId);
+    }
+
+    return toStartedSession(generatedSessionCase, creditContext);
   });
 }

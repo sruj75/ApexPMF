@@ -5,6 +5,7 @@ import {
 } from "../src/application/end-session/session-orchestrator";
 import { createInMemoryGeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
 import type { GeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
+import { createInMemoryCreditLedgerRepository } from "../src/domain/credits/credit-ledger-repository";
 import { Effect } from "effect";
 
 const learnerId = "learner-1";
@@ -532,6 +533,86 @@ describe("Session Orchestrator", () => {
     expect(persisted?.sessionLifecycle.reportReadyAt?.toISOString()).toBe(
       "2026-05-08T10:30:00.000Z"
     );
+  });
+
+  it("finalizes Credits when ending a paid Session with credit context", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    const creditLedgerRepository = createInMemoryCreditLedgerRepository([
+      { learnerId, freeTrialUsed: true, subscriptionCredits: 5, topUpCredits: 0 }
+    ]);
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
+        }
+      }
+    });
+
+    const outcome = await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion,
+        reason: "natural-conclusion",
+        creditFinalization: {
+          sessionCreditContext: { kind: "paid", estimatedCredits: 3, availableCredits: 5 },
+          actualDurationMinutes: 7,
+          usableDurationMinutes: 7,
+          creditLedgerRepository
+        }
+      })
+    );
+
+    expect(outcome.endedReason).toBe("natural-conclusion");
+    expect(outcome.creditChargeResult).toEqual({
+      kind: "charged",
+      billed: {
+        actualDurationMinutes: 7,
+        billedDurationMinutes: 10,
+        creditsCharged: 2
+      }
+    });
+
+    const ledger = await Effect.runPromise(
+      creditLedgerRepository.getOrInitializeForLearner(learnerId)
+    );
+    expect(ledger.subscriptionCredits).toBe(3);
+  });
+
+  it("applies fair Voice Failure credit handling through the orchestrator", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    const creditLedgerRepository = createInMemoryCreditLedgerRepository([
+      { learnerId, freeTrialUsed: true, subscriptionCredits: 5, topUpCredits: 0 }
+    ]);
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
+        }
+      }
+    });
+
+    const outcome = await Effect.runPromise(
+      orchestrator.handleVoiceFailureForLearner({
+        learnerId,
+        sessionId: sessionIds.voiceFailure,
+        recoverable: false,
+        creditFinalization: {
+          sessionCreditContext: { kind: "paid", estimatedCredits: 3, availableCredits: 5 },
+          actualDurationMinutes: 12,
+          usableDurationMinutes: 8,
+          creditLedgerRepository
+        }
+      })
+    );
+
+    expect(outcome.behavior).toBe("end-session");
+
+    const ledger = await Effect.runPromise(
+      creditLedgerRepository.getOrInitializeForLearner(learnerId)
+    );
+    expect(ledger.subscriptionCredits).toBe(3);
   });
 });
 

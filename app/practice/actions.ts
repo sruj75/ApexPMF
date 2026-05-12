@@ -24,7 +24,8 @@ export async function startPracticeAction(_formData: FormData) {
   const startedSession = await startPracticeFromEntryContext({
     learnerId: context.learnerId,
     idealCustomerProfileRepository: context.idealCustomerProfileRepository,
-    generatedSessionCaseRepository: context.generatedSessionCaseRepository
+    generatedSessionCaseRepository: context.generatedSessionCaseRepository,
+    creditLedgerRepository: context.creditLedgerRepository
   });
   if (!startedSession.ok) {
     console.error(

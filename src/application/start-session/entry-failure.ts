@@ -4,6 +4,7 @@ import {
   PersonaGenerationDecodeError,
   PersonaGenerationProviderError
 } from "@/src/domain/persona/persona-generation";
+import { StartPracticeInsufficientCreditsError } from "@/src/application/start-session/start-practice";
 import {
   IdealCustomerProfileRepositoryDecodeError,
   IdealCustomerProfileRepositoryNotFoundError,
@@ -19,6 +20,7 @@ import {
 export type EntryFailureCategory =
   | "input_invalid"
   | "auth_missing"
+  | "insufficient_credits"
   | "provider_failure"
   | "decode_failure"
   | "persistence_failure";
@@ -54,6 +56,18 @@ export function createEntryFailure(input: {
 export function classifyEntryFailure(cause: unknown): EntryFailure {
   if (cause instanceof EntryFailure) {
     return cause;
+  }
+
+  if (cause instanceof StartPracticeInsufficientCreditsError) {
+    return createEntryFailure({
+      category: "insufficient_credits",
+      message: "Insufficient Credits to start a paid Session.",
+      cause,
+      details: [
+        `availableCredits=${cause.availableCredits}`,
+        `minimumRequired=${cause.minimumRequired}`
+      ]
+    });
   }
 
   if (cause instanceof NonLiveLlmProviderUnavailableError) {
@@ -202,6 +216,8 @@ export function mapStartPracticeFailureToRedirectPath(
   switch (failure.category) {
     case "auth_missing":
       return "/login";
+    case "insufficient_credits":
+      return "/dashboard?error=insufficient_credits";
     case "provider_failure":
     case "decode_failure":
     case "persistence_failure":
@@ -218,6 +234,8 @@ export function mapProfileFailureToRedirectPath(failure: EntryFailure): string {
       return "/login";
     case "input_invalid":
       return `/profile?${new URLSearchParams({ error: (failure.details ?? []).join(" ") }).toString()}`;
+    case "insufficient_credits":
+      return "/dashboard?error=insufficient_credits";
     case "provider_failure":
     case "decode_failure":
     case "persistence_failure":
@@ -233,6 +251,8 @@ function defaultMessageForCategory(category: EntryFailureCategory): string {
       return "Entry input is invalid.";
     case "auth_missing":
       return "Learner authentication is missing.";
+    case "insufficient_credits":
+      return "Insufficient Credits to start a paid Session.";
     case "provider_failure":
       return "Provider request failed at entry seam.";
     case "decode_failure":

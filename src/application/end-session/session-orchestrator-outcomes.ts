@@ -1,3 +1,4 @@
+import type { SessionChargeResult } from "@/src/domain/credits/credit-ledger";
 import type { ReportStatus, SessionEndReason } from "@/src/domain/session/session-lifecycle";
 
 export type SessionEndOutcome = {
@@ -5,6 +6,7 @@ export type SessionEndOutcome = {
   sessionStatus: "ended";
   endedReason: SessionEndReason;
   reportStatus: ReportStatus;
+  creditChargeResult?: SessionChargeResult;
 };
 
 export type VoiceFailureOutcome =
@@ -26,12 +28,14 @@ export function sessionEndOutcome(input: {
   nextPath: string;
   endedReason: SessionEndReason;
   reportStatus: ReportStatus;
+  creditChargeResult?: SessionChargeResult;
 }): SessionEndOutcome {
   return {
     nextPath: input.nextPath,
     sessionStatus: "ended",
     endedReason: input.endedReason,
-    reportStatus: input.reportStatus
+    reportStatus: input.reportStatus,
+    ...(input.creditChargeResult ? { creditChargeResult: input.creditChargeResult } : {})
   };
 }
 

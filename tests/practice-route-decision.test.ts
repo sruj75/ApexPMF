@@ -179,7 +179,8 @@ describe("Practice route decision module", () => {
           sessionId: defaultPracticeSessionId,
           openingContext: "Opening context",
           sessionSourceLabel: "Broad Practice Pool",
-          lightPersonaLabel: "Finance operator"
+          lightPersonaLabel: "Finance operator",
+          creditContext: { kind: "free-trial" }
         }
       }
     );

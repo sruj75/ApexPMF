@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   SessionCaseNotFoundError,
   createSessionOrchestrator
@@ -6,6 +6,8 @@ import {
 import { createInMemoryGeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
 import type { GeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
 import { createInMemoryCreditLedgerRepository } from "../src/domain/credits/credit-ledger-repository";
+import { createProgressionUpdater } from "../src/application/update-progression/progression-updater";
+import { createInMemoryProgressionRepository } from "../src/domain/progression/progression-repository";
 import { Effect } from "effect";
 
 const learnerId = "learner-1";
@@ -613,6 +615,127 @@ describe("Session Orchestrator", () => {
       creditLedgerRepository.getOrInitializeForLearner(learnerId)
     );
     expect(ledger.subscriptionCredits).toBe(3);
+  });
+});
+
+describe("Session Orchestrator — Progression integration", () => {
+  it("triggers progression update when report generation succeeds", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    const progressionRepository = createInMemoryProgressionRepository();
+    const progressionUpdater = createProgressionUpdater({ progressionRepository });
+    const applyCompletedSessionSpy = vi.spyOn(progressionUpdater, "applyCompletedSession");
+
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
+        }
+      },
+      progressionUpdater
+    });
+
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion,
+        reason: "natural-conclusion"
+      })
+    );
+
+    await Effect.runPromise(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion
+      })
+    );
+
+    expect(applyCompletedSessionSpy).toHaveBeenCalledTimes(1);
+    expect(applyCompletedSessionSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion
+      })
+    );
+
+    const progression = await Effect.runPromise(
+      progressionRepository.getOrInitializeForLearner(learnerId)
+    );
+    expect(progression.completedSessionCount).toBe(1);
+    expect(progression.achievementNodes).toContainEqual(
+      expect.objectContaining({ id: "first-session" })
+    );
+  });
+
+  it("does not trigger progression update when report evidence is insufficient", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    const progressionRepository = createInMemoryProgressionRepository();
+    const progressionUpdater = createProgressionUpdater({ progressionRepository });
+    const applyCompletedSessionSpy = vi.spyOn(progressionUpdater, "applyCompletedSession");
+
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        generateForEndedSession() {
+          return Effect.succeed({
+            status: "insufficient-evidence" as const,
+            reason: "too-few-turns"
+          });
+        }
+      },
+      progressionUpdater
+    });
+
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion,
+        reason: "natural-conclusion"
+      })
+    );
+
+    await Effect.runPromise(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion
+      })
+    );
+
+    expect(applyCompletedSessionSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it("does not trigger progression update for user-quit sessions", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    const progressionRepository = createInMemoryProgressionRepository();
+    const progressionUpdater = createProgressionUpdater({ progressionRepository });
+    const applyCompletedSessionSpy = vi.spyOn(progressionUpdater, "applyCompletedSession");
+
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
+        }
+      },
+      progressionUpdater
+    });
+
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.userQuit,
+        reason: "user-quit"
+      })
+    );
+
+    await Effect.runPromise(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: sessionIds.userQuit
+      })
+    );
+
+    expect(applyCompletedSessionSpy).toHaveBeenCalledTimes(0);
   });
 });
 

@@ -3,6 +3,7 @@ import {
   type ReportGenerationCoordinatorError
 } from "@/src/application/generate-report/report-generation-coordinator";
 import type { HiddenEvaluationCapability } from "@/src/application/llm-runtime/llm-runtime-layers";
+import type { ProgressionUpdater } from "@/src/application/update-progression/progression-updater";
 import { finalizeSessionCredits } from "@/src/application/end-session/finalize-session-credits";
 import type { SessionCreditContext } from "@/src/domain/credits/credit-ledger";
 import type { CreditLedgerRepository, CreditLedgerRepositoryError } from "@/src/domain/credits/credit-ledger-repository";
@@ -10,6 +11,7 @@ import {
   type GeneratedSessionCaseRepository,
   type GeneratedSessionCaseRepositoryError
 } from "@/src/domain/session/generated-session-case-repository";
+import type { ProgressionRepositoryError } from "@/src/domain/progression/progression-repository";
 import type { SessionEndReason } from "@/src/domain/session/session-lifecycle";
 import { Data, Effect } from "effect";
 import {
@@ -47,6 +49,7 @@ export type SessionOrchestratorError =
   | GeneratedSessionCaseRepositoryError
   | ReportGenerationCoordinatorError
   | CreditLedgerRepositoryError
+  | ProgressionRepositoryError
   | SessionCaseNotFoundError
   | SessionLifecycleRouteResolutionError;
 
@@ -83,9 +86,10 @@ export type SessionOrchestrator = {
 export function createSessionOrchestrator(input: {
   generatedSessionCaseRepository: GeneratedSessionCaseRepository;
   reportGenerationCoordinator: ReportGenerationCoordinator;
+  progressionUpdater?: ProgressionUpdater;
   now?: () => Effect.Effect<Date, never, never>;
 }): SessionOrchestrator {
-  const { generatedSessionCaseRepository, reportGenerationCoordinator } = input;
+  const { generatedSessionCaseRepository, reportGenerationCoordinator, progressionUpdater } = input;
   const now = input.now ?? defaultNow;
 
   const endSessionForLearner: SessionOrchestrator["endSessionForLearner"] = ({
@@ -212,6 +216,15 @@ export function createSessionOrchestrator(input: {
             learnerId,
             sessionId,
             operation: "report-generating"
+          });
+        }
+
+        if (result.status === "ready" && progressionUpdater) {
+          yield* progressionUpdater.applyCompletedSession({
+            learnerId,
+            sessionId,
+            sessionReport: result.report,
+            completedAt: reportReadyAt!
           });
         }
 

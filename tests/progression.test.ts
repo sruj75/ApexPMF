@@ -173,6 +173,25 @@ describe("Progression — Global Ranking gating", () => {
     });
   });
 
+  it("keeps insufficient-data even with a single max-quality session", () => {
+    const maxSingleSessionScore = computeProgressionContribution(
+      makeSessionReport({
+        skillMovement: [
+          { skill: "Asking Concrete History", movement: "up", rationale: "Good" },
+          { skill: "Resisting Compliments", movement: "up", rationale: "Good" },
+          { skill: "Following Up on Vague Answers", movement: "up", rationale: "Good" },
+          { skill: "Avoiding Pitching", movement: "up", rationale: "Good" },
+          { skill: "Identifying Bad Fit", movement: "up", rationale: "Good" },
+          { skill: "Uncovering Workarounds", movement: "up", rationale: "Good" }
+        ]
+      })
+    );
+
+    const state = resolveGlobalRankingState(1, maxSingleSessionScore);
+
+    expect(state.kind).toBe("insufficient-data");
+  });
+
   it("transitions to ranked after enough completed sessions", () => {
     const state = resolveGlobalRankingState(3, 30);
 
@@ -180,5 +199,62 @@ describe("Progression — Global Ranking gating", () => {
     if (state.kind === "ranked") {
       expect(["top-10", "top-25", "top-50", "bottom-50"]).toContain(state.percentileBand);
     }
+  });
+});
+
+describe("Progression — quality-weighted ranking", () => {
+  it("ranks low when volume is present but quality is poor", () => {
+    const downReport = makeSessionReport({
+      skillMovement: [
+        { skill: "Asking Concrete History", movement: "down", rationale: "Regressed" },
+        { skill: "Resisting Compliments", movement: "down", rationale: "Regressed" }
+      ]
+    });
+    const perSession = computeProgressionContribution(downReport);
+    const totalScore = perSession * 3;
+
+    const state = resolveGlobalRankingState(3, totalScore);
+
+    expect(state).toEqual({ kind: "ranked", percentileBand: "bottom-50" });
+  });
+
+  it("ranks high when volume is paired with consistent quality", () => {
+    const upReport = makeSessionReport({
+      skillMovement: [
+        { skill: "Asking Concrete History", movement: "up", rationale: "Good" },
+        { skill: "Resisting Compliments", movement: "up", rationale: "Good" }
+      ]
+    });
+    const perSession = computeProgressionContribution(upReport);
+    const totalScore = perSession * 3;
+
+    const state = resolveGlobalRankingState(3, totalScore);
+
+    expect(state).toEqual({ kind: "ranked", percentileBand: "top-10" });
+  });
+
+  it("same volume, quality determines the band", () => {
+    const downContribution = computeProgressionContribution(
+      makeSessionReport({
+        skillMovement: [
+          { skill: "Asking Concrete History", movement: "down", rationale: "Regressed" },
+          { skill: "Resisting Compliments", movement: "down", rationale: "Regressed" }
+        ]
+      })
+    );
+    const upContribution = computeProgressionContribution(
+      makeSessionReport({
+        skillMovement: [
+          { skill: "Asking Concrete History", movement: "up", rationale: "Good" },
+          { skill: "Resisting Compliments", movement: "up", rationale: "Good" }
+        ]
+      })
+    );
+
+    const lowQuality = resolveGlobalRankingState(3, downContribution * 3);
+    const highQuality = resolveGlobalRankingState(3, upContribution * 3);
+
+    expect(lowQuality).toEqual({ kind: "ranked", percentileBand: "bottom-50" });
+    expect(highQuality).toEqual({ kind: "ranked", percentileBand: "top-10" });
   });
 });

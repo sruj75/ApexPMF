@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createSessionOrchestrator } from "../src/application/end-session/session-orchestrator";
+import { createProgressionUpdater } from "../src/application/update-progression/progression-updater";
 import { createInMemoryGeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
 import type { GeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
 import { createInMemoryCreditLedgerRepository } from "../src/domain/credits/credit-ledger-repository";
+import { createInMemoryProgressionRepository } from "../src/domain/progression/progression-repository";
 import { Effect } from "effect";
 
 const learnerId = "learner-trial";
@@ -108,6 +110,45 @@ describe("Free Trial Session — report generation path", () => {
       reportStatus: "insufficient-evidence",
       nextPath: "/dashboard"
     });
+  });
+});
+
+describe("Free Trial Session — progression integration", () => {
+  it("unlocks first-session achievement and contributes to progression", async () => {
+    const { repository, sessionId } = await createFreeTrialSession();
+    const progressionRepository = createInMemoryProgressionRepository();
+    const progressionUpdater = createProgressionUpdater({ progressionRepository });
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
+        }
+      },
+      progressionUpdater
+    });
+
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId,
+        reason: "natural-conclusion"
+      })
+    );
+
+    await Effect.runPromise(
+      orchestrator.runReportGeneratingFlowForLearner({ learnerId, sessionId })
+    );
+
+    const progression = await Effect.runPromise(
+      progressionRepository.getOrInitializeForLearner(learnerId)
+    );
+
+    expect(progression.completedSessionCount).toBe(1);
+    expect(progression.achievementNodes).toContainEqual(
+      expect.objectContaining({ id: "first-session" })
+    );
+    expect(progression.progressionScore).toBeGreaterThan(0);
   });
 });
 

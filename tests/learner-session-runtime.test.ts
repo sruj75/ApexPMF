@@ -5,11 +5,13 @@ const {
   getSupabaseLearnerEntryContextEffect,
   createSessionOrchestrator,
   createReportGenerationCoordinator,
+  createProgressionUpdater,
   SessionCaseNotFoundError
 } = vi.hoisted(() => ({
   getSupabaseLearnerEntryContextEffect: vi.fn(),
   createSessionOrchestrator: vi.fn(),
   createReportGenerationCoordinator: vi.fn(),
+  createProgressionUpdater: vi.fn(),
   SessionCaseNotFoundError: class SessionCaseNotFoundError extends Error {}
 }));
 
@@ -24,6 +26,10 @@ vi.mock("@/src/application/end-session/session-orchestrator", () => ({
 
 vi.mock("@/src/application/generate-report/report-generation-coordinator", () => ({
   createReportGenerationCoordinator
+}));
+
+vi.mock("@/src/application/update-progression/progression-updater", () => ({
+  createProgressionUpdater
 }));
 
 import { getLearnerSessionRuntime } from "../src/application/start-session/practice-entry-web-adapter";
@@ -113,10 +119,39 @@ describe("Learner session runtime seam", () => {
       learnerId: "learner-42",
       sessionId: "session-case-1"
     });
-    expect(createSessionOrchestrator).toHaveBeenCalledWith({
-      generatedSessionCaseRepository: {},
-      reportGenerationCoordinator
+    expect(createSessionOrchestrator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generatedSessionCaseRepository: {},
+        reportGenerationCoordinator
+      })
+    );
+  });
+
+  it("wires progressionUpdater into the session orchestrator", async () => {
+    const progressionUpdater = { applyCompletedSession: vi.fn() };
+    createProgressionUpdater.mockReturnValue(progressionUpdater);
+
+    getSupabaseLearnerEntryContextEffect.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-42",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {} as never
+      })
+    );
+    createReportGenerationCoordinator.mockReturnValue({});
+    createSessionOrchestrator.mockReturnValue({
+      endSessionForLearner: vi.fn(),
+      runReportGeneratingFlowForLearner: vi.fn()
     });
+
+    await getLearnerSessionRuntime();
+
+    expect(createSessionOrchestrator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        progressionUpdater
+      })
+    );
   });
 
   it("maps report-generating missing-session errors into boundary not-found outcomes", async () => {

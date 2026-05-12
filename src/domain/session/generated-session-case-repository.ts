@@ -90,7 +90,8 @@ export function createInMemoryGeneratedSessionCaseRepository(
           ...input,
           id: `session-case-${nextId}`,
           learnerId,
-          createdAt: new Date()
+          createdAt: new Date(),
+          creditCharge: null
         });
 
         nextId += 1;

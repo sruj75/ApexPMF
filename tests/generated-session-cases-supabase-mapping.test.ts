@@ -843,5 +843,10 @@ const validGeneratedSessionCaseRow = {
   report_ready_at: null,
   session_report: null,
   session_transcript: null,
-  session_evaluation: null
+  session_evaluation: null,
+  credit_context: {
+    kind: "free-trial",
+    maxDurationMinutes: 15
+  },
+  credit_charge: null
 };

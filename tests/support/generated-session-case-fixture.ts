@@ -63,7 +63,12 @@ export function makeGeneratedSessionCase(
     },
     sessionReport: overrides.sessionReport ?? null,
     sessionTranscript: overrides.sessionTranscript ?? null,
-    sessionEvaluation: overrides.sessionEvaluation ?? null
+    sessionEvaluation: overrides.sessionEvaluation ?? null,
+    creditContext: overrides.creditContext ?? {
+      kind: "free-trial",
+      maxDurationMinutes: 15
+    },
+    creditCharge: overrides.creditCharge ?? null
   };
 }
 

@@ -74,7 +74,19 @@ describe("Learner session runtime seam", () => {
         ok: true,
         learnerId: "learner-42",
         idealCustomerProfileRepository: {} as never,
-        generatedSessionCaseRepository: {} as never
+        generatedSessionCaseRepository: {
+          getForLearner: vi.fn(() =>
+            Effect.succeed({
+              createdAt: new Date(Date.now() - 7 * 60_000),
+              creditContext: {
+                kind: "paid",
+                estimatedCredits: 3,
+                availableCredits: 5
+              }
+            })
+          )
+        } as never,
+        creditLedgerRepository: { kind: "credit-ledger-repository" } as never
       })
     );
     const reportGenerationCoordinator = {};
@@ -113,7 +125,15 @@ describe("Learner session runtime seam", () => {
     expect(endSessionForLearner).toHaveBeenCalledWith({
       learnerId: "learner-42",
       sessionId: "session-case-1",
-      reason: "user-quit"
+      reason: "user-quit",
+      creditFinalization: expect.objectContaining({
+        sessionCreditContext: {
+          kind: "paid",
+          estimatedCredits: 3,
+          availableCredits: 5
+        },
+        creditLedgerRepository: { kind: "credit-ledger-repository" }
+      })
     });
     expect(runReportGeneratingFlowForLearner).toHaveBeenCalledWith({
       learnerId: "learner-42",
@@ -121,7 +141,9 @@ describe("Learner session runtime seam", () => {
     });
     expect(createSessionOrchestrator).toHaveBeenCalledWith(
       expect.objectContaining({
-        generatedSessionCaseRepository: {},
+        generatedSessionCaseRepository: expect.objectContaining({
+          getForLearner: expect.any(Function)
+        }),
         reportGenerationCoordinator
       })
     );
@@ -136,7 +158,8 @@ describe("Learner session runtime seam", () => {
         ok: true,
         learnerId: "learner-42",
         idealCustomerProfileRepository: {} as never,
-        generatedSessionCaseRepository: {} as never
+        generatedSessionCaseRepository: {} as never,
+        creditLedgerRepository: {} as never
       })
     );
     createReportGenerationCoordinator.mockReturnValue({});
@@ -172,7 +195,8 @@ describe("Learner session runtime seam", () => {
         ok: true,
         learnerId: "learner-42",
         idealCustomerProfileRepository: {} as never,
-        generatedSessionCaseRepository: {} as never
+        generatedSessionCaseRepository: {} as never,
+        creditLedgerRepository: {} as never
       })
     );
     createReportGenerationCoordinator.mockReturnValue({});

@@ -7,6 +7,7 @@ import type {
   CreateGeneratedSessionCaseInput,
   GeneratedSessionCase
 } from "@/src/domain/session/generated-session-case";
+import type { SessionChargeResult } from "@/src/domain/credits/credit-ledger";
 import {
   GeneratedSessionCaseRepositoryDecodeError,
   type GeneratedSessionCaseRepositoryOperation
@@ -61,7 +62,9 @@ export function decodeGeneratedSessionCaseRow(
         ),
         sessionEvaluation: cloneUnknownOrNull<SessionEvaluationArtifact>(
           decodedRow.session_evaluation
-        )
+        ),
+        creditContext: decodedRow.credit_context,
+        creditCharge: cloneUnknownOrNull<SessionChargeResult>(decodedRow.credit_charge)
       };
     },
     catch: (cause) =>
@@ -96,7 +99,9 @@ export function toInsertRow(
     report_ready_at: null,
     session_report: null,
     session_transcript: null,
-    session_evaluation: null
+    session_evaluation: null,
+    credit_context: input.creditContext,
+    credit_charge: null
   };
 }
 

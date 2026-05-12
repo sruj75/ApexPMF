@@ -1,7 +1,7 @@
 import type { GeneratedSessionCaseRepository } from "@/src/domain/session/generated-session-case-repository";
 import type { IdealCustomerProfileRepository } from "@/src/domain/persona/ideal-customer-profile-repository";
 import type { CreditLedgerRepository } from "@/src/domain/credits/credit-ledger-repository";
-import { createInMemoryCreditLedgerRepository } from "@/src/domain/credits/credit-ledger-repository";
+import { createSupabaseCreditLedgerRepository } from "@/src/infrastructure/supabase/credit-ledgers";
 import { createSupabaseGeneratedSessionCaseRepository } from "@/src/infrastructure/supabase/generated-session-cases";
 import { createSupabaseIdealCustomerProfileRepository } from "@/src/infrastructure/supabase/ideal-customer-profiles";
 import {
@@ -83,8 +83,7 @@ export function getSupabaseLearnerEntryContextEffect(): Effect.Effect<
         createSupabaseIdealCustomerProfileRepository(supabase),
       generatedSessionCaseRepository:
         createSupabaseGeneratedSessionCaseRepository(supabase),
-      // TODO: replace with createSupabaseCreditLedgerRepository(supabase) after migration
-      creditLedgerRepository: createInMemoryCreditLedgerRepository()
+      creditLedgerRepository: createSupabaseCreditLedgerRepository(supabase)
     };
   });
 }

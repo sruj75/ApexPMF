@@ -143,13 +143,14 @@ export function startPracticeForLearner(
       yield* dependencies.generatedSessionCaseRepository.create(learnerId, {
         ...generatedDraft,
         sessionSource,
-        generationNonce
+        generationNonce,
+        creditContext
       });
 
     if (creditContext.kind === "free-trial") {
       yield* dependencies.creditLedgerRepository.markFreeTrialUsed(learnerId);
     }
 
-    return toStartedSession(generatedSessionCase, creditContext);
+    return toStartedSession(generatedSessionCase);
   });
 }

@@ -130,10 +130,31 @@ export function getLearnerSessionRuntimeEffect(): Effect.Effect<
     return {
       ok: true as const,
       endSessionForLearner({ sessionId, reason }) {
-        return orchestrator.endSessionForLearner({
-          learnerId,
-          sessionId,
-          reason
+        return Effect.gen(function* () {
+          const generatedSessionCase =
+            yield* context.generatedSessionCaseRepository.getForLearner(
+              learnerId,
+              sessionId
+            );
+          const actualDurationMinutes = generatedSessionCase
+            ? elapsedMinutesSince(generatedSessionCase.createdAt)
+            : 0;
+
+          return yield* orchestrator.endSessionForLearner({
+            learnerId,
+            sessionId,
+            reason,
+            ...(generatedSessionCase
+              ? {
+                  creditFinalization: {
+                    sessionCreditContext: generatedSessionCase.creditContext,
+                    actualDurationMinutes,
+                    usableDurationMinutes: actualDurationMinutes,
+                    creditLedgerRepository: context.creditLedgerRepository
+                  }
+                }
+              : {})
+          });
         });
       },
       runReportGeneratingFlowForLearner({ sessionId }) {
@@ -153,6 +174,10 @@ export function getLearnerSessionRuntimeEffect(): Effect.Effect<
       }
     };
   });
+}
+
+function elapsedMinutesSince(createdAt: Date): number {
+  return Math.max(0, (Date.now() - createdAt.getTime()) / 60_000);
 }
 
 export type StartPracticeEntryContext = {

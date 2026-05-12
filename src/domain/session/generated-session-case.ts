@@ -9,6 +9,10 @@ import {
 } from "./session-lifecycle";
 import type { SessionEvaluationArtifact } from "./session-evaluation";
 import type { SessionReport, SessionTranscriptTurn } from "./session-report";
+import type {
+  SessionChargeResult,
+  SessionCreditContext
+} from "../credits/credit-ledger";
 
 export type GeneratedSessionCase = GeneratedSessionCaseDraft & {
   id: string;
@@ -20,12 +24,20 @@ export type GeneratedSessionCase = GeneratedSessionCaseDraft & {
   sessionReport: SessionReport | null;
   sessionTranscript: SessionTranscriptTurn[] | null;
   sessionEvaluation: SessionEvaluationArtifact | null;
+  creditContext: PersistedSessionCreditContext;
+  creditCharge: SessionChargeResult | null;
 };
 
 export type CreateGeneratedSessionCaseInput = GeneratedSessionCaseDraft & {
   sessionSource: SessionSource;
   generationNonce: string;
+  creditContext: PersistedSessionCreditContext;
 };
+
+export type PersistedSessionCreditContext = Exclude<
+  SessionCreditContext,
+  { kind: "insufficient-credits" }
+>;
 
 export type StartedSessionCreditContext =
   | { kind: "free-trial" }
@@ -40,14 +52,15 @@ export type StartedSession = {
 };
 
 export function toStartedSession(
-  generatedSessionCase: GeneratedSessionCase,
-  creditContext?: { kind: "free-trial" } | { kind: "paid"; estimatedCredits: number; availableCredits: number }
+  generatedSessionCase: GeneratedSessionCase
 ): StartedSession {
-  const resolvedCreditContext: StartedSessionCreditContext = creditContext
-    ? creditContext.kind === "free-trial"
+  const resolvedCreditContext: StartedSessionCreditContext =
+    generatedSessionCase.creditContext.kind === "free-trial"
       ? { kind: "free-trial" }
-      : { kind: "paid", estimatedCredits: creditContext.estimatedCredits }
-    : { kind: "free-trial" };
+      : {
+          kind: "paid",
+          estimatedCredits: generatedSessionCase.creditContext.estimatedCredits
+        };
 
   return {
     sessionId: generatedSessionCase.id,
@@ -70,11 +83,13 @@ export function withDefaultSessionLifecycle(
     | "sessionReport"
     | "sessionTranscript"
     | "sessionEvaluation"
+    | "creditCharge"
   > & {
     sessionLifecycle?: SessionLifecycleState;
     sessionReport?: SessionReport | null;
     sessionTranscript?: SessionTranscriptTurn[] | null;
     sessionEvaluation?: SessionEvaluationArtifact | null;
+    creditCharge?: SessionChargeResult | null;
   }
 ): GeneratedSessionCase {
   return {
@@ -84,6 +99,7 @@ export function withDefaultSessionLifecycle(
       createInitialSessionLifecycleState(),
     sessionReport: generatedSessionCase.sessionReport ?? null,
     sessionTranscript: generatedSessionCase.sessionTranscript ?? null,
-    sessionEvaluation: generatedSessionCase.sessionEvaluation ?? null
+    sessionEvaluation: generatedSessionCase.sessionEvaluation ?? null,
+    creditCharge: generatedSessionCase.creditCharge ?? null
   };
 }

@@ -85,11 +85,6 @@ const unavailableHiddenEvaluationEngine: HiddenEvaluationEngine = {
     })
 };
 
-const unavailableHiddenEvaluationFallbackLayer = Layer.succeed(
-  HiddenEvaluationCapability,
-  unavailableHiddenEvaluationEngine
-);
-
 export function degradableHiddenEvaluationCapabilityLayerFromEnv(
   env: NodeJS.ProcessEnv
 ): Layer.Layer<HiddenEvaluationCapability, never, never> {
@@ -97,6 +92,14 @@ export function degradableHiddenEvaluationCapabilityLayerFromEnv(
     Layer.provide(openRouterChatClientLayerFromEnv(env))
   );
   return liveLayer.pipe(
-    Layer.catchAll(() => unavailableHiddenEvaluationFallbackLayer)
+    Layer.catchAll((error) =>
+      Layer.effect(
+        HiddenEvaluationCapability,
+        Effect.logWarning("hidden-evaluation.provider_unavailable", {
+          reason: error.category,
+          missingEnvVar: error.missingEnvVar
+        }).pipe(Effect.map(() => unavailableHiddenEvaluationEngine))
+      )
+    )
   );
 }

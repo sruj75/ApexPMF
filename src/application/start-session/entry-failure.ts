@@ -221,7 +221,7 @@ export function mapProfileFailureToRedirectPath(failure: EntryFailure): string {
     case "provider_failure":
     case "decode_failure":
     case "persistence_failure":
-      throw failure;
+      return `/profile?error=profile_update_failed`;
     default:
       return assertNever(failure.category);
   }

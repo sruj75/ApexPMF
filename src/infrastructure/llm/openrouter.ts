@@ -68,6 +68,7 @@ export class OpenRouterProviderError extends Error {
   readonly status?: number;
   readonly statusText?: string;
   readonly cause?: unknown;
+  readonly errorBodyPreview?: string;
 
   constructor(input: {
     message: string;
@@ -75,12 +76,14 @@ export class OpenRouterProviderError extends Error {
     status?: number;
     statusText?: string;
     cause?: unknown;
+    errorBodyPreview?: string;
   }) {
     super(input.message);
     this.phase = input.phase;
     this.status = input.status;
     this.statusText = input.statusText;
     this.cause = input.cause;
+    this.errorBodyPreview = input.errorBodyPreview;
   }
 }
 
@@ -118,71 +121,79 @@ export function createOpenRouterChatClient({
 }: OpenRouterChatClientOptions): OpenRouterChatClient {
   return {
     createStructuredJsonCompletion(request) {
-      const attempt = Effect.tryPromise({
-        try: async () => {
-          let response: Response;
+      const attempt = Effect.flatMap(
+        Effect.sync(() => new AbortController()),
+        (controller) =>
+          Effect.tryPromise({
+            try: async () => {
+              let response: Response;
 
-          try {
-            response = await fetchImplementation(
-              "https://openrouter.ai/api/v1/chat/completions",
-              {
-                method: "POST",
-                headers: headersForRequest({ apiKey, appTitle, siteUrl }),
-                body: JSON.stringify({
-                  model,
-                  messages: request.messages,
-                  stream: false,
-                  response_format: {
-                    type: "json_schema",
-                    json_schema: {
-                      name: request.responseSchemaName,
-                      strict: true,
-                      schema: request.responseJsonSchema
-                    }
+              try {
+                response = await fetchImplementation(
+                  "https://openrouter.ai/api/v1/chat/completions",
+                  {
+                    method: "POST",
+                    headers: headersForRequest({ apiKey, appTitle, siteUrl }),
+                    body: JSON.stringify({
+                      model,
+                      messages: request.messages,
+                      stream: false,
+                      response_format: {
+                        type: "json_schema",
+                        json_schema: {
+                          name: request.responseSchemaName,
+                          strict: true,
+                          schema: request.responseJsonSchema
+                        }
+                      }
+                    }),
+                    signal: controller.signal
                   }
-                })
+                );
+              } catch (cause) {
+                throw new OpenRouterProviderError({
+                  phase: "request_failed",
+                  message: "OpenRouter request failed before receiving a response.",
+                  cause
+                });
               }
-            );
-          } catch (cause) {
-            throw new OpenRouterProviderError({
-              phase: "request_failed",
-              message: "OpenRouter request failed before receiving a response.",
-              cause
-            });
-          }
 
-          if (!response.ok) {
-            const errorBody = await response.text().catch(() => "");
-            throw new OpenRouterProviderError({
-              phase: "request_failed",
-              status: response.status,
-              statusText: response.statusText,
-              message: `OpenRouter request failed: ${response.status} ${response.statusText}${errorBody ? ` - ${errorBody}` : ""}`
-            });
-          }
+              if (!response.ok) {
+                const errorBody = await response.text().catch(() => "");
+                throw new OpenRouterProviderError({
+                  phase: "request_failed",
+                  status: response.status,
+                  statusText: response.statusText,
+                  message: `OpenRouter request failed: ${response.status} ${response.statusText}`,
+                  errorBodyPreview: errorBody ? errorBody.slice(0, 256) : undefined
+                });
+              }
 
-          let body: OpenRouterCompletionResponse;
-          try {
-            body = (await response.json()) as OpenRouterCompletionResponse;
-          } catch (cause) {
-            throw new OpenRouterProviderError({
-              phase: "invalid_response",
-              message: "OpenRouter response is not valid JSON.",
-              cause
-            });
-          }
+              let body: OpenRouterCompletionResponse;
+              try {
+                body = (await response.json()) as OpenRouterCompletionResponse;
+              } catch (cause) {
+                throw new OpenRouterProviderError({
+                  phase: "invalid_response",
+                  message: "OpenRouter response is not valid JSON.",
+                  cause
+                });
+              }
 
-          return parseCompletionResponse(body);
-        },
-        catch: (cause) =>
-          cause instanceof OpenRouterProviderError
-            ? cause
-            : new OpenRouterProviderError({
-                phase: "request_failed",
-                message: "OpenRouter request failed before receiving a response.",
-                cause
-              })
-      });
+              return parseCompletionResponse(body);
+            },
+            catch: (cause) =>
+              cause instanceof OpenRouterProviderError
+                ? cause
+                : new OpenRouterProviderError({
+                    phase: "request_failed",
+                    message: "OpenRouter request failed before receiving a response.",
+                    cause
+                  })
+          }).pipe(
+            Effect.onInterrupt(() => Effect.sync(() => controller.abort()))
+          )
+      );
 
       return withNonLiveLlmResilience(attempt, {
         attemptTimeoutMillis,
@@ -196,13 +207,13 @@ export function createOpenRouterChatClient({
         attemptFailureAttributes: (error) => ({
           provider: "openrouter",
           phase: error.phase,
-          status: error.status
+          status: error.status,
+          errorBodyPreview: error.errorBodyPreview
         }),
         finalFailureAttributes: (error) => ({
           provider: "openrouter",
           phase: error.phase,
-          status: error.status,
-          message: error.message
+          status: error.status
         })
       }).pipe(
         Effect.withSpan("openrouter.create_structured_json_completion", {

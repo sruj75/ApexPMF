@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
+  classifyEntryFailure,
   createEntryFailure,
   mapProfileFailureToRedirectPath
 } from "@/src/application/start-session/entry-failure";
@@ -28,7 +29,11 @@ export async function createIdealCustomerProfileAction(formData: FormData) {
     );
   }
 
-  await createIdealCustomerProfileForLearner(learnerId, repository, parsed.value);
+  try {
+    await createIdealCustomerProfileForLearner(learnerId, repository, parsed.value);
+  } catch (cause) {
+    redirectWithEntryFailure(classifyEntryFailure(cause));
+  }
   revalidatePath("/profile");
 }
 
@@ -55,7 +60,11 @@ export async function updateIdealCustomerProfileAction(formData: FormData) {
     );
   }
 
-  await updateIdealCustomerProfileForLearner(learnerId, repository, profileId, parsed.value);
+  try {
+    await updateIdealCustomerProfileForLearner(learnerId, repository, profileId, parsed.value);
+  } catch (cause) {
+    redirectWithEntryFailure(classifyEntryFailure(cause));
+  }
   revalidatePath("/profile");
 }
 
@@ -72,14 +81,22 @@ export async function selectActiveIdealCustomerProfileAction(formData: FormData)
     );
   }
 
-  await selectActiveIdealCustomerProfileForLearner(learnerId, repository, profileId);
+  try {
+    await selectActiveIdealCustomerProfileForLearner(learnerId, repository, profileId);
+  } catch (cause) {
+    redirectWithEntryFailure(classifyEntryFailure(cause));
+  }
   revalidatePath("/profile");
 }
 
 export async function clearActiveIdealCustomerProfileAction(_formData: FormData) {
   void _formData;
   const { learnerId, repository } = await getProfileSettingsContext();
-  await clearActiveIdealCustomerProfileForLearner(learnerId, repository);
+  try {
+    await clearActiveIdealCustomerProfileForLearner(learnerId, repository);
+  } catch (cause) {
+    redirectWithEntryFailure(classifyEntryFailure(cause));
+  }
   revalidatePath("/profile");
 }
 

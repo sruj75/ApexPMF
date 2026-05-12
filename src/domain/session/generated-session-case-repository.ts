@@ -2,26 +2,63 @@ import type {
   CreateGeneratedSessionCaseInput,
   GeneratedSessionCase
 } from "./generated-session-case";
+import { Data, Effect } from "effect";
 import { withDefaultSessionLifecycle } from "./generated-session-case";
 import type { ReportStatus } from "./session-lifecycle";
 import type { SessionReport, SessionTranscriptTurn } from "./session-report";
 import type { SessionLifecycleState } from "./session-lifecycle";
 import type { SessionEvaluationArtifact } from "./session-evaluation";
 
+export type GeneratedSessionCaseRepositoryOperation =
+  | "create"
+  | "getForLearner"
+  | "updateSessionLifecycleForLearner"
+  | "updateReportArtifactsForLearner";
+
+export class GeneratedSessionCaseRepositoryPersistenceError extends Data.TaggedError(
+  "GeneratedSessionCaseRepositoryPersistenceError"
+)<{
+  operation: GeneratedSessionCaseRepositoryOperation;
+  cause: unknown;
+}> {}
+
+export class GeneratedSessionCaseRepositoryDecodeError extends Data.TaggedError(
+  "GeneratedSessionCaseRepositoryDecodeError"
+)<{
+  operation: GeneratedSessionCaseRepositoryOperation;
+  cause: unknown;
+}> {}
+
+export type GeneratedSessionCaseRepositoryError =
+  | GeneratedSessionCaseRepositoryPersistenceError
+  | GeneratedSessionCaseRepositoryDecodeError;
+
 export type GeneratedSessionCaseRepository = {
   create(
     learnerId: string,
     input: CreateGeneratedSessionCaseInput
-  ): Promise<GeneratedSessionCase>;
+  ): Effect.Effect<
+    GeneratedSessionCase,
+    GeneratedSessionCaseRepositoryError,
+    never
+  >;
   getForLearner(
     learnerId: string,
     sessionCaseId: string
-  ): Promise<GeneratedSessionCase | null>;
+  ): Effect.Effect<
+    GeneratedSessionCase | null,
+    GeneratedSessionCaseRepositoryError,
+    never
+  >;
   updateSessionLifecycleForLearner(input: {
     learnerId: string;
     sessionCaseId: string;
     updater: (current: SessionLifecycleState) => SessionLifecycleState;
-  }): Promise<GeneratedSessionCase | null>;
+  }): Effect.Effect<
+    GeneratedSessionCase | null,
+    GeneratedSessionCaseRepositoryError,
+    never
+  >;
   updateReportArtifactsForLearner(input: {
     learnerId: string;
     sessionCaseId: string;
@@ -30,7 +67,11 @@ export type GeneratedSessionCaseRepository = {
     sessionReport: SessionReport | null;
     sessionTranscript: SessionTranscriptTurn[] | null;
     sessionEvaluation: SessionEvaluationArtifact | null;
-  }): Promise<GeneratedSessionCase | null>;
+  }): Effect.Effect<
+    GeneratedSessionCase | null,
+    GeneratedSessionCaseRepositoryError,
+    never
+  >;
 };
 
 export function createInMemoryGeneratedSessionCaseRepository(
@@ -43,21 +84,23 @@ export function createInMemoryGeneratedSessionCaseRepository(
   }, 1);
 
   return {
-    async create(learnerId, input) {
-      const generatedSessionCase = withDefaultSessionLifecycle({
-        ...input,
-        id: `session-case-${nextId}`,
-        learnerId,
-        createdAt: new Date()
-      });
+    create(learnerId, input) {
+      return Effect.sync(() => {
+        const generatedSessionCase = withDefaultSessionLifecycle({
+          ...input,
+          id: `session-case-${nextId}`,
+          learnerId,
+          createdAt: new Date()
+        });
 
-      nextId += 1;
-      generatedSessionCases = [...generatedSessionCases, generatedSessionCase];
-      return generatedSessionCase;
+        nextId += 1;
+        generatedSessionCases = [...generatedSessionCases, generatedSessionCase];
+        return generatedSessionCase;
+      });
     },
 
-    async getForLearner(learnerId, sessionCaseId) {
-      return (
+    getForLearner(learnerId, sessionCaseId) {
+      return Effect.succeed(
         generatedSessionCases.find(
           (generatedSessionCase) =>
             generatedSessionCase.learnerId === learnerId &&
@@ -66,57 +109,61 @@ export function createInMemoryGeneratedSessionCaseRepository(
       );
     },
 
-    async updateSessionLifecycleForLearner(input) {
-      const index = generatedSessionCases.findIndex(
-        (generatedSessionCase) =>
-          generatedSessionCase.learnerId === input.learnerId &&
-          generatedSessionCase.id === input.sessionCaseId
-      );
-      if (index < 0) {
-        return null;
-      }
+    updateSessionLifecycleForLearner(input) {
+      return Effect.sync(() => {
+        const index = generatedSessionCases.findIndex(
+          (generatedSessionCase) =>
+            generatedSessionCase.learnerId === input.learnerId &&
+            generatedSessionCase.id === input.sessionCaseId
+        );
+        if (index < 0) {
+          return null;
+        }
 
-      const current = generatedSessionCases[index];
-      const next: GeneratedSessionCase = {
-        ...current,
-        sessionLifecycle: input.updater(current.sessionLifecycle)
-      };
+        const current = generatedSessionCases[index];
+        const next: GeneratedSessionCase = {
+          ...current,
+          sessionLifecycle: input.updater(current.sessionLifecycle)
+        };
 
-      generatedSessionCases = generatedSessionCases.map((sessionCase, rowIndex) =>
-        rowIndex === index ? next : sessionCase
-      );
+        generatedSessionCases = generatedSessionCases.map((sessionCase, rowIndex) =>
+          rowIndex === index ? next : sessionCase
+        );
 
-      return next;
+        return next;
+      });
     },
 
-    async updateReportArtifactsForLearner(input) {
-      const index = generatedSessionCases.findIndex(
-        (generatedSessionCase) =>
-          generatedSessionCase.learnerId === input.learnerId &&
-          generatedSessionCase.id === input.sessionCaseId
-      );
-      if (index < 0) {
-        return null;
-      }
+    updateReportArtifactsForLearner(input) {
+      return Effect.sync(() => {
+        const index = generatedSessionCases.findIndex(
+          (generatedSessionCase) =>
+            generatedSessionCase.learnerId === input.learnerId &&
+            generatedSessionCase.id === input.sessionCaseId
+        );
+        if (index < 0) {
+          return null;
+        }
 
-      const current = generatedSessionCases[index];
-      const next: GeneratedSessionCase = {
-        ...current,
-        sessionLifecycle: {
-          ...current.sessionLifecycle,
-          reportStatus: input.reportStatus,
-          reportReadyAt: input.reportReadyAt
-        },
-        sessionReport: input.sessionReport,
-        sessionTranscript: input.sessionTranscript,
-        sessionEvaluation: input.sessionEvaluation
-      };
+        const current = generatedSessionCases[index];
+        const next: GeneratedSessionCase = {
+          ...current,
+          sessionLifecycle: {
+            ...current.sessionLifecycle,
+            reportStatus: input.reportStatus,
+            reportReadyAt: input.reportReadyAt
+          },
+          sessionReport: input.sessionReport,
+          sessionTranscript: input.sessionTranscript,
+          sessionEvaluation: input.sessionEvaluation
+        };
 
-      generatedSessionCases = generatedSessionCases.map((sessionCase, rowIndex) =>
-        rowIndex === index ? next : sessionCase
-      );
+        generatedSessionCases = generatedSessionCases.map((sessionCase, rowIndex) =>
+          rowIndex === index ? next : sessionCase
+        );
 
-      return next;
+        return next;
+      });
     }
   };
 }

@@ -1,3 +1,5 @@
+import type { Effect } from "effect";
+
 export type HiddenEvaluationJudgeMessage = {
   role: "system" | "user" | "assistant";
   content: string;
@@ -16,5 +18,5 @@ export type HiddenEvaluationJudgeCompletion = {
 export type HiddenEvaluationJudge = {
   createStructuredJsonCompletion(
     request: HiddenEvaluationJudgeRequest
-  ): Promise<HiddenEvaluationJudgeCompletion>;
+  ): Effect.Effect<HiddenEvaluationJudgeCompletion, unknown, never>;
 };

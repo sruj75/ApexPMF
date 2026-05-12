@@ -12,13 +12,22 @@ vi.mock("next/navigation", () => ({
   redirect
 }));
 
-vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
+vi.mock("@/src/application/start-session/practice-entry-web-adapter", () => ({
   getLearnerSessionRuntime
 }));
 
 describe("End Session action", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("redirects to practice on missing sessionId instead of throwing", async () => {
+    const formData = new FormData();
+
+    await expect(endSessionAction(formData)).rejects.toThrow(
+      "REDIRECT:/practice?error=session_creation_failed"
+    );
+    expect(getLearnerSessionRuntime).not.toHaveBeenCalled();
   });
 
   it("redirects unauthenticated Learners to /login", async () => {

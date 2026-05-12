@@ -1,4 +1,29 @@
 import type { HiddenEvaluationJudge } from "@/src/domain/session/hidden-evaluation-judge";
+import { Effect, Schedule } from "effect";
+import { withNonLiveLlmResilience } from "@/src/application/non-live-llm-resilience";
+
+const defaultRetryableStatusCodes: ReadonlySet<number> = new Set([408, 429]);
+
+export function isOpenRouterErrorRetryable(error: OpenRouterProviderError): boolean {
+  if (error.phase === "invalid_response") {
+    return false;
+  }
+  if (error.status === undefined) {
+    return true;
+  }
+  if (defaultRetryableStatusCodes.has(error.status)) {
+    return true;
+  }
+  if (error.status === 501) {
+    return false;
+  }
+  return error.status >= 500 && error.status <= 599;
+}
+
+export const defaultOpenRouterRetrySchedule = Schedule.exponential("200 millis").pipe(
+  Schedule.jittered,
+  Schedule.intersect(Schedule.recurs(2))
+);
 
 export type OpenRouterChatMessage = {
   role: "system" | "user" | "assistant";
@@ -8,7 +33,7 @@ export type OpenRouterChatMessage = {
 export type OpenRouterChatClient = {
   createStructuredJsonCompletion(
     request: OpenRouterStructuredJsonRequest
-  ): Promise<OpenRouterStructuredJsonCompletion>;
+  ): Effect.Effect<OpenRouterStructuredJsonCompletion, OpenRouterProviderError, never>;
 };
 
 export type OpenRouterStructuredJsonRequest = {
@@ -27,12 +52,12 @@ export function createOpenRouterHiddenEvaluationJudge(input: {
   chatClient: OpenRouterChatClient;
 }): HiddenEvaluationJudge {
   return {
-    async createStructuredJsonCompletion(request) {
-      const completion =
-        await input.chatClient.createStructuredJsonCompletion(request);
-      return {
-        content: completion.content
-      };
+    createStructuredJsonCompletion(request) {
+      return input.chatClient.createStructuredJsonCompletion(request).pipe(
+        Effect.map((completion) => ({
+          content: completion.content
+        }))
+      );
     }
   };
 }
@@ -43,6 +68,7 @@ export class OpenRouterProviderError extends Error {
   readonly status?: number;
   readonly statusText?: string;
   readonly cause?: unknown;
+  readonly errorBodyPreview?: string;
 
   constructor(input: {
     message: string;
@@ -50,12 +76,14 @@ export class OpenRouterProviderError extends Error {
     status?: number;
     statusText?: string;
     cause?: unknown;
+    errorBodyPreview?: string;
   }) {
     super(input.message);
     this.phase = input.phase;
     this.status = input.status;
     this.statusText = input.statusText;
     this.cause = input.cause;
+    this.errorBodyPreview = input.errorBodyPreview;
   }
 }
 
@@ -70,7 +98,11 @@ type OpenRouterChatClientOptions = {
   appTitle?: string;
   siteUrl?: string;
   fetch?: FetchLike;
+  retrySchedule?: Schedule.Schedule<unknown, OpenRouterProviderError>;
+  attemptTimeoutMillis?: number;
 };
+
+const defaultAttemptTimeoutMillis = 30_000;
 
 type OpenRouterCompletionResponse = {
   id?: unknown;
@@ -83,63 +115,114 @@ export function createOpenRouterChatClient({
   model,
   appTitle,
   siteUrl,
-  fetch: fetchImplementation = fetch
+  fetch: fetchImplementation = fetch,
+  retrySchedule = defaultOpenRouterRetrySchedule,
+  attemptTimeoutMillis = defaultAttemptTimeoutMillis
 }: OpenRouterChatClientOptions): OpenRouterChatClient {
   return {
-    async createStructuredJsonCompletion(request) {
-      let response: Response;
+    createStructuredJsonCompletion(request) {
+      const attempt = Effect.flatMap(
+        Effect.sync(() => new AbortController()),
+        (controller) =>
+          Effect.tryPromise({
+            try: async () => {
+              let response: Response;
 
-      try {
-        response = await fetchImplementation(
-          "https://openrouter.ai/api/v1/chat/completions",
-          {
-            method: "POST",
-            headers: headersForRequest({ apiKey, appTitle, siteUrl }),
-            body: JSON.stringify({
-              model,
-              messages: request.messages,
-              stream: false,
-              response_format: {
-                type: "json_schema",
-                json_schema: {
-                  name: request.responseSchemaName,
-                  strict: true,
-                  schema: request.responseJsonSchema
-                }
+              try {
+                response = await fetchImplementation(
+                  "https://openrouter.ai/api/v1/chat/completions",
+                  {
+                    method: "POST",
+                    headers: headersForRequest({ apiKey, appTitle, siteUrl }),
+                    body: JSON.stringify({
+                      model,
+                      messages: request.messages,
+                      stream: false,
+                      response_format: {
+                        type: "json_schema",
+                        json_schema: {
+                          name: request.responseSchemaName,
+                          strict: true,
+                          schema: request.responseJsonSchema
+                        }
+                      }
+                    }),
+                    signal: controller.signal
+                  }
+                );
+              } catch (cause) {
+                throw new OpenRouterProviderError({
+                  phase: "request_failed",
+                  message: "OpenRouter request failed before receiving a response.",
+                  cause
+                });
               }
-            })
+
+              if (!response.ok) {
+                const errorBody = await response.text().catch(() => "");
+                throw new OpenRouterProviderError({
+                  phase: "request_failed",
+                  status: response.status,
+                  statusText: response.statusText,
+                  message: `OpenRouter request failed: ${response.status} ${response.statusText}`,
+                  errorBodyPreview: errorBody ? errorBody.slice(0, 256) : undefined
+                });
+              }
+
+              let body: OpenRouterCompletionResponse;
+              try {
+                body = (await response.json()) as OpenRouterCompletionResponse;
+              } catch (cause) {
+                throw new OpenRouterProviderError({
+                  phase: "invalid_response",
+                  message: "OpenRouter response is not valid JSON.",
+                  cause
+                });
+              }
+
+              return parseCompletionResponse(body);
+            },
+            catch: (cause) =>
+              cause instanceof OpenRouterProviderError
+                ? cause
+                : new OpenRouterProviderError({
+                    phase: "request_failed",
+                    message: "OpenRouter request failed before receiving a response.",
+                    cause
+                  })
+          }).pipe(
+            Effect.onInterrupt(() => Effect.sync(() => controller.abort()))
+          )
+      );
+
+      return withNonLiveLlmResilience(attempt, {
+        attemptTimeoutMillis,
+        retrySchedule,
+        isRetryable: isOpenRouterErrorRetryable,
+        timeoutFailure: () =>
+          new OpenRouterProviderError({
+            phase: "request_failed",
+            message: `OpenRouter request timed out after ${attemptTimeoutMillis}ms.`
+          }),
+        attemptFailureAttributes: (error) => ({
+          provider: "openrouter",
+          phase: error.phase,
+          status: error.status,
+          errorBodyPreview: error.errorBodyPreview
+        }),
+        finalFailureAttributes: (error) => ({
+          provider: "openrouter",
+          phase: error.phase,
+          status: error.status
+        })
+      }).pipe(
+        Effect.withSpan("openrouter.create_structured_json_completion", {
+          attributes: {
+            model,
+            responseSchemaName: request.responseSchemaName
           }
-        );
-      } catch (cause) {
-        throw new OpenRouterProviderError({
-          phase: "request_failed",
-          message: "OpenRouter request failed before receiving a response.",
-          cause
-        });
-      }
-
-      if (!response.ok) {
-        const errorBody = await response.text().catch(() => "");
-        throw new OpenRouterProviderError({
-          phase: "request_failed",
-          status: response.status,
-          statusText: response.statusText,
-          message: `OpenRouter request failed: ${response.status} ${response.statusText}${errorBody ? ` - ${errorBody}` : ""}`
-        });
-      }
-
-      let body: OpenRouterCompletionResponse;
-      try {
-        body = (await response.json()) as OpenRouterCompletionResponse;
-      } catch (cause) {
-        throw new OpenRouterProviderError({
-          phase: "invalid_response",
-          message: "OpenRouter response is not valid JSON.",
-          cause
-        });
-      }
-
-      return parseCompletionResponse(body);
+        })
+      );
     }
   };
 }

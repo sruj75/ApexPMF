@@ -1,28 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Effect } from "effect";
 
 const {
-  getSupabaseLearnerEntryContext,
+  getSupabaseLearnerEntryContextEffect,
   createSessionOrchestrator,
-  createReportGenerationCoordinator
+  createReportGenerationCoordinator,
+  SessionCaseNotFoundError
 } = vi.hoisted(() => ({
-  getSupabaseLearnerEntryContext: vi.fn(),
+  getSupabaseLearnerEntryContextEffect: vi.fn(),
   createSessionOrchestrator: vi.fn(),
-  createReportGenerationCoordinator: vi.fn()
+  createReportGenerationCoordinator: vi.fn(),
+  SessionCaseNotFoundError: class SessionCaseNotFoundError extends Error {}
 }));
 
 vi.mock("@/src/infrastructure/supabase/learner-entry-context", () => ({
-  getSupabaseLearnerEntryContext
+  getSupabaseLearnerEntryContextEffect
 }));
 
 vi.mock("@/src/application/end-session/session-orchestrator", () => ({
-  createSessionOrchestrator
+  createSessionOrchestrator,
+  SessionCaseNotFoundError
 }));
 
 vi.mock("@/src/application/generate-report/report-generation-coordinator", () => ({
   createReportGenerationCoordinator
 }));
 
-import { getLearnerSessionRuntime } from "../src/application/start-session/practice-entry-seam";
+import { getLearnerSessionRuntime } from "../src/application/start-session/practice-entry-web-adapter";
 
 describe("Learner session runtime seam", () => {
   beforeEach(() => {
@@ -30,10 +34,12 @@ describe("Learner session runtime seam", () => {
   });
 
   it("returns unauthenticated when Learner entry context is not signed in", async () => {
-    getSupabaseLearnerEntryContext.mockResolvedValue({
-      ok: false,
-      reason: "unauthenticated"
-    });
+    getSupabaseLearnerEntryContextEffect.mockReturnValue(
+      Effect.succeed({
+        ok: false,
+        reason: "unauthenticated"
+      })
+    );
 
     await expect(getLearnerSessionRuntime()).resolves.toEqual({
       ok: false,
@@ -42,24 +48,31 @@ describe("Learner session runtime seam", () => {
   });
 
   it("returns learner-scoped runtime actions for authenticated learners", async () => {
-    const endSessionForLearner = vi.fn(async () => ({
-      nextPath: "/dashboard",
-      sessionStatus: "ended" as const,
-      endedReason: "user-quit" as const,
-      reportStatus: "insufficient-evidence" as const
-    }));
-    const runReportGeneratingFlowForLearner = vi.fn(async () => ({
-      reportStatus: "ready" as const,
-      nextPath: "/practice/session-case-1/report"
-    }));
+    const endSessionForLearner = vi.fn(() =>
+      Effect.succeed({
+        nextPath: "/dashboard",
+        sessionStatus: "ended" as const,
+        endedReason: "user-quit" as const,
+        reportStatus: "insufficient-evidence" as const
+      })
+    );
+    const runReportGeneratingFlowForLearner = vi.fn(() =>
+      Effect.succeed({
+        reportStatus: "ready" as const,
+        nextPath: "/practice/session-case-1/report"
+      })
+    );
 
-    getSupabaseLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-42",
-      idealCustomerProfileRepository: {} as never,
-      generatedSessionCaseRepository: {} as never
-    });
-    createReportGenerationCoordinator.mockReturnValue({});
+    getSupabaseLearnerEntryContextEffect.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-42",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {} as never
+      })
+    );
+    const reportGenerationCoordinator = {};
+    createReportGenerationCoordinator.mockReturnValue(reportGenerationCoordinator);
     createSessionOrchestrator.mockReturnValue({
       endSessionForLearner,
       runReportGeneratingFlowForLearner
@@ -99,6 +112,51 @@ describe("Learner session runtime seam", () => {
     expect(runReportGeneratingFlowForLearner).toHaveBeenCalledWith({
       learnerId: "learner-42",
       sessionId: "session-case-1"
+    });
+    expect(createSessionOrchestrator).toHaveBeenCalledWith({
+      generatedSessionCaseRepository: {},
+      reportGenerationCoordinator
+    });
+  });
+
+  it("maps report-generating missing-session errors into boundary not-found outcomes", async () => {
+    const endSessionForLearner = vi.fn(() =>
+      Effect.succeed({
+        nextPath: "/dashboard",
+        sessionStatus: "ended" as const,
+        endedReason: "user-quit" as const,
+        reportStatus: "not-requested" as const
+      })
+    );
+    const runReportGeneratingFlowForLearner = vi.fn(() =>
+      Effect.fail(new SessionCaseNotFoundError())
+    );
+
+    getSupabaseLearnerEntryContextEffect.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-42",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {} as never
+      })
+    );
+    createReportGenerationCoordinator.mockReturnValue({});
+    createSessionOrchestrator.mockReturnValue({
+      endSessionForLearner,
+      runReportGeneratingFlowForLearner
+    });
+
+    const runtime = await getLearnerSessionRuntime();
+    if (!runtime.ok) {
+      throw new Error("expected authenticated runtime");
+    }
+
+    await expect(
+      runtime.runReportGeneratingFlowForLearner({
+        sessionId: "session-case-missing"
+      })
+    ).resolves.toEqual({
+      reportStatus: "not-found"
     });
   });
 });

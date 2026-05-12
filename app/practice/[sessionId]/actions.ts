@@ -1,12 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getLearnerSessionRuntime } from "@/src/application/start-session/practice-entry-seam";
+import { getLearnerSessionRuntime } from "@/src/application/start-session/practice-entry-web-adapter";
 
 export async function endSessionAction(formData: FormData) {
   const sessionId = stringFromFormData(formData, "sessionId");
   if (!sessionId) {
-    throw new Error("Missing sessionId for endSessionAction.");
+    redirect("/practice?error=session_creation_failed");
   }
 
   const runtime = await getLearnerSessionRuntime();

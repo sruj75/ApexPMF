@@ -2,25 +2,50 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getLearnerEntryContext,
   startPracticeFromEntryContext
-} from "../src/application/start-session/practice-entry-seam";
-import type { NonLiveLlmRuntimePolicy } from "../src/application/non-live-llm-policy";
-import { createEntryFailure } from "../src/application/start-session/entry-failure";
+} from "../src/application/start-session/practice-entry-web-adapter";
 import { OpenRouterProviderError } from "../src/infrastructure/llm/openrouter";
+import {
+  StartPracticePersonaGenerationError,
+  StartPracticeSessionSourceError
+} from "../src/application/start-session/start-practice";
+import { PersonaGenerationDecodeError, PersonaGenerationProviderError } from "../src/domain/persona/persona-generation";
+import {
+  GeneratedSessionCaseRepositoryDecodeError,
+  GeneratedSessionCaseRepositoryPersistenceError
+} from "../src/domain/session/generated-session-case-repository";
+import { SessionSourceResolutionError } from "../src/domain/persona/session-source";
+import {
+  IdealCustomerProfileRepositoryNotFoundError
+} from "../src/domain/persona/ideal-customer-profile-repository";
+import { LearnerEntryContextAuthQueryError } from "../src/infrastructure/supabase/learner-entry-context";
+import { Effect } from "effect";
 
-const { getSupabaseLearnerEntryContext, startPracticeForLearner } = vi.hoisted(
+const { getSupabaseLearnerEntryContextEffect, startPracticeForLearner } = vi.hoisted(
   () => ({
-    getSupabaseLearnerEntryContext: vi.fn(),
+    getSupabaseLearnerEntryContextEffect: vi.fn(),
     startPracticeForLearner: vi.fn()
   })
 );
 
-vi.mock("@/src/infrastructure/supabase/learner-entry-context", () => ({
-  getSupabaseLearnerEntryContext
-}));
+vi.mock("@/src/infrastructure/supabase/learner-entry-context", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("@/src/infrastructure/supabase/learner-entry-context")
+  >();
+  return {
+    ...actual,
+    getSupabaseLearnerEntryContextEffect
+  };
+});
 
-vi.mock("@/src/application/start-session/start-practice", () => ({
-  startPracticeForLearner
-}));
+vi.mock("@/src/application/start-session/start-practice", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("@/src/application/start-session/start-practice")
+  >();
+  return {
+    ...actual,
+    startPracticeForLearner
+  };
+});
 
 const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
 
@@ -35,10 +60,12 @@ describe("Practice entry seam", () => {
   });
 
   it("returns an unauthenticated context result when no Learner is signed in", async () => {
-    getSupabaseLearnerEntryContext.mockResolvedValue({
-      ok: false,
-      reason: "unauthenticated"
-    });
+    getSupabaseLearnerEntryContextEffect.mockReturnValue(
+      Effect.succeed({
+        ok: false,
+        reason: "unauthenticated"
+      })
+    );
 
     await expect(getLearnerEntryContext()).resolves.toEqual({
       ok: false,
@@ -46,11 +73,23 @@ describe("Practice entry seam", () => {
     });
   });
 
+  it("propagates Learner entry auth query errors through the web adapter", async () => {
+    const failure = new LearnerEntryContextAuthQueryError({
+      operation: "resolve-auth-user",
+      message: "Auth service failed."
+    });
+    getSupabaseLearnerEntryContextEffect.mockReturnValue(Effect.fail(failure));
+
+    await expect(getLearnerEntryContext()).rejects.toThrow("Auth service failed.");
+  });
+
   it("returns a started Session id when Start Practice succeeds", async () => {
     process.env.OPENROUTER_API_KEY = "openrouter-key";
-    startPracticeForLearner.mockResolvedValue({
-      sessionId: "session-case-123"
-    });
+    startPracticeForLearner.mockReturnValue(
+      Effect.succeed({
+        sessionId: "session-case-123"
+      })
+    );
 
     const result = await startPracticeFromEntryContext({
       learnerId: "learner-1",
@@ -66,8 +105,7 @@ describe("Practice entry seam", () => {
       "learner-1",
       expect.objectContaining({
         idealCustomerProfileRepository: expect.any(Object),
-        generatedSessionCaseRepository: expect.any(Object),
-        personaGenerator: expect.any(Object)
+        generatedSessionCaseRepository: expect.any(Object)
       })
     );
   });
@@ -82,14 +120,18 @@ describe("Practice entry seam", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure.category).toBe("provider_failure");
-      expect(result.failure.cause).toBeUndefined();
+      expect(result.failure.cause).toMatchObject({
+        _tag: "NonLiveLlmProviderUnavailableError"
+      });
       expect(result.failure.message).toContain("OPENROUTER_API_KEY");
     }
   });
 
   it("maps downstream Start Practice failures to persistence_failure by default", async () => {
     process.env.OPENROUTER_API_KEY = "openrouter-key";
-    startPracticeForLearner.mockRejectedValue(new Error("downstream failure"));
+    startPracticeForLearner.mockReturnValue(
+      Effect.fail(new Error("downstream failure"))
+    );
 
     const result = await startPracticeFromEntryContext({
       learnerId: "learner-3",
@@ -105,15 +147,50 @@ describe("Practice entry seam", () => {
     }
   });
 
-  it("maps typed OpenRouter provider failures to provider_failure", async () => {
+  it("maps wrapped persona decode failures to decode_failure", async () => {
     process.env.OPENROUTER_API_KEY = "openrouter-key";
-    startPracticeForLearner.mockRejectedValue(
-      new OpenRouterProviderError({
-        phase: "request_failed",
-        status: 503,
-        statusText: "Service Unavailable",
-        message: "OpenRouter request failed: 503 Service Unavailable"
-      })
+    startPracticeForLearner.mockReturnValue(
+      Effect.fail(
+        new StartPracticePersonaGenerationError({
+          learnerId: "learner-3",
+          cause: new PersonaGenerationDecodeError({
+            reason: "schema_validation_failed",
+            message: "Persona Generation response failed schema validation."
+          })
+        })
+      )
+    );
+
+    const result = await startPracticeFromEntryContext({
+      learnerId: "learner-3",
+      idealCustomerProfileRepository: {} as never,
+      generatedSessionCaseRepository: {} as never
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.category).toBe("decode_failure");
+      expect(result.failure.details).toEqual(["reason=schema_validation_failed"]);
+    }
+  });
+
+  it("maps wrapped provider errors to provider_failure", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-key";
+    startPracticeForLearner.mockReturnValue(
+      Effect.fail(
+        new StartPracticePersonaGenerationError({
+          learnerId: "learner-4",
+          cause: new PersonaGenerationProviderError({
+            message: "provider failed",
+            cause: new OpenRouterProviderError({
+              phase: "request_failed",
+              status: 503,
+              statusText: "Service Unavailable",
+              message: "OpenRouter request failed: 503 Service Unavailable"
+            })
+          })
+        })
+      )
     );
 
     const result = await startPracticeFromEntryContext({
@@ -133,42 +210,147 @@ describe("Practice entry seam", () => {
     }
   });
 
-  it("uses the injected non-live runtime policy contract for persona and failure mapping", async () => {
-    const personaGenerator = {} as never;
-    const mappedFailure = createEntryFailure({
-      category: "input_invalid",
-      message: "mapped by injected non-live policy"
-    });
-    const nonLiveLlmRuntimePolicy: NonLiveLlmRuntimePolicy = {
-      composePersonaGenerator: () => personaGenerator,
-      composeHiddenEvaluationEngine: () => ({
-        evaluateEndedSession: async () => ({
-          status: "insufficient-evidence",
-          reason: "provider-failure"
+  it("maps repository decode errors to decode_failure", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-key";
+    startPracticeForLearner.mockReturnValue(
+      Effect.fail(
+        new GeneratedSessionCaseRepositoryDecodeError({
+          operation: "create",
+          cause: new Error("row decode failed")
         })
-      }),
-      mapStartSessionFailure: () => mappedFailure
-    };
-    startPracticeForLearner.mockRejectedValue(new Error("downstream failure"));
-
-    const result = await startPracticeFromEntryContext(
-      {
-        learnerId: "learner-5",
-        idealCustomerProfileRepository: {} as never,
-        generatedSessionCaseRepository: {} as never
-      },
-      { nonLiveLlmRuntimePolicy }
+      )
     );
 
-    expect(startPracticeForLearner).toHaveBeenCalledWith(
-      "learner-5",
-      expect.objectContaining({
-        personaGenerator
-      })
-    );
-    expect(result).toEqual({
-      ok: false,
-      failure: mappedFailure
+    const result = await startPracticeFromEntryContext({
+      learnerId: "learner-5",
+      idealCustomerProfileRepository: {} as never,
+      generatedSessionCaseRepository: {} as never
     });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.category).toBe("decode_failure");
+      expect(result.failure.details).toEqual(["operation=create"]);
+    }
   });
+
+  it("maps repository persistence errors to persistence_failure", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-key";
+    startPracticeForLearner.mockReturnValue(
+      Effect.fail(
+        new GeneratedSessionCaseRepositoryPersistenceError({
+          operation: "create",
+          cause: new Error("write failed")
+        })
+      )
+    );
+
+    const result = await startPracticeFromEntryContext({
+      learnerId: "learner-6",
+      idealCustomerProfileRepository: {} as never,
+      generatedSessionCaseRepository: {} as never
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.category).toBe("persistence_failure");
+      expect(result.failure.details).toEqual(["operation=create"]);
+    }
+  });
+
+  it("unwraps wrapped session source failures before policy mapping", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-key";
+    startPracticeForLearner.mockReturnValue(
+      Effect.fail(
+        new StartPracticeSessionSourceError({
+          learnerId: "learner-7",
+          cause: new SessionSourceResolutionError({
+            learnerId: "learner-7",
+            cause: new Error("profile lookup failed")
+          })
+        })
+      )
+    );
+
+    const result = await startPracticeFromEntryContext({
+      learnerId: "learner-7",
+      idealCustomerProfileRepository: {} as never,
+      generatedSessionCaseRepository: {} as never
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.category).toBe("persistence_failure");
+      expect(result.failure.cause).toBeInstanceOf(SessionSourceResolutionError);
+    }
+  });
+
+  it("maps wrapped Ideal Customer Profile not-found failures to persistence_failure", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-key";
+    startPracticeForLearner.mockReturnValue(
+      Effect.fail(
+        new StartPracticeSessionSourceError({
+          learnerId: "learner-8",
+          cause: new SessionSourceResolutionError({
+            learnerId: "learner-8",
+            cause: new IdealCustomerProfileRepositoryNotFoundError({
+              learnerId: "learner-8",
+              profileId: "missing-profile",
+              operation: "selectActive"
+            })
+          })
+        })
+      )
+    );
+
+    const result = await startPracticeFromEntryContext({
+      learnerId: "learner-8",
+      idealCustomerProfileRepository: {} as never,
+      generatedSessionCaseRepository: {} as never
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.category).toBe("persistence_failure");
+      expect(result.failure.cause).toMatchObject({
+        _tag: "IdealCustomerProfileRepositoryNotFoundError",
+        operation: "selectActive"
+      });
+      expect(result.failure.details).toEqual([
+        "operation=selectActive",
+        "profileId=missing-profile"
+      ]);
+    }
+  });
+
+  it("maps typed OpenRouter provider failures to provider_failure", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-key";
+    startPracticeForLearner.mockReturnValue(
+      Effect.fail(
+        new OpenRouterProviderError({
+          phase: "request_failed",
+          status: 503,
+          statusText: "Service Unavailable",
+          message: "OpenRouter request failed: 503 Service Unavailable"
+        })
+      )
+    );
+
+    const result = await startPracticeFromEntryContext({
+      learnerId: "learner-4",
+      idealCustomerProfileRepository: {} as never,
+      generatedSessionCaseRepository: {} as never
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.category).toBe("provider_failure");
+      expect(result.failure.details).toEqual([
+        "phase=request_failed",
+        "status=503",
+        "statusText=Service Unavailable"
+      ]);
+    }
+  });
+
 });

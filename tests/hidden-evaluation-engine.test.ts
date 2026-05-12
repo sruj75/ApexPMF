@@ -3,28 +3,34 @@ import { createHiddenEvaluationEngine } from "../src/domain/session/hidden-evalu
 import {
   createFallbackHiddenEvaluationPromptSource,
   createPinnedHiddenEvaluationPromptSource,
-  createStubFailingHiddenEvaluationPromptSource
+  createStubFailingHiddenEvaluationPromptSource,
+  HiddenEvaluationPromptSourceError
 } from "../src/domain/session/hidden-evaluation-prompt-source";
 import type { GeneratedSessionCase } from "../src/domain/session/generated-session-case";
 import type { SessionTranscriptTurn } from "../src/domain/session/session-report";
+import { Effect } from "effect";
 
 describe("Hidden Evaluation engine", () => {
   it("returns ready from LLM judge JSON for ended non-quit sessions with >=5 turns", async () => {
     const judge = {
-      createStructuredJsonCompletion: vi.fn(async () => ({
+      createStructuredJsonCompletion: vi.fn(() =>
+        Effect.succeed({
         id: "resp-1",
         model: "test-model",
         content: JSON.stringify(makeReadyJudgeOutput())
-      }))
+        })
+      )
     };
     const engine = createHiddenEvaluationEngine({
       judge
     });
 
-    const result = await engine.evaluateEndedSession({
-      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-      transcript: makeTranscript()
-    });
+    const result = await Effect.runPromise(
+      engine.evaluateEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+        transcript: makeTranscript()
+      })
+    );
 
     expect(result.status).toBe("ready");
     if (result.status !== "ready") {
@@ -36,11 +42,13 @@ describe("Hidden Evaluation engine", () => {
 
   it("returns typed insufficient reasons for user-quit, not-ended, short transcript, and missing speakers", async () => {
     const judge = {
-      createStructuredJsonCompletion: vi.fn(async () => ({
+      createStructuredJsonCompletion: vi.fn(() =>
+        Effect.succeed({
         id: "resp-1",
         model: "test-model",
         content: JSON.stringify(makeReadyJudgeOutput())
-      }))
+        })
+      )
     };
     const engine = createHiddenEvaluationEngine({
       judge
@@ -48,10 +56,12 @@ describe("Hidden Evaluation engine", () => {
 
     const userQuitCase = makeGeneratedSessionCase("user-quit");
     await expect(
-      engine.evaluateEndedSession({
-        generatedSessionCase: userQuitCase,
-        transcript: makeTranscript()
-      })
+      Effect.runPromise(
+        engine.evaluateEndedSession({
+          generatedSessionCase: userQuitCase,
+          transcript: makeTranscript()
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "user-quit"
@@ -65,30 +75,36 @@ describe("Hidden Evaluation engine", () => {
       endedAt: null
     };
     await expect(
-      engine.evaluateEndedSession({
-        generatedSessionCase: notEndedCase,
-        transcript: makeTranscript()
-      })
+      Effect.runPromise(
+        engine.evaluateEndedSession({
+          generatedSessionCase: notEndedCase,
+          transcript: makeTranscript()
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "not-ended"
     });
 
     await expect(
-      engine.evaluateEndedSession({
-        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-        transcript: makeTranscript().slice(0, 4)
-      })
+      Effect.runPromise(
+        engine.evaluateEndedSession({
+          generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+          transcript: makeTranscript().slice(0, 4)
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "transcript-too-short"
     });
 
     await expect(
-      engine.evaluateEndedSession({
-        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-        transcript: makeLearnerOnlyTranscript()
-      })
+      Effect.runPromise(
+        engine.evaluateEndedSession({
+          generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+          transcript: makeLearnerOnlyTranscript()
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "transcript-missing-speakers"
@@ -99,12 +115,15 @@ describe("Hidden Evaluation engine", () => {
     const judge = {
       createStructuredJsonCompletion: vi
         .fn()
-        .mockResolvedValueOnce({
+        .mockReturnValueOnce(
+          Effect.succeed({
           id: "resp-1",
           model: "test-model",
           content: "{invalid-json"
-        })
-        .mockResolvedValueOnce({
+          })
+        )
+        .mockReturnValueOnce(
+          Effect.succeed({
           id: "resp-2",
           model: "test-model",
           content: JSON.stringify({
@@ -112,17 +131,20 @@ describe("Hidden Evaluation engine", () => {
             reasonIfInsufficient: null,
             evaluation: null
           })
-        })
+          })
+        )
     };
     const engine = createHiddenEvaluationEngine({
       judge
     });
 
     await expect(
-      engine.evaluateEndedSession({
-        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-        transcript: makeTranscript()
-      })
+      Effect.runPromise(
+        engine.evaluateEndedSession({
+          generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+          transcript: makeTranscript()
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "invalid-judge-output"
@@ -133,19 +155,21 @@ describe("Hidden Evaluation engine", () => {
 
   it("returns provider-failure when judge call throws", async () => {
     const judge = {
-      createStructuredJsonCompletion: vi.fn(async () => {
-        throw new Error("provider unavailable");
-      })
+      createStructuredJsonCompletion: vi.fn(() =>
+        Effect.fail(new Error("provider unavailable"))
+      )
     };
     const engine = createHiddenEvaluationEngine({
       judge
     });
 
     await expect(
-      engine.evaluateEndedSession({
-        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-        transcript: makeTranscript()
-      })
+      Effect.runPromise(
+        engine.evaluateEndedSession({
+          generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+          transcript: makeTranscript()
+        })
+      )
     ).resolves.toEqual({
       status: "insufficient-evidence",
       reason: "provider-failure"
@@ -159,21 +183,25 @@ describe("Hidden Evaluation engine", () => {
       repairInstruction: "Repair in strict JSON."
     });
     const judge = {
-      createStructuredJsonCompletion: vi.fn(async () => ({
+      createStructuredJsonCompletion: vi.fn(() =>
+        Effect.succeed({
         id: "resp-1",
         model: "test-model",
         content: JSON.stringify(makeReadyJudgeOutput())
-      }))
+        })
+      )
     };
     const engine = createHiddenEvaluationEngine({
       judge,
       promptSource
     });
 
-    await engine.evaluateEndedSession({
-      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-      transcript: makeTranscript()
-    });
+    await Effect.runPromise(
+      engine.evaluateEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+        transcript: makeTranscript()
+      })
+    );
 
     expect(judge.createStructuredJsonCompletion).toHaveBeenCalledTimes(1);
     const firstRequest = judge.createStructuredJsonCompletion.mock.calls[0]?.[0];
@@ -190,16 +218,20 @@ describe("Hidden Evaluation engine", () => {
     const judge = {
       createStructuredJsonCompletion: vi
         .fn()
-        .mockResolvedValueOnce({
+        .mockReturnValueOnce(
+          Effect.succeed({
           id: "resp-1",
           model: "test-model",
           content: "{invalid-json"
-        })
-        .mockResolvedValueOnce({
+          })
+        )
+        .mockReturnValueOnce(
+          Effect.succeed({
           id: "resp-2",
           model: "test-model",
           content: JSON.stringify(makeReadyJudgeOutput())
-        })
+          })
+        )
     };
     const engine = createHiddenEvaluationEngine({
       judge,
@@ -210,10 +242,12 @@ describe("Hidden Evaluation engine", () => {
       })
     });
 
-    await engine.evaluateEndedSession({
-      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-      transcript: makeTranscript()
-    });
+    await Effect.runPromise(
+      engine.evaluateEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+        transcript: makeTranscript()
+      })
+    );
 
     expect(judge.createStructuredJsonCompletion).toHaveBeenCalledTimes(2);
     const secondRequest = judge.createStructuredJsonCompletion.mock.calls[1]?.[0];
@@ -235,25 +269,39 @@ describe("Hidden Evaluation engine", () => {
       })
     });
     const judge = {
-      createStructuredJsonCompletion: vi.fn(async () => ({
+      createStructuredJsonCompletion: vi.fn(() =>
+        Effect.succeed({
         id: "resp-1",
         model: "test-model",
         content: JSON.stringify(makeReadyJudgeOutput())
-      }))
+        })
+      )
     };
     const engine = createHiddenEvaluationEngine({
       judge,
       promptSource
     });
 
-    await engine.evaluateEndedSession({
-      generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
-      transcript: makeTranscript()
-    });
+    await Effect.runPromise(
+      engine.evaluateEndedSession({
+        generatedSessionCase: makeGeneratedSessionCase("natural-conclusion"),
+        transcript: makeTranscript()
+      })
+    );
 
     const firstRequest = judge.createStructuredJsonCompletion.mock.calls[0]?.[0];
     expect(firstRequest?.messages[0]?.content).toBe("FALLBACK SYSTEM");
     expect(firstRequest?.messages[1]?.content).toContain("FALLBACK EVALUATION");
+  });
+
+  it("exposes prompt source failures as typed Effect failures", async () => {
+    const promptSource = createStubFailingHiddenEvaluationPromptSource({
+      failureMessage: "primary prompt source unavailable"
+    });
+
+    await expect(
+      Effect.runPromise(Effect.flip(promptSource.getPromptBundle()))
+    ).resolves.toBeInstanceOf(HiddenEvaluationPromptSourceError);
   });
 });
 

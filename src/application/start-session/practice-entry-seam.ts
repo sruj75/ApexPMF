@@ -1,17 +1,29 @@
-import { type EntryFailure } from "@/src/application/start-session/entry-failure";
 import {
-  createNonLiveLlmRuntimePolicy,
-  type NonLiveLlmRuntimePolicy
-} from "@/src/application/non-live-llm-policy";
-import { createSessionOrchestrator } from "@/src/application/end-session/session-orchestrator";
-import type { SessionOrchestrator } from "@/src/application/end-session/session-orchestrator";
+  classifyEntryFailure,
+  type EntryFailure
+} from "@/src/application/start-session/entry-failure";
+import {
+  degradableHiddenEvaluationCapabilityLayerFromEnv,
+  requiredPersonaGenerationCapabilityLayerFromEnv
+} from "@/src/application/llm-runtime/llm-runtime-layers";
+import {
+  SessionCaseNotFoundError,
+  type SessionOrchestratorError,
+  createSessionOrchestrator
+} from "@/src/application/end-session/session-orchestrator";
 import { createReportGenerationCoordinator } from "@/src/application/generate-report/report-generation-coordinator";
 import type { SessionEndReason } from "@/src/domain/session/session-lifecycle";
-import { startPracticeForLearner } from "@/src/application/start-session/start-practice";
 import {
-  getSupabaseLearnerEntryContext,
+  normalizeStartPracticeFailure,
+  defaultStartPracticeNonceLayer,
+  startPracticeForLearner
+} from "@/src/application/start-session/start-practice";
+import {
+  getSupabaseLearnerEntryContextEffect,
+  type SupabaseLearnerEntryContextError,
   type SupabaseLearnerEntryContextResult
 } from "@/src/infrastructure/supabase/learner-entry-context";
+import { Effect } from "effect";
 
 export type LearnerEntryContextResult =
   | {
@@ -41,11 +53,15 @@ export type StartPracticeSeamResult =
       failure: EntryFailure;
     };
 
-export async function getLearnerEntryContext(): Promise<LearnerEntryContextResult> {
-  return getSupabaseLearnerEntryContext();
+export function getLearnerEntryContextEffect(): Effect.Effect<
+  LearnerEntryContextResult,
+  SupabaseLearnerEntryContextError,
+  never
+> {
+  return getSupabaseLearnerEntryContextEffect();
 }
 
-export type LearnerSessionRuntimeResult =
+export type LearnerSessionRuntimeEffectResult =
   | {
       ok: false;
       reason: "unauthenticated";
@@ -55,48 +71,82 @@ export type LearnerSessionRuntimeResult =
       endSessionForLearner(input: {
         sessionId: string;
         reason: SessionEndReason;
-      }): ReturnType<SessionOrchestrator["endSessionForLearner"]>;
+      }): Effect.Effect<{
+        nextPath: string;
+        sessionStatus: "ended";
+        endedReason: SessionEndReason;
+        reportStatus: "not-requested" | "generating" | "ready" | "insufficient-evidence";
+      }, SessionOrchestratorError, never>;
       runReportGeneratingFlowForLearner(input: {
         sessionId: string;
-      }): ReturnType<SessionOrchestrator["runReportGeneratingFlowForLearner"]>;
+      }): Effect.Effect<
+        | {
+            reportStatus: "not-found";
+          }
+        | {
+            reportStatus: "ready" | "insufficient-evidence";
+            nextPath: string;
+          },
+        SessionOrchestratorError,
+        never
+      >;
     };
 
 /**
  * Learner-scoped Session Orchestrator wiring for end-session and report-generating flows.
  * Call sites use this instead of assembling repositories and coordinators directly.
  */
-export async function getLearnerSessionRuntime(): Promise<LearnerSessionRuntimeResult> {
-  const context = await getLearnerEntryContext();
-  if (!context.ok) {
-    return { ok: false, reason: "unauthenticated" };
-  }
-
-  const orchestrator = createSessionOrchestrator({
-    generatedSessionCaseRepository: context.generatedSessionCaseRepository,
-    reportGenerationCoordinator: createReportGenerationCoordinator()
-  });
-
-  const { learnerId } = context;
-
-  return {
-    ok: true,
-    endSessionForLearner({ sessionId, reason }) {
-      return orchestrator.endSessionForLearner({
-        learnerId,
-        sessionId,
-        reason
-      });
-    },
-    runReportGeneratingFlowForLearner({ sessionId }) {
-      return orchestrator.runReportGeneratingFlowForLearner({
-        learnerId,
-        sessionId
-      });
+export function getLearnerSessionRuntimeEffect(): Effect.Effect<
+  LearnerSessionRuntimeEffectResult,
+  SupabaseLearnerEntryContextError,
+  never
+> {
+  return Effect.gen(function* () {
+    const context = yield* getLearnerEntryContextEffect();
+    if (!context.ok) {
+      return { ok: false, reason: "unauthenticated" };
     }
-  };
+
+    const hiddenEvaluationLayer = degradableHiddenEvaluationCapabilityLayerFromEnv(
+      process.env
+    );
+    const reportGenerationCoordinator = createReportGenerationCoordinator();
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: context.generatedSessionCaseRepository,
+      reportGenerationCoordinator
+    });
+
+    const { learnerId } = context;
+
+    return {
+      ok: true as const,
+      endSessionForLearner({ sessionId, reason }) {
+        return orchestrator.endSessionForLearner({
+          learnerId,
+          sessionId,
+          reason
+        });
+      },
+      runReportGeneratingFlowForLearner({ sessionId }) {
+        return orchestrator
+          .runReportGeneratingFlowForLearner({ learnerId, sessionId })
+          .pipe(
+            Effect.provide(hiddenEvaluationLayer),
+            Effect.catchIf(
+              (error): error is SessionCaseNotFoundError =>
+                error instanceof SessionCaseNotFoundError,
+              () =>
+              Effect.succeed({
+                reportStatus: "not-found" as const
+              })
+            )
+          );
+      }
+    };
+  });
 }
 
-export async function startPracticeFromEntryContext(context: {
+export type StartPracticeEntryContext = {
   learnerId: string;
   idealCustomerProfileRepository: Extract<
     LearnerEntryContextResult,
@@ -106,28 +156,42 @@ export async function startPracticeFromEntryContext(context: {
     LearnerEntryContextResult,
     { ok: true }
   >["generatedSessionCaseRepository"];
-},
-input?: {
-  nonLiveLlmRuntimePolicy?: NonLiveLlmRuntimePolicy;
-}): Promise<StartPracticeSeamResult> {
-  const nonLiveLlmRuntimePolicy =
-    input?.nonLiveLlmRuntimePolicy ?? createNonLiveLlmRuntimePolicy();
+};
 
-  try {
-    const startedSession = await startPracticeForLearner(context.learnerId, {
-      idealCustomerProfileRepository: context.idealCustomerProfileRepository,
-      generatedSessionCaseRepository: context.generatedSessionCaseRepository,
-      personaGenerator: nonLiveLlmRuntimePolicy.composePersonaGenerator()
-    });
+export function startPracticeFromEntryContextEffect(
+  context: StartPracticeEntryContext
+): Effect.Effect<StartPracticeSeamResult, never, never> {
+  const personaLayer = requiredPersonaGenerationCapabilityLayerFromEnv(process.env);
+
+  return Effect.gen(function* () {
+    const result = yield* Effect.either(
+      startPracticeForLearner(context.learnerId, {
+        idealCustomerProfileRepository: context.idealCustomerProfileRepository,
+        generatedSessionCaseRepository: context.generatedSessionCaseRepository
+      }).pipe(
+        Effect.provide(defaultStartPracticeNonceLayer),
+        Effect.provide(personaLayer)
+      )
+    );
+
+    if (result._tag === "Left") {
+      const failure = classifyEntryFailure(
+        normalizeStartPracticeFailure(result.left)
+      );
+      yield* Effect.logWarning("start-practice.entry_failure", {
+        learnerId: context.learnerId,
+        category: failure.category,
+        details: failure.details
+      });
+      return {
+        ok: false,
+        failure
+      };
+    }
 
     return {
       ok: true,
-      sessionId: startedSession.sessionId
+      sessionId: result.right.sessionId
     };
-  } catch (cause) {
-    return {
-      ok: false,
-      failure: nonLiveLlmRuntimePolicy.mapStartSessionFailure(cause)
-    };
-  }
+  });
 }

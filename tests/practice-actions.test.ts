@@ -22,7 +22,7 @@ vi.mock("next/navigation", () => ({
   redirect
 }));
 
-vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
+vi.mock("@/src/application/start-session/practice-entry-web-adapter", () => ({
   getLearnerEntryContext,
   startPracticeFromEntryContext
 }));

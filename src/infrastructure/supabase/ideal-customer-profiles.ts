@@ -1,13 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import type {
   IdealCustomerProfile,
   IdealCustomerProfileInput
 } from "@/src/domain/persona/ideal-customer-profile";
-import type { IdealCustomerProfileRepository } from "@/src/domain/persona/ideal-customer-profile-repository";
 import {
-  formatParseErrorDetails,
-  SupabaseRowDecodeError
+  IdealCustomerProfileRepositoryDecodeError,
+  type IdealCustomerProfileRepositoryDecodeDetail,
+  type IdealCustomerProfileRepositoryDecodeOperation,
+  IdealCustomerProfileRepositoryNotFoundError,
+  IdealCustomerProfileRepositoryPersistenceError,
+  type IdealCustomerProfileRepository,
+  type IdealCustomerProfileRepositoryOperation
+} from "@/src/domain/persona/ideal-customer-profile-repository";
+import {
+  formatParseErrorDetails
 } from "./supabase-row-decode-error";
 
 const adapterName = "ideal_customer_profiles";
@@ -33,98 +40,110 @@ export function createSupabaseIdealCustomerProfileRepository(
   supabase: SupabaseClient
 ): IdealCustomerProfileRepository {
   return {
-    async listForLearner(learnerId) {
-      const { data, error } = await supabase
-        .from("ideal_customer_profiles")
-        .select(idealCustomerProfileColumns)
-        .eq("learner_id", learnerId)
-        .order("updated_at", { ascending: false });
+    listForLearner(learnerId) {
+      return Effect.gen(function* () {
+        const result = yield* queryIdealCustomerProfiles({
+          operation: "listForLearner",
+          run: () =>
+            supabase
+              .from("ideal_customer_profiles")
+              .select(idealCustomerProfileColumns)
+              .eq("learner_id", learnerId)
+              .order("updated_at", { ascending: false })
+        });
 
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return decodeRowsOrThrow(data ?? [], "listForLearner").map(
-        toIdealCustomerProfile
-      );
+        const rows = yield* decodeRows(result.data ?? [], "listForLearner");
+        return rows.map(toIdealCustomerProfile);
+      });
     },
 
-    async getActiveForLearner(learnerId) {
-      const { data, error } = await supabase
-        .from("ideal_customer_profiles")
-        .select(idealCustomerProfileColumns)
-        .eq("learner_id", learnerId)
-        .eq("is_active", true)
-        .maybeSingle();
+    getActiveForLearner(learnerId) {
+      return Effect.gen(function* () {
+        const result = yield* queryIdealCustomerProfiles({
+          operation: "getActiveForLearner",
+          run: () =>
+            supabase
+              .from("ideal_customer_profiles")
+              .select(idealCustomerProfileColumns)
+              .eq("learner_id", learnerId)
+              .eq("is_active", true)
+              .maybeSingle()
+        });
 
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      if (!data) {
-        return null;
-      }
-
-      return toIdealCustomerProfile(
-        decodeRowOrThrow(data, "getActiveForLearner")
-      );
-    },
-
-    async create(learnerId, input) {
-      const { data, error } = await supabase
-        .from("ideal_customer_profiles")
-        .insert(toInsertRow(learnerId, input))
-        .select(idealCustomerProfileColumns)
-        .single();
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return toIdealCustomerProfile(decodeRowOrThrow(data, "create"));
-    },
-
-    async update(learnerId, profileId, input) {
-      const { data, error } = await supabase
-        .from("ideal_customer_profiles")
-        .update({
-          name: input.name,
-          customer_description: input.customerDescription,
-          notes: input.notes
-        })
-        .eq("learner_id", learnerId)
-        .eq("id", profileId)
-        .select(idealCustomerProfileColumns)
-        .single();
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return toIdealCustomerProfile(decodeRowOrThrow(data, "update"));
-    },
-
-    async selectActive(_learnerId, profileId) {
-      const { error } = await supabase.rpc(
-        "select_active_ideal_customer_profile",
-        {
-          profile_id: profileId
+        if (!result.data) {
+          return null;
         }
-      );
 
-      if (error) {
-        throw new Error(error.message);
-      }
+        const row = yield* decodeRow(result.data, "getActiveForLearner");
+        return toIdealCustomerProfile(row);
+      });
     },
 
-    async clearActive() {
-      const { error } = await supabase.rpc(
-        "clear_active_ideal_customer_profile"
-      );
+    create(learnerId, input) {
+      return Effect.gen(function* () {
+        const result = yield* queryIdealCustomerProfiles({
+          operation: "create",
+          run: () =>
+            supabase
+              .from("ideal_customer_profiles")
+              .insert(toInsertRow(learnerId, input))
+              .select(idealCustomerProfileColumns)
+              .single()
+        });
 
-      if (error) {
-        throw new Error(error.message);
-      }
+        const row = yield* decodeRow(result.data, "create");
+        return toIdealCustomerProfile(row);
+      });
+    },
+
+    update(learnerId, profileId, input) {
+      return Effect.gen(function* () {
+        const result = yield* queryIdealCustomerProfiles({
+          operation: "update",
+          run: () =>
+            supabase
+              .from("ideal_customer_profiles")
+              .update({
+                name: input.name,
+                customer_description: input.customerDescription,
+                notes: input.notes
+              })
+              .eq("learner_id", learnerId)
+              .eq("id", profileId)
+              .select(idealCustomerProfileColumns)
+              .maybeSingle()
+        });
+
+        if (!result.data) {
+          return yield* Effect.fail(
+            new IdealCustomerProfileRepositoryNotFoundError({
+              learnerId,
+              profileId,
+              operation: "update"
+            })
+          );
+        }
+
+        const row = yield* decodeRow(result.data, "update");
+        return toIdealCustomerProfile(row);
+      });
+    },
+
+    selectActive(_learnerId, profileId) {
+      return queryIdealCustomerProfiles({
+        operation: "selectActive",
+        run: () =>
+          supabase.rpc("select_active_ideal_customer_profile", {
+            profile_id: profileId
+          })
+      }).pipe(Effect.asVoid);
+    },
+
+    clearActive() {
+      return queryIdealCustomerProfiles({
+        operation: "clearActive",
+        run: () => supabase.rpc("clear_active_ideal_customer_profile")
+      }).pipe(Effect.asVoid);
     }
   };
 }
@@ -138,30 +157,76 @@ function toInsertRow(learnerId: string, input: IdealCustomerProfileInput) {
   };
 }
 
-function decodeRowsOrThrow(
-  rows: unknown[],
-  operation: "listForLearner"
-): IdealCustomerProfileRow[] {
-  return rows.map((row, index) => decodeRowOrThrow(row, operation, index));
+function queryIdealCustomerProfiles<T>(input: {
+  operation: IdealCustomerProfileRepositoryOperation;
+  run: () => PromiseLike<{ data: T; error: { message: string } | null }>;
+}): Effect.Effect<
+  { data: T; error: { message: string } | null },
+  IdealCustomerProfileRepositoryPersistenceError,
+  never
+> {
+  return Effect.tryPromise({
+    try: input.run,
+    catch: (cause) =>
+      new IdealCustomerProfileRepositoryPersistenceError({
+        operation: input.operation,
+        cause
+      })
+  }).pipe(
+    Effect.flatMap((result) =>
+      result.error
+        ? Effect.fail(
+            new IdealCustomerProfileRepositoryPersistenceError({
+              operation: input.operation,
+              cause: new Error(result.error.message)
+            })
+          )
+        : Effect.succeed(result)
+    )
+  );
 }
 
-function decodeRowOrThrow(
-  row: unknown,
-  operation: "listForLearner" | "getActiveForLearner" | "create" | "update",
-  rowIndex?: number
-): IdealCustomerProfileRow {
-  const decoded = Schema.decodeUnknownEither(IdealCustomerProfileRowSchema)(row);
+function decodeRows(
+  rows: unknown[],
+  operation: "listForLearner"
+): Effect.Effect<IdealCustomerProfileRow[], IdealCustomerProfileRepositoryDecodeError> {
+  return Effect.forEach(rows, (row, index) => decodeRow(row, operation, index));
+}
 
+function decodeRow(
+  row: unknown,
+  operation: IdealCustomerProfileRepositoryDecodeOperation,
+  rowIndex?: number
+): Effect.Effect<IdealCustomerProfileRow, IdealCustomerProfileRepositoryDecodeError> {
+  const decoded = Schema.decodeUnknownEither(IdealCustomerProfileRowSchema)(row);
   if (decoded._tag === "Left") {
-    throw new SupabaseRowDecodeError({
-      adapter: adapterName,
-      operation,
-      rowIndex,
-      details: formatParseErrorDetails(decoded.left)
-    });
+    return Effect.fail(
+      new IdealCustomerProfileRepositoryDecodeError({
+        operation,
+        cause: decodeDetail({
+          operation,
+          rowIndex,
+          details: formatParseErrorDetails(decoded.left)
+        })
+      })
+    );
   }
 
-  return decoded.right;
+  return Effect.succeed(decoded.right);
+}
+
+function decodeDetail(input: {
+  operation: IdealCustomerProfileRepositoryDecodeOperation;
+  rowIndex?: number;
+  details: readonly string[];
+}): IdealCustomerProfileRepositoryDecodeDetail {
+  return {
+    _tag: "IdealCustomerProfileRepositoryDecodeDetail",
+    adapter: adapterName,
+    operation: input.operation,
+    ...(typeof input.rowIndex === "number" ? { rowIndex: input.rowIndex } : {}),
+    details: input.details
+  };
 }
 
 function toIdealCustomerProfile(row: IdealCustomerProfileRow): IdealCustomerProfile {

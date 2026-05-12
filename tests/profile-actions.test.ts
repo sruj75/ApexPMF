@@ -7,13 +7,17 @@ import {
 const {
   redirect,
   revalidatePath,
-  getLearnerEntryContext
+  getLearnerEntryContext,
+  createIdealCustomerProfileForLearner,
+  clearActiveIdealCustomerProfileForLearner
 } = vi.hoisted(() => ({
   redirect: vi.fn((location: string) => {
     throw new Error(`REDIRECT:${location}`);
   }),
   revalidatePath: vi.fn(),
-  getLearnerEntryContext: vi.fn()
+  getLearnerEntryContext: vi.fn(),
+  createIdealCustomerProfileForLearner: vi.fn(),
+  clearActiveIdealCustomerProfileForLearner: vi.fn()
 }));
 
 vi.mock("next/navigation", () => ({
@@ -24,17 +28,20 @@ vi.mock("next/cache", () => ({
   revalidatePath
 }));
 
-vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
-  getLearnerEntryContext
-}));
+vi.mock("@/src/application/start-session/practice-entry-web-adapter", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("@/src/application/start-session/practice-entry-web-adapter")
+  >();
+  return {
+    ...actual,
+    getLearnerEntryContext,
+    createIdealCustomerProfileForLearner,
+    clearActiveIdealCustomerProfileForLearner
+  };
+});
 
 describe("Profile Settings actions", () => {
-  const repository = {
-    create: vi.fn(),
-    update: vi.fn(),
-    selectActive: vi.fn(),
-    clearActive: vi.fn()
-  };
+  const repository = {};
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -44,8 +51,8 @@ describe("Profile Settings actions", () => {
       idealCustomerProfileRepository: repository,
       generatedSessionCaseRepository: {}
     });
-    repository.create.mockResolvedValue(undefined);
-    repository.clearActive.mockResolvedValue(undefined);
+    createIdealCustomerProfileForLearner.mockResolvedValue(undefined);
+    clearActiveIdealCustomerProfileForLearner.mockResolvedValue(undefined);
   });
 
   it("creates an Ideal Customer Profile and revalidates /profile", async () => {
@@ -60,11 +67,15 @@ describe("Profile Settings actions", () => {
     await expect(createIdealCustomerProfileAction(formData)).resolves.toBe(
       undefined
     );
-    expect(repository.create).toHaveBeenCalledWith("learner-1", {
-      name: "Finance operators",
-      customerDescription: "Controllers at growing SaaS companies",
-      notes: "Probe budget owner workarounds"
-    });
+    expect(createIdealCustomerProfileForLearner).toHaveBeenCalledWith(
+      "learner-1",
+      repository,
+      {
+        name: "Finance operators",
+        customerDescription: "Controllers at growing SaaS companies",
+        notes: "Probe budget owner workarounds"
+      }
+    );
     expect(revalidatePath).toHaveBeenCalledWith("/profile");
   });
 
@@ -77,7 +88,7 @@ describe("Profile Settings actions", () => {
     await expect(createIdealCustomerProfileAction(formData)).rejects.toThrow(
       "REDIRECT:/profile?error=Name+is+required."
     );
-    expect(repository.create).not.toHaveBeenCalled();
+    expect(createIdealCustomerProfileForLearner).not.toHaveBeenCalled();
   });
 
   it("clears active profile and revalidates /profile", async () => {
@@ -85,7 +96,10 @@ describe("Profile Settings actions", () => {
       clearActiveIdealCustomerProfileAction(new FormData())
     ).resolves.toBeUndefined();
 
-    expect(repository.clearActive).toHaveBeenCalledWith("learner-1");
+    expect(clearActiveIdealCustomerProfileForLearner).toHaveBeenCalledWith(
+      "learner-1",
+      repository
+    );
     expect(revalidatePath).toHaveBeenCalledWith("/profile");
   });
 
@@ -98,6 +112,6 @@ describe("Profile Settings actions", () => {
     await expect(
       clearActiveIdealCustomerProfileAction(new FormData())
     ).rejects.toThrow("REDIRECT:/login");
-    expect(repository.clearActive).not.toHaveBeenCalled();
+    expect(clearActiveIdealCustomerProfileForLearner).not.toHaveBeenCalled();
   });
 });

@@ -1,12 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { makeIdealCustomerProfile } from "./fixtures/ideal-customer-profile";
-import { startPracticeForLearner } from "../src/application/start-session/start-practice";
+import {
+  StartPracticeNonce,
+  startPracticeForLearner
+} from "../src/application/start-session/start-practice";
 import { createInMemoryIdealCustomerProfileRepository } from "../src/domain/persona/ideal-customer-profile-repository";
 import type {
   PersonaGenerationInput,
   PersonaGenerator
 } from "../src/domain/persona/persona-generation";
 import { createInMemoryGeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
+import { PersonaGenerationCapability } from "../src/application/llm-runtime/llm-runtime-layers";
+import { Effect, Layer } from "effect";
+
+const provideStartPracticeServices = (
+  generator: PersonaGenerator,
+  nonce: string
+) =>
+  Effect.provide(
+    Layer.mergeAll(
+      Layer.succeed(PersonaGenerationCapability, generator),
+      Layer.succeed(StartPracticeNonce, {
+        create: () => nonce
+      })
+    )
+  );
 
 const learnerId = "learner-1";
 
@@ -15,12 +33,12 @@ describe("Start Practice", () => {
     const generatedSessionCases = createInMemoryGeneratedSessionCaseRepository();
     const personaGenerator = createRecordingPersonaGenerator();
 
-    const started = await startPracticeForLearner(learnerId, {
-      idealCustomerProfileRepository: createInMemoryIdealCustomerProfileRepository(),
-      generatedSessionCaseRepository: generatedSessionCases,
-      personaGenerator,
-      createNonce: () => "nonce-1"
-    });
+    const started = await Effect.runPromise(
+      startPracticeForLearner(learnerId, {
+        idealCustomerProfileRepository: createInMemoryIdealCustomerProfileRepository(),
+        generatedSessionCaseRepository: generatedSessionCases
+      }).pipe(provideStartPracticeServices(personaGenerator, "nonce-1"))
+    );
 
     expect(started).toEqual({
       sessionId: "session-case-1",
@@ -40,9 +58,8 @@ describe("Start Practice", () => {
       }
     ]);
 
-    const persisted = await generatedSessionCases.getForLearner(
-      learnerId,
-      started.sessionId
+    const persisted = await Effect.runPromise(
+      generatedSessionCases.getForLearner(learnerId, started.sessionId)
     );
     expect(persisted).toMatchObject({
       id: "session-case-1",
@@ -83,13 +100,13 @@ describe("Start Practice", () => {
     const generatedSessionCases = createInMemoryGeneratedSessionCaseRepository();
     const personaGenerator = createRecordingPersonaGenerator();
 
-    const started = await startPracticeForLearner(learnerId, {
-      idealCustomerProfileRepository:
-        createInMemoryIdealCustomerProfileRepository([profile]),
-      generatedSessionCaseRepository: generatedSessionCases,
-      personaGenerator,
-      createNonce: () => "nonce-profile"
-    });
+    const started = await Effect.runPromise(
+      startPracticeForLearner(learnerId, {
+        idealCustomerProfileRepository:
+          createInMemoryIdealCustomerProfileRepository([profile]),
+        generatedSessionCaseRepository: generatedSessionCases
+      }).pipe(provideStartPracticeServices(personaGenerator, "nonce-profile"))
+    );
 
     expect(started.sessionSourceLabel).toBe("Clinical operators");
     expect(personaGenerator.inputs[0]?.sessionSource).toEqual({
@@ -102,7 +119,9 @@ describe("Start Practice", () => {
       }
     });
     await expect(
-      generatedSessionCases.getForLearner(learnerId, started.sessionId)
+      Effect.runPromise(
+        generatedSessionCases.getForLearner(learnerId, started.sessionId)
+      )
     ).resolves.toMatchObject({
       sessionSource: {
         kind: "active-ideal-customer-profile",
@@ -119,13 +138,13 @@ describe("Start Practice", () => {
   it("uses the Broad Practice Pool when no Active Ideal Customer Profile exists", async () => {
     const personaGenerator = createRecordingPersonaGenerator();
 
-    const started = await startPracticeForLearner(learnerId, {
-      idealCustomerProfileRepository: createInMemoryIdealCustomerProfileRepository(),
-      generatedSessionCaseRepository:
-        createInMemoryGeneratedSessionCaseRepository(),
-      personaGenerator,
-      createNonce: () => "nonce-broad"
-    });
+    const started = await Effect.runPromise(
+      startPracticeForLearner(learnerId, {
+        idealCustomerProfileRepository: createInMemoryIdealCustomerProfileRepository(),
+        generatedSessionCaseRepository:
+          createInMemoryGeneratedSessionCaseRepository()
+      }).pipe(provideStartPracticeServices(personaGenerator, "nonce-broad"))
+    );
 
     expect(started.sessionSourceLabel).toBe("Broad Practice Pool");
     expect(personaGenerator.inputs[0]?.sessionSource.kind).toBe(
@@ -143,23 +162,38 @@ describe("Start Practice", () => {
         createInMemoryIdealCustomerProfileRepository([
           makeIdealCustomerProfile({ isActive: true })
         ]),
-      generatedSessionCaseRepository: generatedSessionCases,
-      personaGenerator,
-      createNonce: () => nonces.shift() ?? "unexpected-nonce"
+      generatedSessionCaseRepository: generatedSessionCases
     };
+    const nonceLayer = Layer.succeed(StartPracticeNonce, {
+      create: () => nonces.shift() ?? "unexpected-nonce"
+    });
 
-    const first = await startPracticeForLearner(learnerId, deps);
-    const second = await startPracticeForLearner(learnerId, deps);
+    const first = await Effect.runPromise(
+      startPracticeForLearner(learnerId, deps).pipe(
+        Effect.provide(nonceLayer),
+        Effect.provide(Layer.succeed(PersonaGenerationCapability, personaGenerator))
+      )
+    );
+    const second = await Effect.runPromise(
+      startPracticeForLearner(learnerId, deps).pipe(
+        Effect.provide(nonceLayer),
+        Effect.provide(Layer.succeed(PersonaGenerationCapability, personaGenerator))
+      )
+    );
 
     expect(first.sessionId).not.toBe(second.sessionId);
     expect(personaGenerator.inputs.map((input) => input.generationNonce)).toEqual(
       ["nonce-a", "nonce-b"]
     );
     await expect(
-      generatedSessionCases.getForLearner(learnerId, first.sessionId)
+      Effect.runPromise(
+        generatedSessionCases.getForLearner(learnerId, first.sessionId)
+      )
     ).resolves.toMatchObject({ generationNonce: "nonce-a" });
     await expect(
-      generatedSessionCases.getForLearner(learnerId, second.sessionId)
+      Effect.runPromise(
+        generatedSessionCases.getForLearner(learnerId, second.sessionId)
+      )
     ).resolves.toMatchObject({ generationNonce: "nonce-b" });
   });
 });
@@ -171,10 +205,9 @@ function createRecordingPersonaGenerator(): PersonaGenerator & {
 
   return {
     inputs,
-    async generateSessionCase(input) {
+    generateSessionCase(input) {
       inputs.push(input);
-
-      return {
+      return Effect.succeed({
         openingContext:
           "You are speaking with a finance operator who recently tried to improve month-end close.",
         customerPersona: {
@@ -228,7 +261,7 @@ function createRecordingPersonaGenerator(): PersonaGenerator & {
           provider: "test",
           model: "fake-persona-generator"
         }
-      };
+      });
     }
   };
 }

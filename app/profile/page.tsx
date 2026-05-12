@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getLearnerEntryContext } from "@/src/application/start-session/practice-entry-seam";
-import { presentSessionSourceForUi } from "@/src/application/start-session/session-source-presentation";
-import { resolveNextSessionSource } from "@/src/domain/persona/session-source";
+import { getProfilePageData } from "@/src/application/start-session/practice-entry-web-adapter";
 import { startPracticeAction } from "../practice/actions";
 import { StartPracticeForm } from "../practice/start-practice-form";
 import {
@@ -22,21 +20,16 @@ type ProfilePageProps = {
 };
 
 export default async function ProfilePage({ searchParams }: ProfilePageProps) {
-  const context = await getLearnerEntryContext();
-  if (!context.ok) {
+  const [pageData, params] = await Promise.all([
+    getProfilePageData(),
+    searchParams
+  ]);
+
+  if (!pageData.ok) {
     redirect("/login");
   }
 
-  const repository = context.idealCustomerProfileRepository;
-  const [profiles, sessionSource, params] = await Promise.all([
-    repository.listForLearner(context.learnerId),
-    resolveNextSessionSource(context.learnerId, repository),
-    searchParams
-  ]);
   const error = Array.isArray(params?.error) ? params.error[0] : params?.error;
-  const presentedSessionSource = presentSessionSourceForUi(sessionSource);
-  const canClearActiveSource =
-    sessionSource.kind === "active-ideal-customer-profile";
 
   return (
     <div className="dashboard-shell">
@@ -60,9 +53,9 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
       </aside>
 
       <ProfileSettingsView
-        profiles={profiles}
-        presentedSessionSource={presentedSessionSource}
-        canClearActiveSource={canClearActiveSource}
+        profiles={pageData.profiles}
+        presentedSessionSource={pageData.presentedSessionSource}
+        canClearActiveSource={pageData.canClearActiveSource}
         actions={{
           createIdealCustomerProfile: createIdealCustomerProfileAction,
           updateIdealCustomerProfile: updateIdealCustomerProfileAction,

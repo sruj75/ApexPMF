@@ -3,17 +3,22 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
+  classifyEntryFailure,
   createEntryFailure,
   mapProfileFailureToRedirectPath
 } from "@/src/application/start-session/entry-failure";
 import {
-  getLearnerEntryContext
-} from "@/src/application/start-session/practice-entry-seam";
-import { parseIdealCustomerProfileInput } from "@/src/domain/persona/ideal-customer-profile";
+  getLearnerEntryContext,
+  parseProfileInput,
+  createIdealCustomerProfileForLearner,
+  updateIdealCustomerProfileForLearner,
+  selectActiveIdealCustomerProfileForLearner,
+  clearActiveIdealCustomerProfileForLearner
+} from "@/src/application/start-session/practice-entry-web-adapter";
 
 export async function createIdealCustomerProfileAction(formData: FormData) {
   const { learnerId, repository } = await getProfileSettingsContext();
-  const parsed = parseIdealCustomerProfileInput(inputFromFormData(formData));
+  const parsed = parseProfileInput(inputFromFormData(formData));
 
   if (!parsed.ok) {
     redirectWithEntryFailure(
@@ -24,14 +29,18 @@ export async function createIdealCustomerProfileAction(formData: FormData) {
     );
   }
 
-  await repository.create(learnerId, parsed.value);
+  try {
+    await createIdealCustomerProfileForLearner(learnerId, repository, parsed.value);
+  } catch (cause) {
+    redirectWithEntryFailure(classifyEntryFailure(cause));
+  }
   revalidatePath("/profile");
 }
 
 export async function updateIdealCustomerProfileAction(formData: FormData) {
   const profileId = stringFromFormData(formData, "profileId");
   const { learnerId, repository } = await getProfileSettingsContext();
-  const parsed = parseIdealCustomerProfileInput(inputFromFormData(formData));
+  const parsed = parseProfileInput(inputFromFormData(formData));
 
   if (!profileId) {
     redirectWithEntryFailure(
@@ -51,7 +60,11 @@ export async function updateIdealCustomerProfileAction(formData: FormData) {
     );
   }
 
-  await repository.update(learnerId, profileId, parsed.value);
+  try {
+    await updateIdealCustomerProfileForLearner(learnerId, repository, profileId, parsed.value);
+  } catch (cause) {
+    redirectWithEntryFailure(classifyEntryFailure(cause));
+  }
   revalidatePath("/profile");
 }
 
@@ -68,14 +81,22 @@ export async function selectActiveIdealCustomerProfileAction(formData: FormData)
     );
   }
 
-  await repository.selectActive(learnerId, profileId);
+  try {
+    await selectActiveIdealCustomerProfileForLearner(learnerId, repository, profileId);
+  } catch (cause) {
+    redirectWithEntryFailure(classifyEntryFailure(cause));
+  }
   revalidatePath("/profile");
 }
 
 export async function clearActiveIdealCustomerProfileAction(_formData: FormData) {
   void _formData;
   const { learnerId, repository } = await getProfileSettingsContext();
-  await repository.clearActive(learnerId);
+  try {
+    await clearActiveIdealCustomerProfileForLearner(learnerId, repository);
+  } catch (cause) {
+    redirectWithEntryFailure(classifyEntryFailure(cause));
+  }
   revalidatePath("/profile");
 }
 

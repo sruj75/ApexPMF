@@ -1,9 +1,30 @@
 import type { IdealCustomerProfileRepository } from "@/src/domain/persona/ideal-customer-profile-repository";
-import type { PersonaGenerator } from "@/src/domain/persona/persona-generation";
-import { resolveNextSessionSource } from "@/src/domain/persona/session-source";
+import type {
+  PersonaGenerationError
+} from "@/src/domain/persona/persona-generation";
+import {
+  resolveNextSessionSource,
+  type SessionSourceResolutionError
+} from "@/src/domain/persona/session-source";
 import type { StartedSession } from "@/src/domain/session/generated-session-case";
 import { toStartedSession } from "@/src/domain/session/generated-session-case";
-import type { GeneratedSessionCaseRepository } from "@/src/domain/session/generated-session-case-repository";
+import type {
+  GeneratedSessionCaseRepository,
+  GeneratedSessionCaseRepositoryError
+} from "@/src/domain/session/generated-session-case-repository";
+import { PersonaGenerationCapability } from "@/src/application/llm-runtime/llm-runtime-layers";
+import { Context, Data, Effect, Layer } from "effect";
+
+export class StartPracticeNonce extends Context.Tag("StartPracticeNonce")<
+  StartPracticeNonce,
+  {
+    create(): string;
+  }
+>() {}
+
+export const defaultStartPracticeNonceLayer = Layer.succeed(StartPracticeNonce, {
+  create: () => globalThis.crypto.randomUUID()
+});
 
 export type StartPracticeDependencies = {
   idealCustomerProfileRepository: Pick<
@@ -11,31 +32,83 @@ export type StartPracticeDependencies = {
     "getActiveForLearner"
   >;
   generatedSessionCaseRepository: GeneratedSessionCaseRepository;
-  personaGenerator: PersonaGenerator;
-  createNonce?: () => string;
 };
 
-export async function startPracticeForLearner(
+export class StartPracticeSessionSourceError extends Data.TaggedError(
+  "StartPracticeSessionSourceError"
+)<{
+  learnerId: string;
+  cause: SessionSourceResolutionError;
+}> {}
+
+export class StartPracticePersonaGenerationError extends Data.TaggedError(
+  "StartPracticePersonaGenerationError"
+)<{
+  learnerId: string;
+  cause: PersonaGenerationError;
+}> {}
+
+export type StartPracticeError =
+  | StartPracticeSessionSourceError
+  | StartPracticePersonaGenerationError
+  | GeneratedSessionCaseRepositoryError;
+
+export function normalizeStartPracticeFailure(cause: unknown): unknown {
+  if (
+    cause instanceof StartPracticePersonaGenerationError ||
+    cause instanceof StartPracticeSessionSourceError
+  ) {
+    return cause.cause;
+  }
+
+  return cause;
+}
+
+export function startPracticeForLearner(
   learnerId: string,
   dependencies: StartPracticeDependencies
-): Promise<StartedSession> {
-  const generationNonce =
-    dependencies.createNonce?.() ?? globalThis.crypto.randomUUID();
-  const sessionSource = await resolveNextSessionSource(
-    learnerId,
-    dependencies.idealCustomerProfileRepository
-  );
-  const generatedDraft =
-    await dependencies.personaGenerator.generateSessionCase({
-      sessionSource,
-      generationNonce
-    });
-  const generatedSessionCase =
-    await dependencies.generatedSessionCaseRepository.create(learnerId, {
-      ...generatedDraft,
-      sessionSource,
-      generationNonce
-    });
+): Effect.Effect<
+  StartedSession,
+  StartPracticeError,
+  PersonaGenerationCapability | StartPracticeNonce
+> {
+  return Effect.gen(function* () {
+    const personaGenerator = yield* PersonaGenerationCapability;
+    const nonce = yield* StartPracticeNonce;
+    const generationNonce = nonce.create();
+    const sessionSource = yield* resolveNextSessionSource(
+      learnerId,
+      dependencies.idealCustomerProfileRepository
+    ).pipe(
+      Effect.mapError(
+        (cause) =>
+          new StartPracticeSessionSourceError({
+            learnerId,
+            cause
+          })
+      )
+    );
+    const generatedDraft = yield* personaGenerator
+      .generateSessionCase({
+        sessionSource,
+        generationNonce
+      })
+      .pipe(
+        Effect.mapError(
+          (cause) =>
+            new StartPracticePersonaGenerationError({
+              learnerId,
+              cause
+            })
+        )
+      );
+    const generatedSessionCase =
+      yield* dependencies.generatedSessionCaseRepository.create(learnerId, {
+        ...generatedDraft,
+        sessionSource,
+        generationNonce
+      });
 
-  return toStartedSession(generatedSessionCase);
+    return toStartedSession(generatedSessionCase);
+  });
 }

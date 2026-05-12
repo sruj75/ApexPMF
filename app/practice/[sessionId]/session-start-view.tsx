@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { StartedSession } from "@/src/domain/session/generated-session-case";
+import type { StartedSession } from "@/src/application/practice-route/practice-route-decision";
 import { endSessionAction } from "./actions";
 
 type SessionStartViewProps = {

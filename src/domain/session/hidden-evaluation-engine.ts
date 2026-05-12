@@ -3,6 +3,7 @@ import {
   hiddenEvaluationResponseJsonSchema,
   hiddenEvaluationResponseSchemaName
 } from "./hidden-evaluation-contract";
+import { Effect } from "effect";
 import type { HiddenEvaluationJudge } from "./hidden-evaluation-judge";
 import {
   createPinnedHiddenEvaluationPromptSource,
@@ -31,7 +32,7 @@ export type HiddenEvaluationEngine = {
   evaluateEndedSession(input: {
     generatedSessionCase: GeneratedSessionCase;
     transcript: SessionTranscriptTurn[];
-  }): Promise<HiddenEvaluationResult>;
+  }): Effect.Effect<HiddenEvaluationResult, never, never>;
 };
 
 export function createHiddenEvaluationEngine(input: {
@@ -42,85 +43,91 @@ export function createHiddenEvaluationEngine(input: {
     input.promptSource ?? createPinnedHiddenEvaluationPromptSource();
 
   return {
-    async evaluateEndedSession({ generatedSessionCase, transcript }) {
-      if (generatedSessionCase.sessionLifecycle.sessionStatus !== "ended") {
+    evaluateEndedSession({ generatedSessionCase, transcript }) {
+      return Effect.gen(function* () {
+        if (generatedSessionCase.sessionLifecycle.sessionStatus !== "ended") {
+          return {
+            status: "insufficient-evidence",
+            reason: "not-ended"
+          };
+        }
+
+        if (generatedSessionCase.sessionLifecycle.endedReason === "user-quit") {
+          return {
+            status: "insufficient-evidence",
+            reason: "user-quit"
+          };
+        }
+
+        if (transcript.length < minimumTranscriptTurns) {
+          return {
+            status: "insufficient-evidence",
+            reason: "transcript-too-short"
+          };
+        }
+
+        const hasLearnerTurn = transcript.some((turn) => turn.speaker === "learner");
+        const hasPersonaTurn = transcript.some((turn) => turn.speaker === "persona");
+        if (!hasLearnerTurn || !hasPersonaTurn) {
+          return {
+            status: "insufficient-evidence",
+            reason: "transcript-missing-speakers"
+          };
+        }
+
+        const completion = yield* requestJudgeCompletion({
+          judge: input.judge,
+          promptSource,
+          generatedSessionCase,
+          transcript
+        });
+
+        if (completion.ok) {
+          return completion.value;
+        }
+
+        if (completion.reason === "provider-failure") {
+          return {
+            status: "insufficient-evidence",
+            reason: "provider-failure"
+          };
+        }
+
+        yield* Effect.logDebug("hidden-evaluation.repair_attempt", {
+          sessionCaseId: generatedSessionCase.id,
+          firstFailureReason: completion.reason
+        });
+        const repairedCompletion = yield* requestJudgeCompletion({
+          judge: input.judge,
+          promptSource,
+          generatedSessionCase,
+          transcript,
+          repairContent: completion.content
+        });
+
+        if (repairedCompletion.ok) {
+          return repairedCompletion.value;
+        }
+
         return {
           status: "insufficient-evidence",
-          reason: "not-ended"
+          reason:
+            repairedCompletion.reason === "provider-failure"
+              ? "provider-failure"
+              : "invalid-judge-output"
         };
-      }
-
-      if (generatedSessionCase.sessionLifecycle.endedReason === "user-quit") {
-        return {
-          status: "insufficient-evidence",
-          reason: "user-quit"
-        };
-      }
-
-      if (transcript.length < minimumTranscriptTurns) {
-        return {
-          status: "insufficient-evidence",
-          reason: "transcript-too-short"
-        };
-      }
-
-      const hasLearnerTurn = transcript.some((turn) => turn.speaker === "learner");
-      const hasPersonaTurn = transcript.some((turn) => turn.speaker === "persona");
-      if (!hasLearnerTurn || !hasPersonaTurn) {
-        return {
-          status: "insufficient-evidence",
-          reason: "transcript-missing-speakers"
-        };
-      }
-
-      const completion = await requestJudgeCompletion({
-        judge: input.judge,
-        promptSource,
-        generatedSessionCase,
-        transcript
       });
-
-      if (completion.ok) {
-        return completion.value;
-      }
-
-      if (completion.reason === "provider-failure") {
-        return {
-          status: "insufficient-evidence",
-          reason: "provider-failure"
-        };
-      }
-
-      const repairedCompletion = await requestJudgeCompletion({
-        judge: input.judge,
-        promptSource,
-        generatedSessionCase,
-        transcript,
-        repairContent: completion.content
-      });
-
-      if (repairedCompletion.ok) {
-        return repairedCompletion.value;
-      }
-
-      return {
-        status: "insufficient-evidence",
-        reason:
-          repairedCompletion.reason === "provider-failure"
-            ? "provider-failure"
-            : "invalid-judge-output"
-      };
     }
   };
 }
 
-async function requestJudgeCompletion(input: {
+function requestJudgeCompletion(input: {
   judge: HiddenEvaluationJudge;
   promptSource: HiddenEvaluationPromptSource;
   generatedSessionCase: GeneratedSessionCase;
   transcript: SessionTranscriptTurn[];
   repairContent?: string;
-}): Promise<
+}): Effect.Effect<
   | {
       ok: true;
       value: HiddenEvaluationResult;
@@ -131,17 +138,22 @@ async function requestJudgeCompletion(input: {
       content?: string;
     }
 > {
-  try {
-    const completion = await input.judge.createStructuredJsonCompletion({
-      responseSchemaName: hiddenEvaluationResponseSchemaName,
-      responseJsonSchema: hiddenEvaluationResponseJsonSchema,
-      messages: await buildMessages(input)
-    });
+  return Effect.gen(function* () {
+    const messages = yield* buildMessages(input).pipe(
+      Effect.catchAll(() => Effect.fail("provider-failure" as const))
+    );
+    const completion = yield* input.judge
+      .createStructuredJsonCompletion({
+        responseSchemaName: hiddenEvaluationResponseSchemaName,
+        responseJsonSchema: hiddenEvaluationResponseJsonSchema,
+        messages
+      })
+      .pipe(Effect.catchAll(() => Effect.fail("provider-failure" as const)));
     const decoded = decodeHiddenEvaluationResponse(completion.content);
     if (!decoded.ok) {
       return {
-        ok: false,
-        reason: "invalid-judge-output",
+        ok: false as const,
+        reason: "invalid-judge-output" as const,
         content: completion.content
       };
     }
@@ -154,88 +166,93 @@ async function requestJudgeCompletion(input: {
         )
       ) {
         return {
-          ok: false,
-          reason: "invalid-judge-output",
+          ok: false as const,
+          reason: "invalid-judge-output" as const,
           content: completion.content
         };
       }
       return {
-        ok: true,
+        ok: true as const,
         value: {
-          status: "ready",
+          status: "ready" as const,
           evaluation: decoded.value.evaluation
         }
       };
     }
 
     return {
-      ok: true,
+      ok: true as const,
       value: {
-        status: "insufficient-evidence",
+        status: "insufficient-evidence" as const,
         reason: decoded.value.reason
       }
     };
-  } catch {
-    return {
-      ok: false,
-      reason: "provider-failure"
-    };
-  }
+  }).pipe(
+    Effect.catchAll((reason) =>
+      Effect.succeed({
+        ok: false as const,
+        reason
+      })
+    )
+  );
 }
 
-async function buildMessages(input: {
+function buildMessages(input: {
   promptSource: HiddenEvaluationPromptSource;
   generatedSessionCase: GeneratedSessionCase;
   transcript: SessionTranscriptTurn[];
   repairContent?: string;
 }) {
-  const promptBundle = await input.promptSource.getPromptBundle();
-  const sessionCaseJson = JSON.stringify(input.generatedSessionCase, null, 2);
-  const transcriptJson = JSON.stringify(input.transcript, null, 2);
+  return input.promptSource.getPromptBundle().pipe(
+    Effect.map((promptBundle) => {
+      const sessionCaseJson = JSON.stringify(input.generatedSessionCase, null, 2);
+      const transcriptJson = JSON.stringify(input.transcript, null, 2);
 
-  const baseUserPrompt = [
-    promptBundle.evaluationInstruction,
-    "",
-    "<generated_session_case_json>",
-    sessionCaseJson,
-    "</generated_session_case_json>",
-    "",
-    "<session_transcript_json>",
-    transcriptJson,
-    "</session_transcript_json>"
-  ].join("\n");
+      const baseUserPrompt = [
+        promptBundle.evaluationInstruction,
+        "",
+        "<generated_session_case_json>",
+        sessionCaseJson,
+        "</generated_session_case_json>",
+        "",
+        "<session_transcript_json>",
+        transcriptJson,
+        "</session_transcript_json>"
+      ].join("\n");
 
-  if (!input.repairContent) {
-    return [
-      {
-        role: "system" as const,
-        content: promptBundle.systemPrompt
-      },
-      {
-        role: "user" as const,
-        content: baseUserPrompt
+      if (!input.repairContent) {
+        return [
+          {
+            role: "system" as const,
+            content: promptBundle.systemPrompt
+          },
+          {
+            role: "user" as const,
+            content: baseUserPrompt
+          }
+        ];
       }
-    ];
-  }
 
-  return [
-    {
-      role: "system" as const,
-      content: promptBundle.systemPrompt
-    },
-    {
-      role: "user" as const,
-      content: baseUserPrompt
-    },
-    {
-      role: "assistant" as const,
-      content: input.repairContent
-    },
-    {
-      role: "user" as const,
-      content: promptBundle.repairInstruction
-    }
-  ];
+      return [
+        {
+          role: "system" as const,
+          content: promptBundle.systemPrompt
+        },
+        {
+          role: "user" as const,
+          content: baseUserPrompt
+        },
+        {
+          role: "assistant" as const,
+          content: input.repairContent
+        },
+        {
+          role: "user" as const,
+          content: promptBundle.repairInstruction
+        }
+      ];
+    })
+  );
 }
 
 function allSequencesExist(

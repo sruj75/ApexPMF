@@ -7,6 +7,7 @@ import {
   type IdealCustomerProfileRepository
 } from "../src/domain/persona/ideal-customer-profile-repository";
 import { makeIdealCustomerProfile } from "./fixtures/ideal-customer-profile";
+import { Effect } from "effect";
 
 const learnerId = "learner-1";
 
@@ -55,26 +56,26 @@ describe("Ideal Customer Profiles", () => {
   it("creates, edits, lists, and switches one Active Ideal Customer Profile", async () => {
     const repository = createInMemoryIdealCustomerProfileRepository();
 
-    const first = await repository.create(learnerId, {
+    const first = await Effect.runPromise(repository.create(learnerId, {
       name: "Finance teams",
       customerDescription: "Controllers at SaaS companies",
       notes: null
-    });
-    const second = await repository.create(learnerId, {
+    }));
+    const second = await Effect.runPromise(repository.create(learnerId, {
       name: "Clinical operators",
       customerDescription: "Practice managers in small clinics",
       notes: "Probe scheduling workarounds."
-    });
+    }));
 
-    await repository.update(learnerId, first.id, {
+    await Effect.runPromise(repository.update(learnerId, first.id, {
       name: "Finance operators",
       customerDescription: "Controllers at growing SaaS companies",
       notes: null
-    });
-    await repository.selectActive(learnerId, first.id);
-    await repository.selectActive(learnerId, second.id);
+    }));
+    await Effect.runPromise(repository.selectActive(learnerId, first.id));
+    await Effect.runPromise(repository.selectActive(learnerId, second.id));
 
-    const profiles = await repository.listForLearner(learnerId);
+    const profiles = await Effect.runPromise(repository.listForLearner(learnerId));
 
     expect(profiles).toHaveLength(2);
     expect(profiles.find((profile) => profile.id === first.id)).toMatchObject({
@@ -90,17 +91,17 @@ describe("Ideal Customer Profiles", () => {
   it("clears the Active Ideal Customer Profile without deleting saved profiles", async () => {
     const repository: IdealCustomerProfileRepository =
       createInMemoryIdealCustomerProfileRepository();
-    const profile = await repository.create(learnerId, {
+    const profile = await Effect.runPromise(repository.create(learnerId, {
       name: "Marketplace sellers",
       customerDescription: "Independent sellers on marketplaces",
       notes: null
-    });
+    }));
 
-    await repository.selectActive(learnerId, profile.id);
-    await repository.clearActive(learnerId);
+    await Effect.runPromise(repository.selectActive(learnerId, profile.id));
+    await Effect.runPromise(repository.clearActive(learnerId));
 
-    expect(await repository.getActiveForLearner(learnerId)).toBeNull();
-    expect(await repository.listForLearner(learnerId)).toHaveLength(1);
+    expect(await Effect.runPromise(repository.getActiveForLearner(learnerId))).toBeNull();
+    expect(await Effect.runPromise(repository.listForLearner(learnerId))).toHaveLength(1);
   });
 
   it("keeps Active flags for other learners when selecting a profile", async () => {
@@ -117,15 +118,19 @@ describe("Ideal Customer Profiles", () => {
       })
     ]);
 
-    const created = await repository.create("learner-1", {
+    const created = await Effect.runPromise(repository.create("learner-1", {
       name: "Logistics operators",
       customerDescription: "Ops leads at mid-sized distributors",
       notes: null
-    });
-    await repository.selectActive("learner-1", created.id);
+    }));
+    await Effect.runPromise(repository.selectActive("learner-1", created.id));
 
-    const learnerOneActive = await repository.getActiveForLearner("learner-1");
-    const learnerTwoActive = await repository.getActiveForLearner("learner-2");
+    const learnerOneActive = await Effect.runPromise(
+      repository.getActiveForLearner("learner-1")
+    );
+    const learnerTwoActive = await Effect.runPromise(
+      repository.getActiveForLearner("learner-2")
+    );
 
     expect(learnerOneActive?.id).toBe(created.id);
     expect(learnerTwoActive?.id).toBe("profile-20");
@@ -136,11 +141,11 @@ describe("Ideal Customer Profiles", () => {
       makeIdealCustomerProfile({ id: "profile-100" })
     ]);
 
-    const created = await repository.create(learnerId, {
+    const created = await Effect.runPromise(repository.create(learnerId, {
       name: "Finance directors",
       customerDescription: "Directors running forecasting and close",
       notes: null
-    });
+    }));
 
     expect(created.id).toBe("profile-101");
   });

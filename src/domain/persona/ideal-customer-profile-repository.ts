@@ -2,21 +2,83 @@ import type {
   IdealCustomerProfile,
   IdealCustomerProfileInput
 } from "./ideal-customer-profile";
+import { Data, Effect } from "effect";
+
+export type IdealCustomerProfileRepositoryOperation =
+  | "listForLearner"
+  | "getActiveForLearner"
+  | "create"
+  | "update"
+  | "selectActive"
+  | "clearActive";
+
+export type IdealCustomerProfileRepositoryDecodeOperation = Extract<
+  IdealCustomerProfileRepositoryOperation,
+  "listForLearner" | "getActiveForLearner" | "create" | "update"
+>;
+
+export type IdealCustomerProfileRepositoryDecodeDetail = {
+  _tag: "IdealCustomerProfileRepositoryDecodeDetail";
+  adapter: "ideal_customer_profiles";
+  operation: IdealCustomerProfileRepositoryDecodeOperation;
+  rowIndex?: number;
+  details: readonly string[];
+};
+
+export class IdealCustomerProfileRepositoryPersistenceError extends Data.TaggedError(
+  "IdealCustomerProfileRepositoryPersistenceError"
+)<{
+  operation: IdealCustomerProfileRepositoryOperation;
+  cause: unknown;
+}> {}
+
+export class IdealCustomerProfileRepositoryDecodeError extends Data.TaggedError(
+  "IdealCustomerProfileRepositoryDecodeError"
+)<{
+  operation: IdealCustomerProfileRepositoryOperation;
+  cause: IdealCustomerProfileRepositoryDecodeDetail;
+}> {}
+
+export class IdealCustomerProfileRepositoryNotFoundError extends Data.TaggedError(
+  "IdealCustomerProfileRepositoryNotFoundError"
+)<{
+  learnerId: string;
+  profileId: string;
+  operation: "update" | "selectActive";
+}> {}
+
+export type IdealCustomerProfileRepositoryError =
+  | IdealCustomerProfileRepositoryPersistenceError
+  | IdealCustomerProfileRepositoryDecodeError
+  | IdealCustomerProfileRepositoryNotFoundError;
 
 export type IdealCustomerProfileRepository = {
-  listForLearner(learnerId: string): Promise<IdealCustomerProfile[]>;
-  getActiveForLearner(learnerId: string): Promise<IdealCustomerProfile | null>;
+  listForLearner(
+    learnerId: string
+  ): Effect.Effect<IdealCustomerProfile[], IdealCustomerProfileRepositoryError, never>;
+  getActiveForLearner(
+    learnerId: string
+  ): Effect.Effect<
+    IdealCustomerProfile | null,
+    IdealCustomerProfileRepositoryError,
+    never
+  >;
   create(
     learnerId: string,
     input: IdealCustomerProfileInput
-  ): Promise<IdealCustomerProfile>;
+  ): Effect.Effect<IdealCustomerProfile, IdealCustomerProfileRepositoryError, never>;
   update(
     learnerId: string,
     profileId: string,
     input: IdealCustomerProfileInput
-  ): Promise<IdealCustomerProfile>;
-  selectActive(learnerId: string, profileId: string): Promise<void>;
-  clearActive(learnerId: string): Promise<void>;
+  ): Effect.Effect<IdealCustomerProfile, IdealCustomerProfileRepositoryError, never>;
+  selectActive(
+    learnerId: string,
+    profileId: string
+  ): Effect.Effect<void, IdealCustomerProfileRepositoryError, never>;
+  clearActive(
+    learnerId: string
+  ): Effect.Effect<void, IdealCustomerProfileRepositoryError, never>;
 };
 
 export function createInMemoryIdealCustomerProfileRepository(
@@ -29,91 +91,113 @@ export function createInMemoryIdealCustomerProfileRepository(
   }, 1);
 
   return {
-    async listForLearner(learnerId) {
-      return profiles
-        .filter((profile) => profile.learnerId === learnerId)
-        .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
+    listForLearner(learnerId) {
+      return Effect.succeed(
+        profiles
+          .filter((profile) => profile.learnerId === learnerId)
+          .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())
+      );
     },
 
-    async getActiveForLearner(learnerId) {
-      return (
+    getActiveForLearner(learnerId) {
+      return Effect.succeed(
         profiles.find(
           (profile) => profile.learnerId === learnerId && profile.isActive
         ) ?? null
       );
     },
 
-    async create(learnerId, input) {
-      const now = new Date();
-      const profile: IdealCustomerProfile = {
-        id: `profile-${nextId}`,
-        learnerId,
-        name: input.name,
-        customerDescription: input.customerDescription,
-        notes: input.notes,
-        isActive: false,
-        createdAt: now,
-        updatedAt: now
-      };
-
-      nextId += 1;
-      profiles = [...profiles, profile];
-      return profile;
-    },
-
-    async update(learnerId, profileId, input) {
-      let updatedProfile: IdealCustomerProfile | null = null;
-
-      profiles = profiles.map((profile) => {
-        if (profile.learnerId !== learnerId || profile.id !== profileId) {
-          return profile;
-        }
-
-        updatedProfile = {
-          ...profile,
+    create(learnerId, input) {
+      return Effect.sync(() => {
+        const now = new Date();
+        const profile: IdealCustomerProfile = {
+          id: `profile-${nextId}`,
+          learnerId,
           name: input.name,
           customerDescription: input.customerDescription,
           notes: input.notes,
-          updatedAt: new Date()
+          isActive: false,
+          createdAt: now,
+          updatedAt: now
         };
+
+        nextId += 1;
+        profiles = [...profiles, profile];
+        return profile;
+      });
+    },
+
+    update(learnerId, profileId, input) {
+      return Effect.gen(function* () {
+        let updatedProfile: IdealCustomerProfile | null = null;
+
+        profiles = profiles.map((profile) => {
+          if (profile.learnerId !== learnerId || profile.id !== profileId) {
+            return profile;
+          }
+
+          updatedProfile = {
+            ...profile,
+            name: input.name,
+            customerDescription: input.customerDescription,
+            notes: input.notes,
+            updatedAt: new Date()
+          };
+          return updatedProfile;
+        });
+
+        if (!updatedProfile) {
+          return yield* Effect.fail(
+            new IdealCustomerProfileRepositoryNotFoundError({
+              learnerId,
+              profileId,
+              operation: "update"
+            })
+          );
+        }
+
         return updatedProfile;
       });
-
-      if (!updatedProfile) {
-        throw new Error("Ideal Customer Profile not found.");
-      }
-
-      return updatedProfile;
     },
 
-    async selectActive(learnerId, profileId) {
-      const exists = profiles.some(
-        (profile) => profile.learnerId === learnerId && profile.id === profileId
-      );
+    selectActive(learnerId, profileId) {
+      return Effect.gen(function* () {
+        const exists = profiles.some(
+          (profile) => profile.learnerId === learnerId && profile.id === profileId
+        );
 
-      if (!exists) {
-        throw new Error("Ideal Customer Profile not found.");
-      }
+        if (!exists) {
+          return yield* Effect.fail(
+            new IdealCustomerProfileRepositoryNotFoundError({
+              learnerId,
+              profileId,
+              operation: "selectActive"
+            })
+          );
+        }
 
-      profiles = profiles.map((profile) =>
-        profile.learnerId === learnerId
-          ? {
-              ...profile,
-              isActive: profile.id === profileId
-            }
-          : profile
-      );
+        profiles = profiles.map((profile) =>
+          profile.learnerId === learnerId
+            ? {
+                ...profile,
+                isActive: profile.id === profileId
+              }
+            : profile
+        );
+      });
     },
 
-    async clearActive(learnerId) {
-      profiles = profiles.map((profile) =>
-        profile.learnerId === learnerId
-          ? {
-              ...profile,
-              isActive: false
-            }
-          : profile
-      );
+    clearActive(learnerId) {
+      return Effect.sync(() => {
+        profiles = profiles.map((profile) =>
+          profile.learnerId === learnerId
+            ? {
+                ...profile,
+                isActive: false
+              }
+            : profile
+        );
+      });
     }
   };
 }

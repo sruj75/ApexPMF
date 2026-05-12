@@ -3,16 +3,19 @@ import { createDeterministicReportBuilder } from "../src/domain/session/report-b
 import type { GeneratedSessionCase } from "../src/domain/session/generated-session-case";
 import type { SessionEvaluationArtifact } from "../src/domain/session/session-evaluation";
 import type { SessionTranscriptTurn } from "../src/domain/session/session-report";
+import { Effect } from "effect";
 
 describe("Report Builder", () => {
   it("returns a structured report using persisted evaluation evidence", async () => {
     const reportBuilder = createDeterministicReportBuilder();
 
-    const result = await reportBuilder.buildFromEvaluation({
-      generatedSessionCase: makeGeneratedSessionCase(),
-      transcript: makeTranscript(),
-      evaluation: makeEvaluation("partial")
-    });
+    const result = await Effect.runPromise(
+      reportBuilder.buildFromEvaluation({
+        generatedSessionCase: makeGeneratedSessionCase(),
+        transcript: makeTranscript(),
+        evaluation: makeEvaluation("partial")
+      })
+    );
 
     expect(result.status).toBe("ready");
     if (result.status !== "ready") {
@@ -36,11 +39,13 @@ describe("Report Builder", () => {
     const evaluation = makeEvaluation("avoided");
     evaluation.learningSignal.evidence = [];
 
-    const result = await reportBuilder.buildFromEvaluation({
-      generatedSessionCase: makeGeneratedSessionCase(),
-      transcript: makeTranscript(),
-      evaluation
-    });
+    const result = await Effect.runPromise(
+      reportBuilder.buildFromEvaluation({
+        generatedSessionCase: makeGeneratedSessionCase(),
+        transcript: makeTranscript(),
+        evaluation
+      })
+    );
 
     expect(result).toEqual({
       status: "insufficient-evidence"

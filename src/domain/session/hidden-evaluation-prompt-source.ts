@@ -1,3 +1,4 @@
+import { Data, Effect } from "effect";
 import { hiddenEvaluationJudgePrompt } from "./hidden-evaluation-prompt";
 
 export type HiddenEvaluationPromptBundle = {
@@ -6,8 +7,19 @@ export type HiddenEvaluationPromptBundle = {
   repairInstruction: string;
 };
 
+export class HiddenEvaluationPromptSourceError extends Data.TaggedError(
+  "HiddenEvaluationPromptSourceError"
+)<{
+  message: string;
+  cause?: unknown;
+}> {}
+
 export type HiddenEvaluationPromptSource = {
-  getPromptBundle(): Promise<HiddenEvaluationPromptBundle>;
+  getPromptBundle(): Effect.Effect<
+    HiddenEvaluationPromptBundle,
+    HiddenEvaluationPromptSourceError,
+    never
+  >;
 };
 
 /**
@@ -15,7 +27,11 @@ export type HiddenEvaluationPromptSource = {
  * Production Hidden Evaluation uses repo-owned prompts via {@link createPinnedHiddenEvaluationPromptSource}.
  */
 export type HiddenEvaluationPromptBundleLoader = {
-  fetchPromptBundle(): Promise<HiddenEvaluationPromptBundle>;
+  fetchPromptBundle(): Effect.Effect<
+    HiddenEvaluationPromptBundle,
+    HiddenEvaluationPromptSourceError,
+    never
+  >;
 };
 
 const defaultPromptBundle: HiddenEvaluationPromptBundle = {
@@ -34,8 +50,8 @@ export function createPinnedHiddenEvaluationPromptSource(
   };
 
   return {
-    async getPromptBundle() {
-      return promptBundle;
+    getPromptBundle() {
+      return Effect.succeed(promptBundle);
     }
   };
 }
@@ -44,7 +60,7 @@ export function createLoaderBackedHiddenEvaluationPromptSource(input: {
   loader: HiddenEvaluationPromptBundleLoader;
 }): HiddenEvaluationPromptSource {
   return {
-    async getPromptBundle() {
+    getPromptBundle() {
       return input.loader.fetchPromptBundle();
     }
   };
@@ -60,8 +76,12 @@ export function createStubFailingHiddenEvaluationPromptSource(input?: {
 
   return createLoaderBackedHiddenEvaluationPromptSource({
     loader: {
-      async fetchPromptBundle() {
-        throw new Error(failureMessage);
+      fetchPromptBundle() {
+        return Effect.fail(
+          new HiddenEvaluationPromptSourceError({
+            message: failureMessage
+          })
+        );
       }
     }
   });
@@ -72,12 +92,10 @@ export function createFallbackHiddenEvaluationPromptSource(input: {
   fallback: HiddenEvaluationPromptSource;
 }): HiddenEvaluationPromptSource {
   return {
-    async getPromptBundle() {
-      try {
-        return await input.primary.getPromptBundle();
-      } catch {
-        return input.fallback.getPromptBundle();
-      }
+    getPromptBundle() {
+      return input.primary
+        .getPromptBundle()
+        .pipe(Effect.catchAll(() => input.fallback.getPromptBundle()));
     }
   };
 }

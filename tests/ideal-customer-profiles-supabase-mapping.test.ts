@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createSupabaseIdealCustomerProfileRepository } from "../src/infrastructure/supabase/ideal-customer-profiles";
-import { SupabaseRowDecodeError } from "../src/infrastructure/supabase/supabase-row-decode-error";
+import { Effect } from "effect";
 
 describe("Ideal Customer Profiles Supabase mapping", () => {
   it("decodes listForLearner rows into domain profiles", async () => {
@@ -8,7 +8,7 @@ describe("Ideal Customer Profiles Supabase mapping", () => {
       listData: [validProfileRow, { ...validProfileRow, id: "profile-2" }]
     });
 
-    const profiles = await repository.listForLearner("learner-1");
+    const profiles = await Effect.runPromise(repository.listForLearner("learner-1"));
 
     expect(profiles).toHaveLength(2);
     expect(profiles[0]).toMatchObject({
@@ -28,7 +28,7 @@ describe("Ideal Customer Profiles Supabase mapping", () => {
       activeData: null
     });
 
-    const profile = await repository.getActiveForLearner("learner-1");
+    const profile = await Effect.runPromise(repository.getActiveForLearner("learner-1"));
 
     expect(profile).toBeNull();
   });
@@ -42,16 +42,16 @@ describe("Ideal Customer Profiles Supabase mapping", () => {
       }
     });
 
-    const created = await repository.create("learner-1", {
+    const created = await Effect.runPromise(repository.create("learner-1", {
       name: "Finance operators",
       customerDescription: "Controllers at growth SaaS companies",
       notes: null
-    });
-    const updated = await repository.update("learner-1", "profile-1", {
+    }));
+    const updated = await Effect.runPromise(repository.update("learner-1", "profile-1", {
       name: "Updated profile",
       customerDescription: "Controllers at growth SaaS companies",
       notes: null
-    });
+    }));
 
     expect(created.name).toBe("Finance operators");
     expect(updated.name).toBe("Updated profile");
@@ -68,12 +68,21 @@ describe("Ideal Customer Profiles Supabase mapping", () => {
       ]
     });
 
-    await expect(repository.listForLearner("learner-1")).rejects.toMatchObject({
-      name: "SupabaseRowDecodeError",
-      adapter: "ideal_customer_profiles",
+    const error = await Effect.runPromise(
+      Effect.flip(repository.listForLearner("learner-1"))
+    );
+
+    expect(error).toMatchObject({
+      _tag: "IdealCustomerProfileRepositoryDecodeError",
       operation: "listForLearner",
-      rowIndex: 1
+      cause: {
+        _tag: "IdealCustomerProfileRepositoryDecodeDetail",
+        adapter: "ideal_customer_profiles",
+        operation: "listForLearner",
+        rowIndex: 1
+      }
     });
+    expect(error.cause.details[0]).toContain("updated_at");
   });
 
   it("throws typed decode error for getActiveForLearner on invalid row shapes", async () => {
@@ -84,25 +93,65 @@ describe("Ideal Customer Profiles Supabase mapping", () => {
       }
     });
 
-    await expect(repository.getActiveForLearner("learner-1")).rejects.toBeInstanceOf(
-      SupabaseRowDecodeError
+    const error = await Effect.runPromise(
+      Effect.flip(repository.getActiveForLearner("learner-1"))
     );
+
+    expect(error).toMatchObject({
+      _tag: "IdealCustomerProfileRepositoryDecodeError",
+      operation: "getActiveForLearner",
+      cause: {
+        _tag: "IdealCustomerProfileRepositoryDecodeDetail",
+        adapter: "ideal_customer_profiles",
+        operation: "getActiveForLearner"
+      }
+    });
+    expect(error.cause.rowIndex).toBeUndefined();
+    expect(error.cause.details[0]).toContain("notes");
   });
 
-  it("still throws Supabase query errors as plain Error", async () => {
+  it("maps Supabase query failures into typed persistence errors", async () => {
     const repository = createRepository({
       createError: {
         message: "insert failed"
       }
     });
 
-    await expect(
-      repository.create("learner-1", {
-        name: "Finance operators",
-        customerDescription: "Controllers at growth SaaS companies",
-        notes: null
-      })
-    ).rejects.toThrow("insert failed");
+    const error = await Effect.runPromise(
+      Effect.flip(
+        repository.create("learner-1", {
+          name: "Finance operators",
+          customerDescription: "Controllers at growth SaaS companies",
+          notes: null
+        })
+      )
+    );
+
+    expect(error).toMatchObject({
+      _tag: "IdealCustomerProfileRepositoryPersistenceError",
+      operation: "create"
+    });
+  });
+
+  it("maps missing update rows into not-found errors", async () => {
+    const repository = createRepository({
+      updateData: null
+    });
+
+    const error = await Effect.runPromise(
+      Effect.flip(
+        repository.update("learner-1", "missing-profile", {
+          name: "Finance operators",
+          customerDescription: "Controllers at growth SaaS companies",
+          notes: null
+        })
+      )
+    );
+
+    expect(error).toMatchObject({
+      _tag: "IdealCustomerProfileRepositoryNotFoundError",
+      operation: "update"
+    });
   });
 });
 
@@ -110,7 +159,7 @@ function createRepository(input: {
   listData?: unknown[];
   activeData?: unknown | null;
   createData?: unknown;
-  updateData?: unknown;
+  updateData?: unknown | null;
   listError?: { message: string } | null;
   activeError?: { message: string } | null;
   createError?: { message: string } | null;
@@ -128,8 +177,8 @@ function createRepository(input: {
   const createUpdateBuilder = {
     eq: vi.fn(() => createUpdateBuilder),
     select: vi.fn(() => createUpdateBuilder),
-    single: vi.fn(async () => ({
-      data: input.updateData ?? validProfileRow,
+    maybeSingle: vi.fn(async () => ({
+      data: input.updateData === undefined ? validProfileRow : input.updateData,
       error: input.updateError ?? null
     }))
   };
@@ -168,7 +217,7 @@ function createRepository(input: {
 
   const supabase = {
     from: vi.fn(() => queryBuilder),
-    rpc: vi.fn(async () => ({ error: null }))
+    rpc: vi.fn(async () => ({ data: {}, error: null }))
   };
 
   return createSupabaseIdealCustomerProfileRepository(supabase as never);

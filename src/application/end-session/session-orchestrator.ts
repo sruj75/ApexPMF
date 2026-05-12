@@ -1,78 +1,113 @@
-import type { ReportGenerationCoordinator } from "@/src/application/generate-report/report-generation-coordinator";
-import type { GeneratedSessionCaseRepository } from "@/src/domain/session/generated-session-case-repository";
-import type { ReportStatus, SessionEndReason } from "@/src/domain/session/session-lifecycle";
+import {
+  type ReportGenerationCoordinator,
+  type ReportGenerationCoordinatorError
+} from "@/src/application/generate-report/report-generation-coordinator";
+import type { HiddenEvaluationCapability } from "@/src/application/llm-runtime/llm-runtime-layers";
+import {
+  type GeneratedSessionCaseRepository,
+  type GeneratedSessionCaseRepositoryError
+} from "@/src/domain/session/generated-session-case-repository";
+import type { SessionEndReason } from "@/src/domain/session/session-lifecycle";
+import { Data, Effect } from "effect";
 import {
   resolveReportGeneratingDecision,
   resolveSessionLifecycleRoute,
   voiceConversationPath
 } from "./session-lifecycle-route-policy";
+import {
+  endSessionVoiceFailureOutcome,
+  reportGeneratingFlowOutcome,
+  resumeVoiceConversationOutcome,
+  sessionEndOutcome,
+  type ReportGeneratingFlowOutcome,
+  type SessionEndOutcome,
+  type VoiceFailureOutcome
+} from "./session-orchestrator-outcomes";
+
+export class SessionCaseNotFoundError extends Data.TaggedError(
+  "SessionCaseNotFoundError"
+)<{
+  learnerId: string;
+  sessionId: string;
+  operation: "end-session" | "report-generating";
+}> {}
+
+export class SessionLifecycleRouteResolutionError extends Data.TaggedError(
+  "SessionLifecycleRouteResolutionError"
+)<{
+  learnerId: string;
+  sessionId: string;
+  operation: "report-generating";
+}> {}
+
+export type SessionOrchestratorError =
+  | GeneratedSessionCaseRepositoryError
+  | ReportGenerationCoordinatorError
+  | SessionCaseNotFoundError
+  | SessionLifecycleRouteResolutionError;
 
 export type SessionOrchestrator = {
   endSessionForLearner(input: {
     learnerId: string;
     sessionId: string;
     reason: SessionEndReason;
-  }): Promise<{
-    nextPath: string;
-    sessionStatus: "ended";
-    endedReason: SessionEndReason;
-    reportStatus: ReportStatus;
-  }>;
+  }): Effect.Effect<SessionEndOutcome, SessionOrchestratorError, never>;
   handleVoiceFailureForLearner(input: {
     learnerId: string;
     sessionId: string;
     recoverable: boolean;
-  }): Promise<
-    | {
-        behavior: "resume-voice-conversation";
-        nextPath: string;
-      }
-    | {
-        behavior: "end-session";
-        nextPath: string;
-      }
-  >;
+  }): Effect.Effect<VoiceFailureOutcome, SessionOrchestratorError, never>;
   runReportGeneratingFlowForLearner(input: {
     learnerId: string;
     sessionId: string;
-  }): Promise<
-    | {
-        reportStatus: "not-found";
-      }
-    | {
-        reportStatus: "ready" | "insufficient-evidence";
-        nextPath: string;
-      }
+  }): Effect.Effect<
+    ReportGeneratingFlowOutcome,
+    SessionOrchestratorError,
+    HiddenEvaluationCapability
   >;
 };
 
 export function createSessionOrchestrator(input: {
   generatedSessionCaseRepository: GeneratedSessionCaseRepository;
   reportGenerationCoordinator: ReportGenerationCoordinator;
+  now?: () => Effect.Effect<Date, never, never>;
 }): SessionOrchestrator {
   const { generatedSessionCaseRepository, reportGenerationCoordinator } = input;
+  const now = input.now ?? defaultNow;
 
-  return {
-    async endSessionForLearner({ learnerId, sessionId, reason }) {
-      const updated = await generatedSessionCaseRepository.updateSessionLifecycleForLearner({
-        learnerId,
-        sessionCaseId: sessionId,
-        updater: (current) => ({
-          ...current,
-          sessionStatus: "ended",
-          endedReason: reason,
-          endedAt: new Date(),
-          reportStatus: needsReportGeneration(reason)
-            ? "generating"
-            : current.reportStatus,
-          reportReadyAt: needsReportGeneration(reason)
-            ? null
-            : current.reportReadyAt
-        })
-      });
+  const endSessionForLearner: SessionOrchestrator["endSessionForLearner"] = ({
+    learnerId,
+    sessionId,
+    reason
+  }) =>
+    Effect.gen(function* () {
+      const endedAt = yield* now();
+      const updated =
+        yield* generatedSessionCaseRepository.updateSessionLifecycleForLearner({
+          learnerId,
+          sessionCaseId: sessionId,
+          updater: (current) => ({
+            ...current,
+            sessionStatus: "ended",
+            endedReason: reason,
+            endedAt,
+            reportStatus: needsReportGeneration(reason)
+              ? "generating"
+              : current.reportStatus,
+            reportReadyAt: needsReportGeneration(reason)
+              ? null
+              : current.reportReadyAt
+          })
+        });
 
       if (!updated) {
-        throw new Error(`Session not found: ${sessionId}`);
+        return yield* Effect.fail(
+          new SessionCaseNotFoundError({
+            learnerId,
+            sessionId,
+            operation: "end-session"
+          })
+        );
       }
 
       const route = resolveSessionLifecycleRoute({
@@ -80,94 +115,125 @@ export function createSessionOrchestrator(input: {
         generatedSessionCase: updated
       });
 
-      return {
+      return sessionEndOutcome({
         nextPath: route.nextPath,
-        sessionStatus: "ended",
         endedReason: reason,
         reportStatus: updated.sessionLifecycle.reportStatus
-      };
-    },
+      });
+    });
 
-    async handleVoiceFailureForLearner({ learnerId, sessionId, recoverable }) {
+  const handleVoiceFailureForLearner: SessionOrchestrator["handleVoiceFailureForLearner"] =
+    ({ learnerId, sessionId, recoverable }) => {
       if (recoverable) {
-        return {
-          behavior: "resume-voice-conversation",
-          nextPath: voiceConversationPath(sessionId)
-        };
+        return Effect.succeed(resumeVoiceConversationOutcome(voiceConversationPath(sessionId)));
       }
 
-      const outcome = await this.endSessionForLearner({
+      return endSessionForLearner({
         learnerId,
         sessionId,
         reason: "voice-failure"
-      });
-
-      return {
-        behavior: "end-session",
-        nextPath: outcome.nextPath
-      };
-    },
-
-    async runReportGeneratingFlowForLearner({ learnerId, sessionId }) {
-      const generatedSessionCase = await generatedSessionCaseRepository.getForLearner(
-        learnerId,
-        sessionId
+      }).pipe(
+        Effect.map((outcome) => endSessionVoiceFailureOutcome(outcome.nextPath))
       );
-      if (!generatedSessionCase) {
-        return {
-          reportStatus: "not-found"
-        };
-      }
+    };
 
-      const decision = resolveReportGeneratingDecision({
-        sessionId,
-        generatedSessionCase
-      });
-
-      if (decision.decision === "skip-generation") {
-        return {
-          reportStatus: decision.reportStatus,
-          nextPath: decision.nextPath
-        };
-      }
-
-      const result = await reportGenerationCoordinator.generateForEndedSession({
-        generatedSessionCase
-      });
-
-      const persisted = await generatedSessionCaseRepository.updateReportArtifactsForLearner({
-        learnerId,
-        sessionCaseId: sessionId,
-        reportStatus: result.status,
-        reportReadyAt: result.status === "ready" ? new Date() : null,
-        sessionReport: result.status === "ready" ? result.report : null,
-        sessionTranscript: result.status === "ready" ? result.transcript : null,
-        sessionEvaluation: result.status === "ready" ? result.evaluation : null
-      });
-      if (!persisted) {
-        return {
-          reportStatus: "not-found"
-        };
-      }
-
-      const persistedDecision = resolveReportGeneratingDecision({
-        sessionId,
-        generatedSessionCase: persisted
-      });
-      if (persistedDecision.decision !== "skip-generation") {
-        throw new Error(
-          `Session lifecycle route unresolved after report persistence: ${sessionId}`
+  const runReportGeneratingFlowForLearner: SessionOrchestrator["runReportGeneratingFlowForLearner"] =
+    ({ learnerId, sessionId }) =>
+      Effect.gen(function* () {
+        const generatedSessionCase = yield* generatedSessionCaseRepository.getForLearner(
+          learnerId,
+          sessionId
         );
-      }
+        if (!generatedSessionCase) {
+          return yield* missingSessionError({
+            learnerId,
+            sessionId,
+            operation: "report-generating"
+          });
+        }
 
-      return {
-        reportStatus: persistedDecision.reportStatus,
-        nextPath: persistedDecision.nextPath
-      };
-    }
+        const decision = resolveReportGeneratingDecision({
+          sessionId,
+          generatedSessionCase
+        });
+
+        if (decision.decision === "skip-generation") {
+          return reportGeneratingFlowOutcome({
+            reportStatus: decision.reportStatus,
+            nextPath: decision.nextPath
+          });
+        }
+
+        const result = yield* reportGenerationCoordinator.generateForEndedSession({
+          generatedSessionCase
+        });
+        const reportReadyAt = result.status === "ready" ? yield* now() : null;
+
+        const persisted =
+          yield* generatedSessionCaseRepository.updateReportArtifactsForLearner({
+            learnerId,
+            sessionCaseId: sessionId,
+            reportStatus: result.status,
+            reportReadyAt,
+            sessionReport: result.status === "ready" ? result.report : null,
+            sessionTranscript: result.status === "ready" ? result.transcript : null,
+            sessionEvaluation: result.status === "ready" ? result.evaluation : null
+          });
+        if (!persisted) {
+          return yield* missingSessionError({
+            learnerId,
+            sessionId,
+            operation: "report-generating"
+          });
+        }
+
+        const persistedDecision = resolveReportGeneratingDecision({
+          sessionId,
+          generatedSessionCase: persisted
+        });
+        if (persistedDecision.decision !== "skip-generation") {
+          return yield* Effect.fail(
+            new SessionLifecycleRouteResolutionError({
+              learnerId,
+              sessionId,
+              operation: "report-generating"
+            })
+          );
+        }
+
+        return reportGeneratingFlowOutcome({
+          reportStatus: persistedDecision.reportStatus,
+          nextPath: persistedDecision.nextPath
+        });
+      });
+
+  return {
+    endSessionForLearner,
+    handleVoiceFailureForLearner,
+    runReportGeneratingFlowForLearner
   };
 }
 
 function needsReportGeneration(reason: SessionEndReason): boolean {
   return reason !== "user-quit";
+}
+
+function missingSessionError(input: {
+  learnerId: string;
+  sessionId: string;
+  operation: "end-session" | "report-generating";
+}): Effect.Effect<never, SessionCaseNotFoundError, never> {
+  return Effect.fail(
+    new SessionCaseNotFoundError({
+      learnerId: input.learnerId,
+      sessionId: input.sessionId,
+      operation: input.operation
+    })
+  );
+}
+
+function defaultNow(): Effect.Effect<Date, never, never> {
+  return Effect.clockWith((clock) =>
+    Effect.succeed(new Date(clock.unsafeCurrentTimeMillis()))
+  );
 }

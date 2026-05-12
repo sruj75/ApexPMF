@@ -1,5 +1,9 @@
 import type { IdealCustomerProfile } from "./ideal-customer-profile";
-import type { IdealCustomerProfileRepository } from "./ideal-customer-profile-repository";
+import type {
+  IdealCustomerProfileRepository,
+  IdealCustomerProfileRepositoryError
+} from "./ideal-customer-profile-repository";
+import { Data, Effect } from "effect";
 
 const broadPracticePoolDefaultLabel = "Broad Practice Pool";
 
@@ -25,6 +29,13 @@ export type SessionSourcePresentation = {
   title: string;
   description: string;
 };
+
+export class SessionSourceResolutionError extends Data.TaggedError(
+  "SessionSourceResolutionError"
+)<{
+  learnerId: string;
+  cause: IdealCustomerProfileRepositoryError;
+}> {}
 
 export function createBroadPracticePoolSessionSource(input?: {
   label?: unknown;
@@ -56,20 +67,27 @@ export function presentSessionSource(
   }
 }
 
-export async function resolveNextSessionSource(
+export function resolveNextSessionSource(
   learnerId: string,
   repository: Pick<IdealCustomerProfileRepository, "getActiveForLearner">
-): Promise<SessionSource> {
-  const activeProfile = await repository.getActiveForLearner(learnerId);
-
-  if (!activeProfile) {
-    return createBroadPracticePoolSessionSource();
-  }
-
-  return {
-    kind: "active-ideal-customer-profile",
-    idealCustomerProfile: toSessionSourceSnapshot(activeProfile)
-  };
+): Effect.Effect<SessionSource, SessionSourceResolutionError, never> {
+  return repository.getActiveForLearner(learnerId).pipe(
+    Effect.mapError(
+      (cause) =>
+      new SessionSourceResolutionError({
+        learnerId,
+        cause
+      })
+    ),
+    Effect.map((activeProfile) =>
+      activeProfile
+        ? {
+            kind: "active-ideal-customer-profile" as const,
+            idealCustomerProfile: toSessionSourceSnapshot(activeProfile)
+          }
+        : createBroadPracticePoolSessionSource()
+    )
+  );
 }
 
 function toSessionSourceSnapshot(

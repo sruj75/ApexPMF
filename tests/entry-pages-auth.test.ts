@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Effect } from "effect";
 import ProfilePage from "../app/profile/page";
 import PracticeSessionPage from "../app/practice/[sessionId]/page";
 
 const {
   redirect,
   notFound,
+  getProfilePageData,
   getLearnerEntryContext,
-  getLearnerSessionRuntime
+  getLearnerSessionRuntime,
+  getLearnerEntryContextEffect,
+  getLearnerSessionRuntimeEffect
 } = vi.hoisted(() => ({
   redirect: vi.fn((location: string) => {
     throw new Error(`REDIRECT:${location}`);
@@ -14,8 +18,11 @@ const {
   notFound: vi.fn(() => {
     throw new Error("NOT_FOUND");
   }),
+  getProfilePageData: vi.fn(),
   getLearnerEntryContext: vi.fn(),
-  getLearnerSessionRuntime: vi.fn()
+  getLearnerSessionRuntime: vi.fn(),
+  getLearnerEntryContextEffect: vi.fn(),
+  getLearnerSessionRuntimeEffect: vi.fn()
 }));
 
 vi.mock("next/navigation", () => ({
@@ -23,14 +30,24 @@ vi.mock("next/navigation", () => ({
   notFound
 }));
 
-vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
+vi.mock("@/src/application/start-session/practice-entry-web-adapter", () => ({
+  getProfilePageData,
   getLearnerEntryContext,
   getLearnerSessionRuntime
+}));
+
+vi.mock("@/src/application/start-session/practice-entry-seam", () => ({
+  getLearnerEntryContextEffect,
+  getLearnerSessionRuntimeEffect
 }));
 
 describe("Entry pages auth guard parity", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getProfilePageData.mockResolvedValue({
+      ok: false,
+      reason: "unauthenticated"
+    });
     getLearnerEntryContext.mockResolvedValue({
       ok: false,
       reason: "unauthenticated"
@@ -39,6 +56,18 @@ describe("Entry pages auth guard parity", () => {
       ok: false,
       reason: "unauthenticated"
     });
+    getLearnerEntryContextEffect.mockReturnValue(
+      Effect.succeed({
+        ok: false,
+        reason: "unauthenticated"
+      })
+    );
+    getLearnerSessionRuntimeEffect.mockReturnValue(
+      Effect.succeed({
+        ok: false,
+        reason: "unauthenticated"
+      })
+    );
   });
 
   it("redirects Profile Settings to /login when unauthenticated", async () => {

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type {
   SessionReport,
   SessionTranscriptTurn
-} from "@/src/domain/session/session-report";
+} from "@/src/application/practice-route/practice-route-decision";
 
 type SessionReportViewProps = {
   report: SessionReport;

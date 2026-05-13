@@ -1,11 +1,23 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { presentDefaultSessionSourceForDashboard } from "@/src/application/start-session/session-source-presentation";
+import { getDashboardPageData } from "@/src/application/start-session/practice-entry-web-adapter";
 import { startPracticeAction } from "../practice/actions";
 import { StartPracticeForm } from "../practice/start-practice-form";
+import { ProgressionPathCard } from "./progression-path-card";
+import { GlobalRankingCard } from "./global-ranking-card";
+
+export const dynamic = "force-dynamic";
 
 const nextSessionSource = presentDefaultSessionSourceForDashboard();
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const pageData = await getDashboardPageData();
+
+  if (!pageData.ok) {
+    redirect("/login");
+  }
+
   return (
     <div className="dashboard-shell">
       <aside className="landing-sidebar dashboard-sidebar" aria-label="Practice">
@@ -55,24 +67,9 @@ export default function DashboardPage() {
             </p>
           </article>
 
-          <article className="dashboard-card" aria-labelledby="progression-title">
-            <p className="dashboard-card-label">Skill growth</p>
-            <h2 id="progression-title">Progression</h2>
-            <p>
-              Progression begins after completed Sessions produce saved Session
-              Reports.
-            </p>
-          </article>
+          <ProgressionPathCard progression={pageData.progression} />
 
-          <article className="dashboard-card" aria-labelledby="ranking-title">
-            <p className="dashboard-card-label">Credibility gate</p>
-            <h2 id="ranking-title">Global Ranking</h2>
-            <p className="dashboard-status">Insufficient Data State</p>
-            <p>
-              Ranking appears only after there is enough credible user and
-              population evidence.
-            </p>
-          </article>
+          <GlobalRankingCard progression={pageData.progression} />
         </section>
 
         <section

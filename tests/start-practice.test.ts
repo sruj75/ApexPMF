@@ -204,6 +204,66 @@ describe("Start Practice", () => {
       )
     ).resolves.toMatchObject({ generationNonce: "nonce-b" });
   });
+
+  it("does not allocate two Free Trial Sessions when Start Practice runs concurrently", async () => {
+    const generatedSessionCases = createInMemoryGeneratedSessionCaseRepository();
+    let releaseLedgerReads: (() => void) | undefined;
+    const ledgerReadsReleased = new Promise<void>((resolve) => {
+      releaseLedgerReads = resolve;
+    });
+    let pendingLedgerReads = 0;
+    const baseCreditLedgerRepository = createInMemoryCreditLedgerRepository();
+    const creditLedgerRepository = {
+      ...baseCreditLedgerRepository,
+      getOrInitializeForLearner(requestLearnerId: string) {
+        if (pendingLedgerReads >= 2) {
+          return baseCreditLedgerRepository.getOrInitializeForLearner(
+            requestLearnerId
+          );
+        }
+        pendingLedgerReads += 1;
+        if (pendingLedgerReads === 2) {
+          releaseLedgerReads?.();
+        }
+        return Effect.promise(async () => {
+          await ledgerReadsReleased;
+          return {
+            learnerId: requestLearnerId,
+            freeTrialUsed: false,
+            subscriptionCredits: 0,
+            topUpCredits: 0
+          };
+        });
+      }
+    };
+    const personaGenerator = createRecordingPersonaGenerator();
+    const deps = {
+      idealCustomerProfileRepository: createInMemoryIdealCustomerProfileRepository(),
+      generatedSessionCaseRepository: generatedSessionCases,
+      creditLedgerRepository
+    };
+    const nonceLayer = Layer.succeed(StartPracticeNonce, {
+      create: () => globalThis.crypto.randomUUID()
+    });
+
+    const results = await Promise.allSettled([
+      Effect.runPromise(
+        startPracticeForLearner(learnerId, deps).pipe(
+          Effect.provide(nonceLayer),
+          Effect.provide(Layer.succeed(PersonaGenerationCapability, personaGenerator))
+        )
+      ),
+      Effect.runPromise(
+        startPracticeForLearner(learnerId, deps).pipe(
+          Effect.provide(nonceLayer),
+          Effect.provide(Layer.succeed(PersonaGenerationCapability, personaGenerator))
+        )
+      )
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+  });
 });
 
 function createRecordingPersonaGenerator(): PersonaGenerator & {

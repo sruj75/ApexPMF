@@ -158,6 +158,9 @@ export function createInMemoryGeneratedSessionCaseRepository(
         }
 
         const current = generatedSessionCases[index];
+        if (current.sessionLifecycle.reportStatus !== "generating") {
+          return null;
+        }
         const next: GeneratedSessionCase = {
           ...current,
           sessionLifecycle: {

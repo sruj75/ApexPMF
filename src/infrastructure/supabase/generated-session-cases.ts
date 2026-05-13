@@ -103,6 +103,7 @@ export function createSupabaseGeneratedSessionCaseRepository(
               })
               .eq("learner_id", input.learnerId)
               .eq("id", input.sessionCaseId)
+              .eq("report_status", "generating")
               .select(generatedSessionCaseColumns)
               .maybeSingle()
         });

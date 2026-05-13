@@ -1,4 +1,6 @@
 import { Effect } from "effect";
+import { getDashboardProgressionData } from "@/src/application/dashboard/dashboard-page-data";
+import type { DashboardProgressionView } from "@/src/application/dashboard/progression-dashboard-presenter";
 import type { SessionEndReason } from "@/src/domain/session/session-lifecycle";
 import {
   parseIdealCustomerProfileInput,
@@ -169,4 +171,35 @@ export async function clearActiveIdealCustomerProfileForLearner(
   repository: Pick<IdealCustomerProfileRepository, "clearActive">
 ): Promise<void> {
   await Effect.runPromise(repository.clearActive(learnerId));
+}
+
+export type DashboardPageDataResult =
+  | {
+      ok: false;
+      reason: "unauthenticated";
+    }
+  | {
+      ok: true;
+      progression: DashboardProgressionView;
+    };
+
+export async function getDashboardPageData(): Promise<DashboardPageDataResult> {
+  return Effect.runPromise(
+    Effect.gen(function* () {
+      const context = yield* getLearnerEntryContextEffect();
+      if (!context.ok) {
+        return { ok: false as const, reason: "unauthenticated" as const };
+      }
+
+      const progression = yield* getDashboardProgressionData({
+        learnerId: context.learnerId,
+        progressionRepository: context.progressionRepository
+      });
+
+      return {
+        ok: true as const,
+        progression
+      };
+    })
+  );
 }

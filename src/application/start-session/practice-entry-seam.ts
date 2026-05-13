@@ -12,6 +12,7 @@ import {
   createSessionOrchestrator
 } from "@/src/application/end-session/session-orchestrator";
 import { createReportGenerationCoordinator } from "@/src/application/generate-report/report-generation-coordinator";
+import { createProgressionUpdater } from "@/src/application/update-progression/progression-updater";
 import type { SessionEndReason } from "@/src/domain/session/session-lifecycle";
 import {
   normalizeStartPracticeFailure,
@@ -41,6 +42,10 @@ export type LearnerEntryContextResult =
         SupabaseLearnerEntryContextResult,
         { ok: true }
       >["creditLedgerRepository"];
+      progressionRepository: Extract<
+        SupabaseLearnerEntryContextResult,
+        { ok: true }
+      >["progressionRepository"];
     }
   | {
       ok: false;
@@ -115,9 +120,13 @@ export function getLearnerSessionRuntimeEffect(): Effect.Effect<
       process.env
     );
     const reportGenerationCoordinator = createReportGenerationCoordinator();
+    const progressionUpdater = createProgressionUpdater({
+      progressionRepository: context.progressionRepository
+    });
     const orchestrator = createSessionOrchestrator({
       generatedSessionCaseRepository: context.generatedSessionCaseRepository,
-      reportGenerationCoordinator
+      reportGenerationCoordinator,
+      progressionUpdater
     });
 
     const { learnerId } = context;

@@ -86,11 +86,13 @@ describe("Learner session runtime seam", () => {
             })
           )
         } as never,
-        creditLedgerRepository: { kind: "credit-ledger-repository" } as never
+        creditLedgerRepository: { kind: "credit-ledger-repository" } as never,
+        progressionRepository: {} as never
       })
     );
     const reportGenerationCoordinator = {};
     createReportGenerationCoordinator.mockReturnValue(reportGenerationCoordinator);
+    createProgressionUpdater.mockReturnValue({ applyCompletedSession: vi.fn() });
     createSessionOrchestrator.mockReturnValue({
       endSessionForLearner,
       runReportGeneratingFlowForLearner
@@ -149,17 +151,21 @@ describe("Learner session runtime seam", () => {
     );
   });
 
-  it("does not wire a request-local Progression updater into production runtime", async () => {
+  it("wires Supabase-backed Progression updater into production runtime", async () => {
+    const progressionRepository = { kind: "progression-repository" };
     getSupabaseLearnerEntryContextEffect.mockReturnValue(
       Effect.succeed({
         ok: true,
         learnerId: "learner-42",
         idealCustomerProfileRepository: {} as never,
         generatedSessionCaseRepository: {} as never,
-        creditLedgerRepository: {} as never
+        creditLedgerRepository: {} as never,
+        progressionRepository
       })
     );
     createReportGenerationCoordinator.mockReturnValue({});
+    const fakeUpdater = { applyCompletedSession: vi.fn() };
+    createProgressionUpdater.mockReturnValue(fakeUpdater);
     createSessionOrchestrator.mockReturnValue({
       endSessionForLearner: vi.fn(),
       runReportGeneratingFlowForLearner: vi.fn()
@@ -167,10 +173,12 @@ describe("Learner session runtime seam", () => {
 
     await getLearnerSessionRuntime();
 
-    expect(createProgressionUpdater).not.toHaveBeenCalled();
+    expect(createProgressionUpdater).toHaveBeenCalledWith({
+      progressionRepository
+    });
     expect(createSessionOrchestrator).toHaveBeenCalledWith(
       expect.objectContaining({
-        generatedSessionCaseRepository: {}
+        progressionUpdater: fakeUpdater
       })
     );
   });
@@ -194,10 +202,12 @@ describe("Learner session runtime seam", () => {
         learnerId: "learner-42",
         idealCustomerProfileRepository: {} as never,
         generatedSessionCaseRepository: {} as never,
-        creditLedgerRepository: {} as never
+        creditLedgerRepository: {} as never,
+        progressionRepository: {} as never
       })
     );
     createReportGenerationCoordinator.mockReturnValue({});
+    createProgressionUpdater.mockReturnValue({ applyCompletedSession: vi.fn() });
     createSessionOrchestrator.mockReturnValue({
       endSessionForLearner,
       runReportGeneratingFlowForLearner

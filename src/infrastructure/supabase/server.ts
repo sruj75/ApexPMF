@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { Data, Effect } from "effect";
 import { cookies } from "next/headers";
 
@@ -11,7 +12,7 @@ export class SupabaseServerConfigurationError extends Data.TaggedError(
 export class SupabaseServerDependencyError extends Data.TaggedError(
   "SupabaseServerDependencyError"
 )<{
-  operation: "cookies" | "create-server-client";
+  operation: "cookies" | "create-server-client" | "create-admin-client";
   cause: unknown;
 }> {}
 
@@ -43,6 +44,32 @@ function getSupabaseEnvironment(): Effect.Effect<
   return Effect.succeed({
     supabaseUrl,
     supabasePublishableKey
+  });
+}
+
+function getSupabaseAdminEnvironment(): Effect.Effect<
+  {
+    supabaseUrl: string;
+    supabaseServiceRoleKey: string;
+  },
+  SupabaseServerConfigurationError,
+  never
+> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    return Effect.fail(
+      new SupabaseServerConfigurationError({
+        message:
+          "Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+      })
+    );
+  }
+
+  return Effect.succeed({
+    supabaseUrl,
+    supabaseServiceRoleKey
   });
 }
 
@@ -97,4 +124,30 @@ export function createSupabaseServerClientEffect(): Effect.Effect<
 
 export async function createSupabaseServerClient() {
   return Effect.runPromise(createSupabaseServerClientEffect());
+}
+
+export function createSupabaseAdminClientEffect(): Effect.Effect<
+  SupabaseClient,
+  SupabaseServerClientError,
+  never
+> {
+  return Effect.gen(function* () {
+    const { supabaseUrl, supabaseServiceRoleKey } =
+      yield* getSupabaseAdminEnvironment();
+
+    return yield* Effect.try({
+      try: () =>
+        createClient(supabaseUrl, supabaseServiceRoleKey, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false
+          }
+        }),
+      catch: (cause) =>
+        new SupabaseServerDependencyError({
+          operation: "create-admin-client",
+          cause
+        })
+    });
+  });
 }

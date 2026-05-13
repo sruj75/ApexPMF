@@ -19,6 +19,7 @@ import {
   type StartPracticeEntryContext,
   type StartPracticeSeamResult
 } from "@/src/application/start-session/practice-entry-seam";
+import { createEntryFailure } from "@/src/application/start-session/entry-failure";
 
 export type LearnerSessionRuntimeResult =
   | {
@@ -71,6 +72,24 @@ export async function startPracticeFromEntryContext(
   context: StartPracticeEntryContext
 ): Promise<StartPracticeSeamResult> {
   return Effect.runPromise(startPracticeFromEntryContextEffect(context));
+}
+
+export async function startPracticeForCurrentLearner(): Promise<
+  | StartPracticeSeamResult
+  | {
+      ok: false;
+      failure: ReturnType<typeof createEntryFailure>;
+    }
+> {
+  const context = await getLearnerEntryContext();
+  if (!context.ok) {
+    return {
+      ok: false,
+      failure: createEntryFailure({ category: "auth_missing" })
+    };
+  }
+
+  return startPracticeFromEntryContext(context);
 }
 
 export type ProfilePageDataResult =

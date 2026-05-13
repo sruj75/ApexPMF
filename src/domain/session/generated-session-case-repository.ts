@@ -8,12 +8,14 @@ import type { ReportStatus } from "./session-lifecycle";
 import type { SessionReport, SessionTranscriptTurn } from "./session-report";
 import type { SessionLifecycleState } from "./session-lifecycle";
 import type { SessionEvaluationArtifact } from "./session-evaluation";
+import type { SessionChargeResult } from "../credits/credit-ledger";
 
 export type GeneratedSessionCaseRepositoryOperation =
   | "create"
   | "getForLearner"
   | "updateSessionLifecycleForLearner"
-  | "updateReportArtifactsForLearner";
+  | "updateReportArtifactsForLearner"
+  | "updateCreditChargeForLearner";
 
 export class GeneratedSessionCaseRepositoryPersistenceError extends Data.TaggedError(
   "GeneratedSessionCaseRepositoryPersistenceError"
@@ -72,6 +74,15 @@ export type GeneratedSessionCaseRepository = {
     GeneratedSessionCaseRepositoryError,
     never
   >;
+  updateCreditChargeForLearner(input: {
+    learnerId: string;
+    sessionCaseId: string;
+    creditCharge: SessionChargeResult;
+  }): Effect.Effect<
+    GeneratedSessionCase | null,
+    GeneratedSessionCaseRepositoryError,
+    never
+  >;
 };
 
 export function createInMemoryGeneratedSessionCaseRepository(
@@ -90,7 +101,8 @@ export function createInMemoryGeneratedSessionCaseRepository(
           ...input,
           id: `session-case-${nextId}`,
           learnerId,
-          createdAt: new Date()
+          createdAt: new Date(),
+          creditCharge: null
         });
 
         nextId += 1;
@@ -156,6 +168,31 @@ export function createInMemoryGeneratedSessionCaseRepository(
           sessionReport: input.sessionReport,
           sessionTranscript: input.sessionTranscript,
           sessionEvaluation: input.sessionEvaluation
+        };
+
+        generatedSessionCases = generatedSessionCases.map((sessionCase, rowIndex) =>
+          rowIndex === index ? next : sessionCase
+        );
+
+        return next;
+      });
+    },
+
+    updateCreditChargeForLearner(input) {
+      return Effect.sync(() => {
+        const index = generatedSessionCases.findIndex(
+          (generatedSessionCase) =>
+            generatedSessionCase.learnerId === input.learnerId &&
+            generatedSessionCase.id === input.sessionCaseId
+        );
+        if (index < 0) {
+          return null;
+        }
+
+        const current = generatedSessionCases[index];
+        const next: GeneratedSessionCase = {
+          ...current,
+          creditCharge: input.creditCharge
         };
 
         generatedSessionCases = generatedSessionCases.map((sessionCase, rowIndex) =>

@@ -9,6 +9,10 @@ import {
 } from "./session-lifecycle";
 import type { SessionEvaluationArtifact } from "./session-evaluation";
 import type { SessionReport, SessionTranscriptTurn } from "./session-report";
+import type {
+  SessionChargeResult,
+  SessionCreditContext
+} from "../credits/credit-ledger";
 
 export type GeneratedSessionCase = GeneratedSessionCaseDraft & {
   id: string;
@@ -20,29 +24,51 @@ export type GeneratedSessionCase = GeneratedSessionCaseDraft & {
   sessionReport: SessionReport | null;
   sessionTranscript: SessionTranscriptTurn[] | null;
   sessionEvaluation: SessionEvaluationArtifact | null;
+  creditContext: PersistedSessionCreditContext;
+  creditCharge: SessionChargeResult | null;
 };
 
 export type CreateGeneratedSessionCaseInput = GeneratedSessionCaseDraft & {
   sessionSource: SessionSource;
   generationNonce: string;
+  creditContext: PersistedSessionCreditContext;
 };
+
+export type PersistedSessionCreditContext = Exclude<
+  SessionCreditContext,
+  { kind: "insufficient-credits" }
+>;
+
+export type StartedSessionCreditContext =
+  | { kind: "free-trial" }
+  | { kind: "paid"; estimatedCredits: number };
 
 export type StartedSession = {
   sessionId: string;
   openingContext: string;
   sessionSourceLabel: string;
   lightPersonaLabel: string;
+  creditContext: StartedSessionCreditContext;
 };
 
 export function toStartedSession(
   generatedSessionCase: GeneratedSessionCase
 ): StartedSession {
+  const resolvedCreditContext: StartedSessionCreditContext =
+    generatedSessionCase.creditContext.kind === "free-trial"
+      ? { kind: "free-trial" }
+      : {
+          kind: "paid",
+          estimatedCredits: generatedSessionCase.creditContext.estimatedCredits
+        };
+
   return {
     sessionId: generatedSessionCase.id,
     openingContext: generatedSessionCase.openingContext,
     sessionSourceLabel: sessionSourceLabel(generatedSessionCase.sessionSource),
     lightPersonaLabel:
-      generatedSessionCase.customerPersona.lightPersonaLabel
+      generatedSessionCase.customerPersona.lightPersonaLabel,
+    creditContext: resolvedCreditContext
   };
 }
 
@@ -57,11 +83,13 @@ export function withDefaultSessionLifecycle(
     | "sessionReport"
     | "sessionTranscript"
     | "sessionEvaluation"
+    | "creditCharge"
   > & {
     sessionLifecycle?: SessionLifecycleState;
     sessionReport?: SessionReport | null;
     sessionTranscript?: SessionTranscriptTurn[] | null;
     sessionEvaluation?: SessionEvaluationArtifact | null;
+    creditCharge?: SessionChargeResult | null;
   }
 ): GeneratedSessionCase {
   return {
@@ -71,6 +99,7 @@ export function withDefaultSessionLifecycle(
       createInitialSessionLifecycleState(),
     sessionReport: generatedSessionCase.sessionReport ?? null,
     sessionTranscript: generatedSessionCase.sessionTranscript ?? null,
-    sessionEvaluation: generatedSessionCase.sessionEvaluation ?? null
+    sessionEvaluation: generatedSessionCase.sessionEvaluation ?? null,
+    creditCharge: generatedSessionCase.creditCharge ?? null
   };
 }

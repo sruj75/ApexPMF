@@ -10,6 +10,7 @@ import type {
   PersonaGenerator
 } from "../src/domain/persona/persona-generation";
 import { createInMemoryGeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
+import { createInMemoryCreditLedgerRepository } from "../src/domain/credits/credit-ledger-repository";
 import { PersonaGenerationCapability } from "../src/application/llm-runtime/llm-runtime-layers";
 import { Effect, Layer } from "effect";
 
@@ -36,7 +37,8 @@ describe("Start Practice", () => {
     const started = await Effect.runPromise(
       startPracticeForLearner(learnerId, {
         idealCustomerProfileRepository: createInMemoryIdealCustomerProfileRepository(),
-        generatedSessionCaseRepository: generatedSessionCases
+        generatedSessionCaseRepository: generatedSessionCases,
+        creditLedgerRepository: createInMemoryCreditLedgerRepository()
       }).pipe(provideStartPracticeServices(personaGenerator, "nonce-1"))
     );
 
@@ -45,7 +47,8 @@ describe("Start Practice", () => {
       openingContext:
         "You are speaking with a finance operator who recently tried to improve month-end close.",
       sessionSourceLabel: "Broad Practice Pool",
-      lightPersonaLabel: "Finance operator"
+      lightPersonaLabel: "Finance operator",
+      creditContext: { kind: "free-trial" }
     });
     expect((started as Record<string, unknown>).personaBehavior).toBeUndefined();
     expect(personaGenerator.inputs).toMatchObject([
@@ -104,7 +107,8 @@ describe("Start Practice", () => {
       startPracticeForLearner(learnerId, {
         idealCustomerProfileRepository:
           createInMemoryIdealCustomerProfileRepository([profile]),
-        generatedSessionCaseRepository: generatedSessionCases
+        generatedSessionCaseRepository: generatedSessionCases,
+        creditLedgerRepository: createInMemoryCreditLedgerRepository()
       }).pipe(provideStartPracticeServices(personaGenerator, "nonce-profile"))
     );
 
@@ -142,7 +146,8 @@ describe("Start Practice", () => {
       startPracticeForLearner(learnerId, {
         idealCustomerProfileRepository: createInMemoryIdealCustomerProfileRepository(),
         generatedSessionCaseRepository:
-          createInMemoryGeneratedSessionCaseRepository()
+          createInMemoryGeneratedSessionCaseRepository(),
+        creditLedgerRepository: createInMemoryCreditLedgerRepository()
       }).pipe(provideStartPracticeServices(personaGenerator, "nonce-broad"))
     );
 
@@ -162,7 +167,10 @@ describe("Start Practice", () => {
         createInMemoryIdealCustomerProfileRepository([
           makeIdealCustomerProfile({ isActive: true })
         ]),
-      generatedSessionCaseRepository: generatedSessionCases
+      generatedSessionCaseRepository: generatedSessionCases,
+      creditLedgerRepository: createInMemoryCreditLedgerRepository([
+        { learnerId, freeTrialUsed: true, subscriptionCredits: 10, topUpCredits: 0 }
+      ])
     };
     const nonceLayer = Layer.succeed(StartPracticeNonce, {
       create: () => nonces.shift() ?? "unexpected-nonce"

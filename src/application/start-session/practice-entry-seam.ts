@@ -37,6 +37,10 @@ export type LearnerEntryContextResult =
         SupabaseLearnerEntryContextResult,
         { ok: true }
       >["generatedSessionCaseRepository"];
+      creditLedgerRepository: Extract<
+        SupabaseLearnerEntryContextResult,
+        { ok: true }
+      >["creditLedgerRepository"];
     }
   | {
       ok: false;
@@ -121,10 +125,31 @@ export function getLearnerSessionRuntimeEffect(): Effect.Effect<
     return {
       ok: true as const,
       endSessionForLearner({ sessionId, reason }) {
-        return orchestrator.endSessionForLearner({
-          learnerId,
-          sessionId,
-          reason
+        return Effect.gen(function* () {
+          const generatedSessionCase =
+            yield* context.generatedSessionCaseRepository.getForLearner(
+              learnerId,
+              sessionId
+            );
+          const actualDurationMinutes = generatedSessionCase
+            ? elapsedMinutesSince(generatedSessionCase.createdAt)
+            : 0;
+
+          return yield* orchestrator.endSessionForLearner({
+            learnerId,
+            sessionId,
+            reason,
+            ...(generatedSessionCase
+              ? {
+                  creditFinalization: {
+                    sessionCreditContext: generatedSessionCase.creditContext,
+                    actualDurationMinutes,
+                    usableDurationMinutes: actualDurationMinutes,
+                    creditLedgerRepository: context.creditLedgerRepository
+                  }
+                }
+              : {})
+          });
         });
       },
       runReportGeneratingFlowForLearner({ sessionId }) {
@@ -146,6 +171,10 @@ export function getLearnerSessionRuntimeEffect(): Effect.Effect<
   });
 }
 
+function elapsedMinutesSince(createdAt: Date): number {
+  return Math.max(0, (Date.now() - createdAt.getTime()) / 60_000);
+}
+
 export type StartPracticeEntryContext = {
   learnerId: string;
   idealCustomerProfileRepository: Extract<
@@ -156,6 +185,10 @@ export type StartPracticeEntryContext = {
     LearnerEntryContextResult,
     { ok: true }
   >["generatedSessionCaseRepository"];
+  creditLedgerRepository: Extract<
+    LearnerEntryContextResult,
+    { ok: true }
+  >["creditLedgerRepository"];
 };
 
 export function startPracticeFromEntryContextEffect(
@@ -167,7 +200,8 @@ export function startPracticeFromEntryContextEffect(
     const result = yield* Effect.either(
       startPracticeForLearner(context.learnerId, {
         idealCustomerProfileRepository: context.idealCustomerProfileRepository,
-        generatedSessionCaseRepository: context.generatedSessionCaseRepository
+        generatedSessionCaseRepository: context.generatedSessionCaseRepository,
+        creditLedgerRepository: context.creditLedgerRepository
       }).pipe(
         Effect.provide(defaultStartPracticeNonceLayer),
         Effect.provide(personaLayer)

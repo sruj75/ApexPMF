@@ -1,8 +1,11 @@
 import type { GeneratedSessionCaseRepository } from "@/src/domain/session/generated-session-case-repository";
 import type { IdealCustomerProfileRepository } from "@/src/domain/persona/ideal-customer-profile-repository";
+import type { CreditLedgerRepository } from "@/src/domain/credits/credit-ledger-repository";
+import { createSupabaseCreditLedgerRepository } from "@/src/infrastructure/supabase/credit-ledgers";
 import { createSupabaseGeneratedSessionCaseRepository } from "@/src/infrastructure/supabase/generated-session-cases";
 import { createSupabaseIdealCustomerProfileRepository } from "@/src/infrastructure/supabase/ideal-customer-profiles";
 import {
+  createSupabaseAdminClientEffect,
   createSupabaseServerClientEffect,
   type SupabaseServerClientError
 } from "@/src/infrastructure/supabase/server";
@@ -14,6 +17,7 @@ export type SupabaseLearnerEntryContextResult =
       learnerId: string;
       idealCustomerProfileRepository: IdealCustomerProfileRepository;
       generatedSessionCaseRepository: GeneratedSessionCaseRepository;
+      creditLedgerRepository: CreditLedgerRepository;
     }
   | {
       ok: false;
@@ -73,13 +77,16 @@ export function getSupabaseLearnerEntryContextEffect(): Effect.Effect<
       };
     }
 
+    const creditSupabase = yield* createSupabaseAdminClientEffect();
+
     return {
       ok: true as const,
       learnerId: user.id,
       idealCustomerProfileRepository:
         createSupabaseIdealCustomerProfileRepository(supabase),
       generatedSessionCaseRepository:
-        createSupabaseGeneratedSessionCaseRepository(supabase)
+        createSupabaseGeneratedSessionCaseRepository(supabase),
+      creditLedgerRepository: createSupabaseCreditLedgerRepository(creditSupabase)
     };
   });
 }

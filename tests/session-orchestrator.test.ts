@@ -1,10 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   SessionCaseNotFoundError,
   createSessionOrchestrator
 } from "../src/application/end-session/session-orchestrator";
 import { createInMemoryGeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
 import type { GeneratedSessionCaseRepository } from "../src/domain/session/generated-session-case-repository";
+import { createInMemoryCreditLedgerRepository } from "../src/domain/credits/credit-ledger-repository";
+import { createProgressionUpdater } from "../src/application/update-progression/progression-updater";
+import { createInMemoryProgressionRepository } from "../src/domain/progression/progression-repository";
 import { Effect } from "effect";
 
 const learnerId = "learner-1";
@@ -532,6 +535,212 @@ describe("Session Orchestrator", () => {
     expect(persisted?.sessionLifecycle.reportReadyAt?.toISOString()).toBe(
       "2026-05-08T10:30:00.000Z"
     );
+  });
+
+  it("finalizes Credits when ending a paid Session with credit context", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    const creditLedgerRepository = createInMemoryCreditLedgerRepository([
+      { learnerId, freeTrialUsed: true, subscriptionCredits: 5, topUpCredits: 0 }
+    ]);
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
+        }
+      }
+    });
+
+    const outcome = await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion,
+        reason: "natural-conclusion",
+        creditFinalization: {
+          sessionCreditContext: { kind: "paid", estimatedCredits: 3, availableCredits: 5 },
+          actualDurationMinutes: 7,
+          usableDurationMinutes: 7,
+          creditLedgerRepository
+        }
+      })
+    );
+
+    expect(outcome.endedReason).toBe("natural-conclusion");
+    expect(outcome.creditChargeResult).toEqual({
+      kind: "charged",
+      billed: {
+        actualDurationMinutes: 7,
+        billedDurationMinutes: 10,
+        creditsCharged: 2
+      }
+    });
+
+    const ledger = await Effect.runPromise(
+      creditLedgerRepository.getOrInitializeForLearner(learnerId)
+    );
+    expect(ledger.subscriptionCredits).toBe(3);
+
+    const persisted = await Effect.runPromise(
+      repository.getForLearner(learnerId, sessionIds.naturalConclusion)
+    );
+    expect(persisted?.creditCharge).toEqual(outcome.creditChargeResult);
+  });
+
+  it("applies fair Voice Failure credit handling through the orchestrator", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    const creditLedgerRepository = createInMemoryCreditLedgerRepository([
+      { learnerId, freeTrialUsed: true, subscriptionCredits: 5, topUpCredits: 0 }
+    ]);
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
+        }
+      }
+    });
+
+    const outcome = await Effect.runPromise(
+      orchestrator.handleVoiceFailureForLearner({
+        learnerId,
+        sessionId: sessionIds.voiceFailure,
+        recoverable: false,
+        creditFinalization: {
+          sessionCreditContext: { kind: "paid", estimatedCredits: 3, availableCredits: 5 },
+          actualDurationMinutes: 12,
+          usableDurationMinutes: 8,
+          creditLedgerRepository
+        }
+      })
+    );
+
+    expect(outcome.behavior).toBe("end-session");
+
+    const ledger = await Effect.runPromise(
+      creditLedgerRepository.getOrInitializeForLearner(learnerId)
+    );
+    expect(ledger.subscriptionCredits).toBe(3);
+  });
+});
+
+describe("Session Orchestrator — Progression integration", () => {
+  it("triggers progression update when report generation succeeds", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    const progressionRepository = createInMemoryProgressionRepository();
+    const progressionUpdater = createProgressionUpdater({ progressionRepository });
+    const applyCompletedSessionSpy = vi.spyOn(progressionUpdater, "applyCompletedSession");
+
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
+        }
+      },
+      progressionUpdater
+    });
+
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion,
+        reason: "natural-conclusion"
+      })
+    );
+
+    await Effect.runPromise(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion
+      })
+    );
+
+    expect(applyCompletedSessionSpy).toHaveBeenCalledTimes(1);
+    expect(applyCompletedSessionSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion
+      })
+    );
+
+    const progression = await Effect.runPromise(
+      progressionRepository.getOrInitializeForLearner(learnerId)
+    );
+    expect(progression.completedSessionCount).toBe(1);
+    expect(progression.achievementNodes).toContainEqual(
+      expect.objectContaining({ id: "first-session" })
+    );
+  });
+
+  it("does not trigger progression update when report evidence is insufficient", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    const progressionRepository = createInMemoryProgressionRepository();
+    const progressionUpdater = createProgressionUpdater({ progressionRepository });
+    const applyCompletedSessionSpy = vi.spyOn(progressionUpdater, "applyCompletedSession");
+
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        generateForEndedSession() {
+          return Effect.succeed({
+            status: "insufficient-evidence" as const,
+            reason: "too-few-turns"
+          });
+        }
+      },
+      progressionUpdater
+    });
+
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion,
+        reason: "natural-conclusion"
+      })
+    );
+
+    await Effect.runPromise(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion
+      })
+    );
+
+    expect(applyCompletedSessionSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it("does not trigger progression update for user-quit sessions", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    const progressionRepository = createInMemoryProgressionRepository();
+    const progressionUpdater = createProgressionUpdater({ progressionRepository });
+    const applyCompletedSessionSpy = vi.spyOn(progressionUpdater, "applyCompletedSession");
+
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        generateForEndedSession() {
+          return Effect.succeed(makeReadyReportGenerationResult());
+        }
+      },
+      progressionUpdater
+    });
+
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.userQuit,
+        reason: "user-quit"
+      })
+    );
+
+    await Effect.runPromise(
+      orchestrator.runReportGeneratingFlowForLearner({
+        learnerId,
+        sessionId: sessionIds.userQuit
+      })
+    );
+
+    expect(applyCompletedSessionSpy).toHaveBeenCalledTimes(0);
   });
 });
 

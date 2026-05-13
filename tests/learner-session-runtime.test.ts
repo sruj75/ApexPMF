@@ -5,11 +5,13 @@ const {
   getSupabaseLearnerEntryContextEffect,
   createSessionOrchestrator,
   createReportGenerationCoordinator,
+  createProgressionUpdater,
   SessionCaseNotFoundError
 } = vi.hoisted(() => ({
   getSupabaseLearnerEntryContextEffect: vi.fn(),
   createSessionOrchestrator: vi.fn(),
   createReportGenerationCoordinator: vi.fn(),
+  createProgressionUpdater: vi.fn(),
   SessionCaseNotFoundError: class SessionCaseNotFoundError extends Error {}
 }));
 
@@ -24,6 +26,10 @@ vi.mock("@/src/application/end-session/session-orchestrator", () => ({
 
 vi.mock("@/src/application/generate-report/report-generation-coordinator", () => ({
   createReportGenerationCoordinator
+}));
+
+vi.mock("@/src/application/update-progression/progression-updater", () => ({
+  createProgressionUpdater
 }));
 
 import { getLearnerSessionRuntime } from "../src/application/start-session/practice-entry-web-adapter";
@@ -68,7 +74,19 @@ describe("Learner session runtime seam", () => {
         ok: true,
         learnerId: "learner-42",
         idealCustomerProfileRepository: {} as never,
-        generatedSessionCaseRepository: {} as never
+        generatedSessionCaseRepository: {
+          getForLearner: vi.fn(() =>
+            Effect.succeed({
+              createdAt: new Date(Date.now() - 7 * 60_000),
+              creditContext: {
+                kind: "paid",
+                estimatedCredits: 3,
+                availableCredits: 5
+              }
+            })
+          )
+        } as never,
+        creditLedgerRepository: { kind: "credit-ledger-repository" } as never
       })
     );
     const reportGenerationCoordinator = {};
@@ -107,16 +125,54 @@ describe("Learner session runtime seam", () => {
     expect(endSessionForLearner).toHaveBeenCalledWith({
       learnerId: "learner-42",
       sessionId: "session-case-1",
-      reason: "user-quit"
+      reason: "user-quit",
+      creditFinalization: expect.objectContaining({
+        sessionCreditContext: {
+          kind: "paid",
+          estimatedCredits: 3,
+          availableCredits: 5
+        },
+        creditLedgerRepository: { kind: "credit-ledger-repository" }
+      })
     });
     expect(runReportGeneratingFlowForLearner).toHaveBeenCalledWith({
       learnerId: "learner-42",
       sessionId: "session-case-1"
     });
-    expect(createSessionOrchestrator).toHaveBeenCalledWith({
-      generatedSessionCaseRepository: {},
-      reportGenerationCoordinator
+    expect(createSessionOrchestrator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generatedSessionCaseRepository: expect.objectContaining({
+          getForLearner: expect.any(Function)
+        }),
+        reportGenerationCoordinator
+      })
+    );
+  });
+
+  it("does not wire a request-local Progression updater into production runtime", async () => {
+    getSupabaseLearnerEntryContextEffect.mockReturnValue(
+      Effect.succeed({
+        ok: true,
+        learnerId: "learner-42",
+        idealCustomerProfileRepository: {} as never,
+        generatedSessionCaseRepository: {} as never,
+        creditLedgerRepository: {} as never
+      })
+    );
+    createReportGenerationCoordinator.mockReturnValue({});
+    createSessionOrchestrator.mockReturnValue({
+      endSessionForLearner: vi.fn(),
+      runReportGeneratingFlowForLearner: vi.fn()
     });
+
+    await getLearnerSessionRuntime();
+
+    expect(createProgressionUpdater).not.toHaveBeenCalled();
+    expect(createSessionOrchestrator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generatedSessionCaseRepository: {}
+      })
+    );
   });
 
   it("maps report-generating missing-session errors into boundary not-found outcomes", async () => {
@@ -137,7 +193,8 @@ describe("Learner session runtime seam", () => {
         ok: true,
         learnerId: "learner-42",
         idealCustomerProfileRepository: {} as never,
-        generatedSessionCaseRepository: {} as never
+        generatedSessionCaseRepository: {} as never,
+        creditLedgerRepository: {} as never
       })
     );
     createReportGenerationCoordinator.mockReturnValue({});

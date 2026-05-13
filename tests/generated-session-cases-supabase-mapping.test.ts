@@ -70,6 +70,25 @@ describe("Generated Session Case Supabase mapping", () => {
     });
   });
 
+  it("decodes legacy rows with null credit_context as Free Trial Sessions", async () => {
+    const repository = createRepositoryForGetForLearner({
+      data: {
+        ...validGeneratedSessionCaseRow,
+        credit_context: null
+      }
+    });
+
+    const sessionCase = await repository.getForLearner(
+      "learner-1",
+      "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
+    );
+
+    expect(sessionCase?.creditContext).toEqual({
+      kind: "free-trial",
+      maxDurationMinutes: 15
+    });
+  });
+
   it("throws typed decode errors when nested JSON shape is invalid", async () => {
     const repository = createRepositoryForGetForLearner({
       data: {
@@ -843,5 +862,10 @@ const validGeneratedSessionCaseRow = {
   report_ready_at: null,
   session_report: null,
   session_transcript: null,
-  session_evaluation: null
+  session_evaluation: null,
+  credit_context: {
+    kind: "free-trial",
+    maxDurationMinutes: 15
+  },
+  credit_charge: null
 };

@@ -116,6 +116,33 @@ export function createSupabaseGeneratedSessionCaseRepository(
           "updateReportArtifactsForLearner"
         );
       });
+    },
+
+    updateCreditChargeForLearner(input) {
+      return Effect.gen(function* () {
+        const updated = yield* querySupabase({
+          operation: "updateCreditChargeForLearner",
+          run: () =>
+            supabase
+              .from("generated_session_cases")
+              .update({
+                credit_charge: input.creditCharge
+              })
+              .eq("learner_id", input.learnerId)
+              .eq("id", input.sessionCaseId)
+              .select(generatedSessionCaseColumns)
+              .maybeSingle()
+        });
+
+        if (!updated.data) {
+          return null;
+        }
+
+        return yield* decodeGeneratedSessionCaseRow(
+          updated.data,
+          "updateCreditChargeForLearner"
+        );
+      });
     }
   };
 }

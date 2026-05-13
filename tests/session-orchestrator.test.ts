@@ -579,6 +579,11 @@ describe("Session Orchestrator", () => {
       creditLedgerRepository.getOrInitializeForLearner(learnerId)
     );
     expect(ledger.subscriptionCredits).toBe(3);
+
+    const persisted = await Effect.runPromise(
+      repository.getForLearner(learnerId, sessionIds.naturalConclusion)
+    );
+    expect(persisted?.creditCharge).toEqual(outcome.creditChargeResult);
   });
 
   it("applies fair Voice Failure credit handling through the orchestrator", async () => {

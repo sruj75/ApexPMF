@@ -138,6 +138,22 @@ export function createSessionOrchestrator(input: {
           usableDurationMinutes: creditFinalization.usableDurationMinutes,
           creditLedgerRepository: creditFinalization.creditLedgerRepository
         });
+
+        const chargedSession =
+          yield* generatedSessionCaseRepository.updateCreditChargeForLearner({
+            learnerId,
+            sessionCaseId: sessionId,
+            creditCharge: creditChargeResult
+          });
+        if (!chargedSession) {
+          return yield* Effect.fail(
+            new SessionCaseNotFoundError({
+              learnerId,
+              sessionId,
+              operation: "end-session"
+            })
+          );
+        }
       }
 
       const route = resolveSessionLifecycleRoute({

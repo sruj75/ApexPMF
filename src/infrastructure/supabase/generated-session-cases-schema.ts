@@ -126,16 +126,18 @@ const GeneratedSessionCaseRowSchema = Schema.Struct({
   session_report: Schema.NullOr(SessionReportSchema),
   session_transcript: Schema.NullOr(Schema.Array(SessionTranscriptTurnSchema)),
   session_evaluation: Schema.NullOr(SessionEvaluationArtifactSchema),
-  credit_context: Schema.Union(
-    Schema.Struct({
-      kind: Schema.Literal("free-trial"),
-      maxDurationMinutes: Schema.Literal(15)
-    }),
-    Schema.Struct({
-      kind: Schema.Literal("paid"),
-      estimatedCredits: Schema.Number,
-      availableCredits: Schema.Number
-    })
+  credit_context: Schema.NullOr(
+    Schema.Union(
+      Schema.Struct({
+        kind: Schema.Literal("free-trial"),
+        maxDurationMinutes: Schema.Literal(15)
+      }),
+      Schema.Struct({
+        kind: Schema.Literal("paid"),
+        estimatedCredits: Schema.Number,
+        availableCredits: Schema.Number
+      })
+    )
   ),
   credit_charge: Schema.NullOr(Schema.Unknown)
 });

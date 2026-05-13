@@ -149,10 +149,7 @@ describe("Learner session runtime seam", () => {
     );
   });
 
-  it("wires progressionUpdater into the session orchestrator", async () => {
-    const progressionUpdater = { applyCompletedSession: vi.fn() };
-    createProgressionUpdater.mockReturnValue(progressionUpdater);
-
+  it("does not wire a request-local Progression updater into production runtime", async () => {
     getSupabaseLearnerEntryContextEffect.mockReturnValue(
       Effect.succeed({
         ok: true,
@@ -170,9 +167,10 @@ describe("Learner session runtime seam", () => {
 
     await getLearnerSessionRuntime();
 
+    expect(createProgressionUpdater).not.toHaveBeenCalled();
     expect(createSessionOrchestrator).toHaveBeenCalledWith(
       expect.objectContaining({
-        progressionUpdater
+        generatedSessionCaseRepository: {}
       })
     );
   });

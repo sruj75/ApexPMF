@@ -3,18 +3,21 @@ import { Effect } from "effect";
 
 const {
   createSupabaseServerClientEffect,
+  createSupabaseAdminClientEffect,
   createSupabaseIdealCustomerProfileRepository,
   createSupabaseGeneratedSessionCaseRepository,
   createSupabaseCreditLedgerRepository
 } = vi.hoisted(() => ({
   createSupabaseServerClientEffect: vi.fn(),
+  createSupabaseAdminClientEffect: vi.fn(),
   createSupabaseIdealCustomerProfileRepository: vi.fn(),
   createSupabaseGeneratedSessionCaseRepository: vi.fn(),
   createSupabaseCreditLedgerRepository: vi.fn()
 }));
 
 vi.mock("@/src/infrastructure/supabase/server", () => ({
-  createSupabaseServerClientEffect
+  createSupabaseServerClientEffect,
+  createSupabaseAdminClientEffect
 }));
 
 vi.mock("@/src/infrastructure/supabase/ideal-customer-profiles", () => ({
@@ -42,8 +45,10 @@ describe("Supabase learner entry context", () => {
       }
     };
     const creditLedgerRepository = { kind: "supabase-credit-ledger" };
+    const creditSupabase = { kind: "admin-supabase" };
 
     createSupabaseServerClientEffect.mockReturnValue(Effect.succeed(supabase));
+    createSupabaseAdminClientEffect.mockReturnValue(Effect.succeed(creditSupabase));
     createSupabaseIdealCustomerProfileRepository.mockReturnValue({
       kind: "profile-repository"
     });
@@ -59,6 +64,6 @@ describe("Supabase learner entry context", () => {
       learnerId: "learner-1",
       creditLedgerRepository
     });
-    expect(createSupabaseCreditLedgerRepository).toHaveBeenCalledWith(supabase);
+    expect(createSupabaseCreditLedgerRepository).toHaveBeenCalledWith(creditSupabase);
   });
 });

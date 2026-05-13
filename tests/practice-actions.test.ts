@@ -4,16 +4,14 @@ import { startPracticeAction } from "../app/practice/actions";
 
 const {
   redirect,
-  getLearnerEntryContext,
-  startPracticeFromEntryContext,
+  startPracticeForCurrentLearner,
   createOpenRouterChatClient,
   createSupabaseServerClient
 } = vi.hoisted(() => ({
   redirect: vi.fn((location: string) => {
     throw new Error(`REDIRECT:${location}`);
   }),
-  getLearnerEntryContext: vi.fn(),
-  startPracticeFromEntryContext: vi.fn(),
+  startPracticeForCurrentLearner: vi.fn(),
   createOpenRouterChatClient: vi.fn(),
   createSupabaseServerClient: vi.fn()
 }));
@@ -23,8 +21,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/src/application/start-session/practice-entry-web-adapter", () => ({
-  getLearnerEntryContext,
-  startPracticeFromEntryContext
+  startPracticeForCurrentLearner
 }));
 
 vi.mock("@/src/infrastructure/llm/openrouter", () => ({
@@ -46,25 +43,19 @@ describe("Start Practice action", () => {
   });
 
   it("redirects unauthenticated Learners to /login", async () => {
-    getLearnerEntryContext.mockResolvedValue({
+    startPracticeForCurrentLearner.mockResolvedValue({
       ok: false,
-      reason: "unauthenticated"
+      failure: createEntryFailure({ category: "auth_missing" })
     });
 
     await expect(startPracticeAction(new FormData())).rejects.toThrow(
       "REDIRECT:/login"
     );
-    expect(startPracticeFromEntryContext).not.toHaveBeenCalled();
+    expect(startPracticeForCurrentLearner).toHaveBeenCalledTimes(1);
   });
 
   it("preserves session creation failure redirect behavior", async () => {
-    getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      idealCustomerProfileRepository: {},
-      generatedSessionCaseRepository: {}
-    });
-    startPracticeFromEntryContext.mockResolvedValue({
+    startPracticeForCurrentLearner.mockResolvedValue({
       ok: false,
       failure: createEntryFailure({
         category: "provider_failure",
@@ -78,13 +69,7 @@ describe("Start Practice action", () => {
   });
 
   it("keeps infrastructure wiring out of the UI action layer", async () => {
-    getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      idealCustomerProfileRepository: {},
-      generatedSessionCaseRepository: {}
-    });
-    startPracticeFromEntryContext.mockResolvedValue({
+    startPracticeForCurrentLearner.mockResolvedValue({
       ok: true,
       sessionId: "session-case-abc"
     });
@@ -98,13 +83,7 @@ describe("Start Practice action", () => {
   });
 
   it("redirects to the created Session on success", async () => {
-    getLearnerEntryContext.mockResolvedValue({
-      ok: true,
-      learnerId: "learner-1",
-      idealCustomerProfileRepository: {},
-      generatedSessionCaseRepository: {}
-    });
-    startPracticeFromEntryContext.mockResolvedValue({
+    startPracticeForCurrentLearner.mockResolvedValue({
       ok: true,
       sessionId: "session-case-abc"
     });

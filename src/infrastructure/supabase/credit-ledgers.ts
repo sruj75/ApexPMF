@@ -9,9 +9,6 @@ import {
 } from "@/src/domain/credits/credit-ledger-repository";
 import { formatParseErrorDetails } from "./supabase-row-decode-error";
 
-const creditLedgerColumns =
-  "learner_id, free_trial_used, subscription_credits, top_up_credits";
-
 const CreditLedgerRowSchema = Schema.Struct({
   learner_id: Schema.String,
   free_trial_used: Schema.Boolean,
@@ -27,100 +24,67 @@ export function createSupabaseCreditLedgerRepository(
   return {
     getOrInitializeForLearner(learnerId) {
       return Effect.gen(function* () {
-        const existing = yield* queryCreditLedger({
+        const result = yield* queryCreditLedger({
           operation: "getOrInitializeForLearner",
           run: () =>
-            supabase
-              .from("credit_ledgers")
-              .select(creditLedgerColumns)
-              .eq("learner_id", learnerId)
-              .maybeSingle()
+            supabase.rpc("ensure_credit_ledger", {
+              p_learner_id: learnerId
+            })
         });
 
-        if (existing.data) {
-          return yield* decodeCreditLedger(existing.data, "getOrInitializeForLearner");
-        }
-
-        const created = yield* queryCreditLedger({
-          operation: "getOrInitializeForLearner",
-          run: () =>
-            supabase
-              .from("credit_ledgers")
-              .insert({ learner_id: learnerId })
-              .select(creditLedgerColumns)
-              .single()
-        });
-
-        return yield* decodeCreditLedger(created.data, "getOrInitializeForLearner");
+        return yield* decodeCreditLedger(result.data, "getOrInitializeForLearner");
       });
     },
 
     markFreeTrialUsed(learnerId) {
-      return mutateLedger({
+      return callLedgerMutation({
         supabase,
         learnerId,
         operation: "markFreeTrialUsed",
-        patch: { free_trial_used: true }
+        rpc: "mark_credit_ledger_free_trial_used"
       });
     },
 
     applyCharge(learnerId, credits) {
-      return Effect.gen(function* () {
-        const current = yield* ensureLedger(supabase, learnerId);
-        const subscriptionCharge = Math.min(credits, current.subscriptionCredits);
-        const topUpCharge = Math.max(0, credits - subscriptionCharge);
-
-        return yield* mutateLedger({
-          supabase,
-          learnerId,
-          operation: "applyCharge",
-          patch: {
-            subscription_credits: current.subscriptionCredits - subscriptionCharge,
-            top_up_credits: current.topUpCredits - topUpCharge
-          }
-        });
+      return callLedgerMutation({
+        supabase,
+        learnerId,
+        operation: "applyCharge",
+        rpc: "apply_credit_ledger_charge",
+        credits
       });
     },
 
     applyRefund(learnerId, credits) {
-      return Effect.gen(function* () {
-        const current = yield* ensureLedger(supabase, learnerId);
-        return yield* mutateLedger({
-          supabase,
-          learnerId,
-          operation: "applyRefund",
-          patch: {
-            top_up_credits: current.topUpCredits + credits
-          }
-        });
+      return callLedgerMutation({
+        supabase,
+        learnerId,
+        operation: "applyRefund",
+        rpc: "apply_credit_ledger_refund",
+        credits
       });
     }
   };
 }
 
-function ensureLedger(supabase: SupabaseClient, learnerId: string) {
-  return createSupabaseCreditLedgerRepository(supabase).getOrInitializeForLearner(
-    learnerId
-  );
-}
-
-function mutateLedger(input: {
+function callLedgerMutation(input: {
   supabase: SupabaseClient;
   learnerId: string;
   operation: CreditLedgerRepositoryOperation;
-  patch: Record<string, number | boolean>;
+  rpc:
+    | "mark_credit_ledger_free_trial_used"
+    | "apply_credit_ledger_charge"
+    | "apply_credit_ledger_refund";
+  credits?: number;
 }) {
   return Effect.gen(function* () {
-    yield* ensureLedger(input.supabase, input.learnerId);
     const updated = yield* queryCreditLedger({
       operation: input.operation,
       run: () =>
-        input.supabase
-          .from("credit_ledgers")
-          .update(input.patch)
-          .eq("learner_id", input.learnerId)
-          .select(creditLedgerColumns)
-          .single()
+        input.supabase.rpc(input.rpc, {
+          p_learner_id: input.learnerId,
+          ...(input.credits === undefined ? {} : { p_credits: input.credits })
+        })
     });
 
     return yield* decodeCreditLedger(updated.data, input.operation);

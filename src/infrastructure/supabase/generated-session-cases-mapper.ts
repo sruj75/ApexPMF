@@ -63,7 +63,12 @@ export function decodeGeneratedSessionCaseRow(
         sessionEvaluation: cloneUnknownOrNull<SessionEvaluationArtifact>(
           decodedRow.session_evaluation
         ),
-        creditContext: decodedRow.credit_context,
+        creditContext:
+          decodedRow.credit_context ??
+          ({
+            kind: "free-trial",
+            maxDurationMinutes: 15
+          } as const),
         creditCharge: cloneUnknownOrNull<SessionChargeResult>(decodedRow.credit_charge)
       };
     },

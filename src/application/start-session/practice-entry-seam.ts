@@ -12,8 +12,6 @@ import {
   createSessionOrchestrator
 } from "@/src/application/end-session/session-orchestrator";
 import { createReportGenerationCoordinator } from "@/src/application/generate-report/report-generation-coordinator";
-import { createProgressionUpdater } from "@/src/application/update-progression/progression-updater";
-import { createInMemoryProgressionRepository } from "@/src/domain/progression/progression-repository";
 import type { SessionEndReason } from "@/src/domain/session/session-lifecycle";
 import {
   normalizeStartPracticeFailure,
@@ -117,12 +115,9 @@ export function getLearnerSessionRuntimeEffect(): Effect.Effect<
       process.env
     );
     const reportGenerationCoordinator = createReportGenerationCoordinator();
-    const progressionRepository = createInMemoryProgressionRepository();
-    const progressionUpdater = createProgressionUpdater({ progressionRepository });
     const orchestrator = createSessionOrchestrator({
       generatedSessionCaseRepository: context.generatedSessionCaseRepository,
-      reportGenerationCoordinator,
-      progressionUpdater
+      reportGenerationCoordinator
     });
 
     const { learnerId } = context;

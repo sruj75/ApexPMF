@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { StartedSession } from "@/src/application/practice-route/practice-route-decision";
+import { PRODUCT_DISPLAY_NAME } from "@/src/product/brand";
 import { endSessionAction } from "./actions";
 
 type SessionStartViewProps = {
@@ -11,7 +12,7 @@ export function SessionStartView({ startedSession }: SessionStartViewProps) {
     <div className="dashboard-shell session-shell">
       <aside className="landing-sidebar dashboard-sidebar" aria-label="Practice">
         <Link className="brand-link" href="/dashboard">
-          The Mom Test Simulator
+          {PRODUCT_DISPLAY_NAME}
         </Link>
         <div className="session-timer-panel" aria-label="Session status">
           <p className="dashboard-card-label">Session Timer</p>

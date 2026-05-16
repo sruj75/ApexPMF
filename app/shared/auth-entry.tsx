@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PRODUCT_DISPLAY_NAME } from "@/src/product/brand";
 
 type AuthEntryProps = {
   eyebrow: string;
@@ -10,7 +11,7 @@ export function AuthEntry({ eyebrow, title, description }: AuthEntryProps) {
   return (
     <main className="auth-shell">
       <Link className="brand-link" href="/">
-        The Mom Test Simulator
+        {PRODUCT_DISPLAY_NAME}
       </Link>
       <section className="auth-panel" aria-labelledby="auth-title">
         <p className="eyebrow">{eyebrow}</p>

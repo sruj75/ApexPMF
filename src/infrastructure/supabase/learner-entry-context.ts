@@ -46,6 +46,10 @@ export type SupabaseLearnerEntryContextError =
   | LearnerEntryContextDependencyError
   | LearnerEntryContextAuthQueryError;
 
+function isMissingAuthSession(error: { message?: string } | null): boolean {
+  return error?.message === "Auth session missing!";
+}
+
 export function getSupabaseLearnerEntryContextEffect(): Effect.Effect<
   SupabaseLearnerEntryContextResult,
   SupabaseLearnerEntryContextError,
@@ -61,6 +65,13 @@ export function getSupabaseLearnerEntryContextEffect(): Effect.Effect<
           cause
         })
     });
+
+    if (isMissingAuthSession(authResult.error)) {
+      return {
+        ok: false as const,
+        reason: "unauthenticated" as const
+      };
+    }
 
     if (authResult.error) {
       return yield* Effect.fail(

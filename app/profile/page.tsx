@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getProfilePageData } from "@/src/application/start-session/practice-entry-web-adapter";
+import { PRODUCT_DISPLAY_NAME } from "@/src/product/brand";
 import { startPracticeAction } from "../practice/actions";
 import { StartPracticeForm } from "../practice/start-practice-form";
 import {
@@ -35,7 +36,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
     <div className="dashboard-shell">
       <aside className="landing-sidebar dashboard-sidebar" aria-label="Practice">
         <Link className="brand-link" href="/dashboard">
-          The Mom Test Simulator
+          {PRODUCT_DISPLAY_NAME}
         </Link>
         <nav className="site-nav" aria-label="Profile navigation">
           <Link href="/dashboard">Practice Dashboard</Link>

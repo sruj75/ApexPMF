@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { presentDefaultSessionSourceForDashboard } from "@/src/application/start-session/session-source-presentation";
 import { getDashboardPageData } from "@/src/application/start-session/practice-entry-web-adapter";
+import { PRODUCT_DISPLAY_NAME } from "@/src/product/brand";
 import { startPracticeAction } from "../practice/actions";
 import { StartPracticeForm } from "../practice/start-practice-form";
 import { ProgressionPathCard } from "./progression-path-card";
@@ -22,7 +23,7 @@ export default async function DashboardPage() {
     <div className="dashboard-shell">
       <aside className="landing-sidebar dashboard-sidebar" aria-label="Practice">
         <Link className="brand-link" href="/dashboard">
-          The Mom Test Simulator
+          {PRODUCT_DISPLAY_NAME}
         </Link>
         <nav className="site-nav" aria-label="Dashboard navigation">
           <Link className="nav-link nav-link--active" href="/dashboard" aria-current="page">

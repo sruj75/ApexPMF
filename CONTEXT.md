@@ -1,4 +1,4 @@
-# Mom Test Simulator
+# zeroone
 
 A practice environment for entrepreneurs to improve customer discovery interview skill through uninterrupted simulated conversations and post-session feedback.
 
@@ -68,9 +68,16 @@ _Avoid_: Team, coach, organization
 The public marketing page that explains the product and sends users to sign up or log in.
 _Avoid_: Onboarding, lesson intro
 
+**Product display name**:
+The user-visible product label shown in React UI: `ZERO 🚀 ONE`.
+_Avoid_: Using the display string in OpenRouter titles, env defaults, or other machine-facing metadata.
+
+**Product app name**:
+The canonical ASCII identifier `zeroone` (matches repository and metadata such as document title and `OPENROUTER_APP_TITLE`).
+_Avoid_: Confusing with unrelated "zero-one" spellings in prose unless intentional.
+
 **Working Product Name**:
-The current product name, "The Mom Test Simulator," used while brand concerns remain unresolved.
-_Avoid_: Official Mom Test product, licensed product
+Deprecated term; use **Product display name** and **Product app name** instead.
 
 **Free Trial Session**:
 The user's first no-cost Session, capped at 15 minutes.
@@ -195,8 +202,8 @@ _Avoid_: Progress bar, trap counter
 - The **Practice Dashboard** should not center tasks, modules, lessons, checklists, or calendars
 - In v1, the **Practice Dashboard** should not show next practice focus; the **Session Report** owns that feedback
 - The **Landing Page** is outside the authenticated practice loop and routes users to sign up or log in
-- The **Working Product Name** can remain "The Mom Test Simulator" for now
-- The product should not imply it is an official Mom Test product
+- The **Landing Page** uses the **Product display name** in visible chrome and the **Product app name** in HTML metadata; it does not require an on-page Mom Test affiliation disclaimer
+- The product should not falsely claim to be an official Mom Test book product, a licensed product, or an endorsed product
 - Landing-page supporting copy is not resolved yet
 - After sign up or log in, the user reaches the **Practice Dashboard** without a lesson-style onboarding step
 - A user may define an **Ideal Customer Profile** from **Profile Settings**
@@ -276,8 +283,8 @@ _Avoid_: Progress bar, trap counter
 > **Domain expert:** "No for v1 — the **Session Report** owns next practice focus to keep the **Practice Dashboard** simple."
 > **Dev:** "Does the authenticated app repeat the landing-page promise?"
 > **Domain expert:** "No — the **Landing Page** handles marketing. After sign up or log in, the user goes to the **Practice Dashboard**."
-> **Dev:** "Is this an official Mom Test product?"
-> **Domain expert:** "No — the **Working Product Name** can remain for now, but the product should not imply official affiliation."
+> **Dev:** "Is this an official Mom Test book product?"
+> **Domain expert:** "No — use **Product display name** / **Product app name** for zeroone, and do not claim official Mom Test licensing or endorsement."
 > **Dev:** "How does the user try the product?"
 > **Domain expert:** "The first **Free Trial Session** is capped at 15 minutes. After that, Sessions use **Credits**."
 > **Dev:** "Does every paid **Session** cost the same?"
@@ -349,7 +356,7 @@ _Avoid_: Progress bar, trap counter
 - "voice storage" was clarified: no **Audio Recording** by default in v1.
 - "next practice focus" was clarified: keep it in the **Session Report**, not the v1 **Practice Dashboard**.
 - "onboarding" was clarified: use a public **Landing Page** before auth, not a lesson-style onboarding step after auth.
-- "product name" was clarified: keep **Working Product Name** for now while avoiding official Mom Test affiliation claims.
+- "product name" was clarified: **Product display name** is `ZERO 🚀 ONE` in UI; **Product app name** is `zeroone` for metadata and integrations.
 - "landing copy" remains unresolved beyond the user's provided hero/tagline ideas.
 - "monetization" was clarified: users get one **Free Trial Session**, then pay with **Credits** through subscription and usage-based purchase.
 - "credit cost" was clarified: paid Sessions are duration-based, not flat-priced.

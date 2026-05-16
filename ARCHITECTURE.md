@@ -4,7 +4,7 @@ This document is the architecture contract for the repository. Keep it aligned w
 
 ## Bird's-eye Overview
 
-The Mom Test Simulator is a modular-monolith Next.js app where a Learner starts practice, gets a fresh generated Customer Persona, and continues through a voice-first Session loop into post-session feedback.
+zeroone is a modular-monolith Next.js app where a Learner starts practice, gets a fresh generated Customer Persona, and continues through a voice-first Session loop into post-session feedback.
 
 Current implementation covers:
 - authenticated entry and route guards,

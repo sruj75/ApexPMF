@@ -1,6 +1,6 @@
 # Agent Instructions
 
-The Mom Test Simulator is a voice-first customer discovery practice product where a Learner interviews fresh LLM-generated Customer Personas and receives post-session feedback.
+zeroone is a voice-first customer discovery practice product where a Learner interviews fresh LLM-generated Customer Personas and receives post-session feedback.
 
 ## Core Docs
 

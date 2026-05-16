@@ -1,4 +1,4 @@
-# The Mom Test Simulator PRD
+# zeroone PRD
 
 ## Problem Statement
 
@@ -17,7 +17,7 @@ The Session Report is the coaching surface. It includes outcome, missed signals,
 ## User Stories
 
 1. As a visitor, I want to understand that the product helps me sharpen my skill to talk to customers, so that I know why it matters before signing up.
-2. As a visitor, I want to see messaging that frames the product as Mom Test-style practice without implying official affiliation, so that I understand the product honestly.
+2. As a visitor, I want clear messaging about voice-first customer discovery practice, so that I understand the product before signing up.
 3. As a visitor, I want to sign up or log in from the Landing Page, so that I can start practicing.
 4. As a Learner, I want to land on the Practice Dashboard after signing in, so that I can start practice without lesson-style onboarding.
 5. As a Learner, I want a prominent Start Practice action, so that I can begin a Session quickly.
@@ -95,12 +95,12 @@ The Session Report is the coaching surface. It includes outcome, missed signals,
 77. As the product operator, I want Generated Session Cases preserved internally, so that reports can be audited for fairness and quality.
 78. As the product operator, I want the Hidden Test Plan preserved internally, so that Trap Results and Session Reports can be explained after the fact.
 79. As the product operator, I want no startup idea input in v1, so that the product trains discovery skill rather than pitch validation.
-80. As the product operator, I want the Working Product Name to remain "The Mom Test Simulator" for now while avoiding official affiliation claims, so that branding can move forward without over-deciding legal concerns.
+80. As the product operator, I want the UI display name and the technical app name (`zeroone`) kept in sync from one module, so branding stays consistent across UI, metadata, and provider headers.
 
 ## Implementation Decisions
 
 - Build v1 as a single-player product for one Learner. Do not introduce teams, coaches, organization accounts, shared report review, or social features.
-- Keep the public Landing Page separate from the authenticated practice loop. Landing Page copy uses the Working Product Name for now but must not imply official Mom Test affiliation.
+- Keep the public Landing Page separate from the authenticated practice loop. Landing Page uses the **Product display name** in visible chrome and the **Product app name** in page metadata; copy must not falsely claim official Mom Test licensing or endorsement.
 - After sign up or log in, route directly to the Practice Dashboard. Do not add lesson-style onboarding inside the authenticated app.
 - The Practice Dashboard centers Start Practice, Progression, Global Ranking or Insufficient Data State, and recent Session Reports. It does not show next practice focus in v1.
 - Profile Settings manages multiple Ideal Customer Profiles and one Active Ideal Customer Profile. It does not behave like a per-session setup screen.
@@ -175,6 +175,6 @@ The Session Report is the coaching surface. It includes outcome, missed signals,
 - Proposed hero/title direction from the founder: "Sharpen your skill to talk to your customers."
 - Additional founder-provided copy directions: "Get better at customer interview" and "In the era of agents taking away grunt work, founders' skill to understand users matters more than ever."
 - Supporting landing-page copy is intentionally unresolved beyond the founder-provided directions.
-- The Working Product Name remains "The Mom Test Simulator" for now. The product must avoid implying official affiliation with The Mom Test.
+- **Product display name** (`ZERO 🚀 ONE`) is for in-app and landing UI only. **Product app name** (`zeroone`) is for document title, OpenRouter `OPENROUTER_APP_TITLE`, and similar machine-facing strings. The product must not falsely claim official affiliation, licensing, or endorsement from The Mom Test book.
 - The product should feel like a game-like practice loop: press Start Practice, do a voice Session, receive a report, see Progression and Achievement Nodes, then practice again.
-- Issue tracker publication is not completed from this workspace because the project is not a git repository and no issue tracker or triage label vocabulary is configured yet.
+- Issues are tracked in GitHub (`sruj75/zeroone`); see `docs/agents/issue-tracker.md`.

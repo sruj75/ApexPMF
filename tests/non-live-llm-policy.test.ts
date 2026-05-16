@@ -7,6 +7,7 @@ import {
   resolveNonLiveLlmAccess
 } from "../src/application/non-live-llm-policy";
 import { OpenRouterProviderError } from "../src/infrastructure/llm/openrouter";
+import { PRODUCT_APP_NAME } from "../src/product/brand";
 
 describe("Non-live LLM policy", () => {
   it("returns typed unavailable failure when OPENROUTER_API_KEY is missing", async () => {
@@ -33,7 +34,7 @@ describe("Non-live LLM policy", () => {
         OPENROUTER_API_KEY: "openrouter-key",
         OPENROUTER_MODEL: "openai/gpt-5.2",
         OPENROUTER_SITE_URL: "https://example.com",
-        OPENROUTER_APP_TITLE: "The Mom Test Simulator QA"
+        OPENROUTER_APP_TITLE: `${PRODUCT_APP_NAME} QA`
       }).pipe(Effect.either)
     );
 
@@ -44,7 +45,7 @@ describe("Non-live LLM policy", () => {
     expect(configuredResult.right.configuration).toEqual({
       model: "openai/gpt-5.2",
       siteUrl: "https://example.com",
-      appTitle: "The Mom Test Simulator QA"
+      appTitle: `${PRODUCT_APP_NAME} QA`
     });
 
     const defaultedResult = await Effect.runPromise(
@@ -59,7 +60,7 @@ describe("Non-live LLM policy", () => {
     expect(defaultedResult.right.configuration).toEqual({
       model: "openrouter/free",
       siteUrl: undefined,
-      appTitle: "The Mom Test Simulator"
+      appTitle: PRODUCT_APP_NAME
     });
   });
 

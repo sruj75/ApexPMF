@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and PRDs for this repo live as GitHub issues in `sruj75/the-mom-test-simulator`.
+Issues and PRDs for this repo live as GitHub issues in `sruj75/zeroone`.
 
 Use the `gh` CLI for issue operations.
 
@@ -13,12 +13,12 @@ Use the `gh` CLI for issue operations.
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
 
-If the current shell is outside this repo or targets another remote, use `--repo sruj75/the-mom-test-simulator` explicitly.
+If the current shell is outside this repo or targets another remote, use `--repo sruj75/zeroone` explicitly.
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue in `sruj75/the-mom-test-simulator`.
+Create a GitHub issue in `sruj75/zeroone`.
 
 ## When a skill says "fetch the relevant ticket"
 
-Run `gh issue view <number> --repo sruj75/the-mom-test-simulator --comments`.
+Run `gh issue view <number> --repo sruj75/zeroone --comments`.

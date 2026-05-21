@@ -1,127 +1,188 @@
 # Architecture
 
-This document is the architecture contract for the repository. Keep it aligned with `PRD.md`, `CONTEXT.md`, `SOFTWARE.md`, and `docs/adr/` decisions.
+Architecture contract for this repository. Align with `CONTEXT.md`, `SOFTWARE.md`, `docs/vision/architecture-platform-and-nodes.md`, `docs/vision/product-vision-grill-synthesis.md`, and `docs/adr/`. Narrative product detail lives in vision docs; this file is the **map and enforceable rules** for agents and humans.
+
+**Status:** Code is mid-migration. **Target** layout and boundaries below are authoritative for new work. **Legacy** paths (`src/domain/*`, `src/application/*`, `src/infrastructure/*`, `app/practice/*`) remain until cutover; do not extend legacy patterns.
 
 ## Bird's-eye Overview
 
-zeroone is a modular-monolith Next.js app where a Learner starts practice, gets a fresh generated Customer Persona, and continues through a voice-first Session loop into post-session feedback.
+**ApexPMF** is a modular-monolith Next.js app: a **Founder** uses **Command** (operational intelligence) and **Grid** (PMF **Node** map). Each **Node** is a Codex-style **plugin** with its own **Node Runtime**, **Node Skill**, and **Node Workspace**. One **Journey Brain** (Deep Agents, TypeScript-first via `deepagentsjs`) spans all **Nodes**; it is **not** the in-session authority inside specialist **Node** UX (interview voice loop in v1).
 
-Current implementation covers:
-- authenticated entry and route guards,
-- Active Ideal Customer Profile or Broad Practice Pool resolution,
-- Persona Generation through OpenRouter structured JSON,
-- persistence of Generated Session Case in Supabase,
-- Session lifecycle orchestration (end session, report generation),
-- Hidden Evaluation via LLM-as-judge after session end,
-- Session Report rendering with structured evidence and transcript,
-- Profile Settings CRUD for Ideal Customer Profiles,
-- redirect-based practice route lifecycle.
+**V1 product spine:** real **Command** + **Grid** with **one Node** (customer interview / Mom Test voice **Session** practice), fully interactive **Active Node surface**, new shell routes (`app/command`, `app/grid`, `app/nodes/interview/*`). No legacy top-level dashboard/practice routes for that slice.
 
-Application workflows use Effect for typed failures, dependency injection, retries, and resource management. The Next.js edge (`app/*`) remains Promise-only, calling thin `Effect.runPromise` wrappers in `src/application/*`.
+**Data:** **Platform store** (Postgres/Supabase) is UI source of truth; **Node Workspace** (virtual FS per **Node**) holds consolidated agent-readable artifacts. **Node Runtime** syncs DB → **Node Workspace** after milestones; **Journey Brain** reads workspaces, not raw dumps every turn.
+
+**Providers:** BYOK **Founder API Key**; **Gemini only** for voice and non-live LLM. **No** OpenRouter, subscription billing, or Credits in the target system.
+
+**Runtime:** Effect at service/runtime/provider boundaries for typed failures, retries, and composition. `app/*` stays Promise-only via thin `Effect.runPromise` facades in `*/service/*`.
+
+```text
+Founder → Command (brain output) | Grid (topology) | Active Node (Node Runtime work)
+                              ↘ Journey Brain (spine) ↗
+                                    Node Workspaces + Platform store
+```
 
 ## Codemap
 
+### Target (authoritative for new code)
+
 ```text
 app/
-  auth/*
-  login
-  signup
-  dashboard
-  practice/*
-  profile/*
+  command/*              # Command module UI (= Dashboard / Mission Control)
+  grid/*                 # Grid module UI (= Playground)
+  nodes/interview/*      # Interview Node Active Node surface + actions
+  auth/*                 # Auth entry (must delegate to platform/shell/service)
+  login, signup
 src/
-  application/start-session/*
-  application/end-session/*
-  application/generate-report/*
-  application/practice-route/*
-  application/llm-runtime/*
-  domain/persona/*
-  domain/session/*
-  infrastructure/supabase/*
-  infrastructure/llm/openrouter.ts
-  infrastructure/gemini/*
-  infrastructure/http/safe-next-path.ts
+  providers/             # ONLY cross-cutting implementations
+    gemini/              # BYOK Founder Gemini (voice + generate)
+    supabase/            # Auth + DB client factories
+    workspace/           # Node Workspace virtual FS (Deep Agents backing)
+  platform/
+    types/               # FounderId, NodeId, shared branded IDs
+    registry/            # Prebuilt Node catalog metadata (Grid + brain)
+    shell/
+      types/
+      config/
+      repo/
+      service/           # Command/Grid facades, auth, BYOK settings, open Node
+      runtime/           # Shell-adjacent loops if needed (keep thin)
+  journey/
+    brain/               # SIBLING of platform/shell — not nested under it
+      types/
+      config/
+      repo/
+      service/           # Brain API consumed by platform/shell/service facade
+      runtime/           # Deep Agents graph steps, workspace tools
+  nodes/
+    interview-practice/  # V1 Node plugin (Mom Test simulator)
+      types/
+      config/
+      repo/              # Session, persona, report persistence + decode
+      service/           # Start/end session, report, profile, route policy
+      runtime/           # Voice session loop, persona gen adapters, evaluation transport
 tests/*
 docs/adr/*
+docs/vision/*
 ```
 
-`app/*`: Next.js routes, server actions, and UI view components. Owns rendering and navigation only. Imports only from `src/application/*` — never from `src/domain/*`, `src/infrastructure/*`, or `effect` directly.
+**`app/*`:** rendering, navigation, server actions. Imports **only** `platform/shell/service` facades and `nodes/*/service` facades (and re-exported view types from those facades). **Never** `src/providers/*`, `src/journey/brain/*` internals, `effect`, or slice `types/repo/runtime` directly.
 
-`app/practice/actions.ts`: practice entry action. Converts seam results into redirects.
+**`src/platform/shell/service`:** auth resolution, **Command** page data, **Grid** topology, **Founder API Key** settings, navigation to **Active Node surface**. Calls **`journey/brain/service` facade** for bottleneck / what-next — not Deep Agents types in `app/*`.
 
-`app/practice/[sessionId]/actions.ts`: session end action. Delegates to session runtime seam and redirects.
+**`src/journey/brain`:** meta-agent spine; read/write **Node Workspaces**; pathing hints for **Grid**; synthesis for **Command**. Does **not** own interview voice turns in v1.
 
-`app/profile/actions.ts`: profile CRUD actions. Delegates parsing and repository calls to application seam functions.
+**`src/nodes/interview-practice`:** **Node Runtime** for voice **Session**, persona generation, **Hidden Evaluation**, **Session Report**, Ideal Customer Profile, progression inside this **Node**. Consolidation into **Node Workspace** after session milestones.
 
-`app/profile/page.tsx`: profile page server component. Uses `getProfilePageData` seam for auth, profile list, and session source resolution.
+**`src/providers`:** Gemini BYOK, Supabase, workspace backend. Slices depend on **provider interfaces**, not env keys or raw SDK clients scattered in UI.
 
-`src/application/start-session/*`: application seam for Start Practice flow, learner entry context, profile page data, and profile CRUD wrappers. Handles entry context, failure classification, and orchestration of domain/repository dependencies. Provides `practice-entry-web-adapter` as the thin `Effect.runPromise` boundary for `app/*`.
+### Legacy (migrate away — do not extend)
 
-`src/application/end-session/*`: session orchestrator for end-session and report-generating lifecycle flows.
+```text
+app/dashboard, app/practice, app/profile
+src/application/*          # → nodes/interview-practice/service + platform/shell/service
+src/domain/*               # → nodes/interview-practice/{types,repo,service,runtime}
+src/infrastructure/*       # → src/providers/*
+```
 
-`src/application/generate-report/*`: report generation coordinator for post-session evaluation and report building.
+| Legacy module | Target |
+|---------------|--------|
+| `application/start-session`, `end-session`, `generate-report`, `practice-route` | `nodes/interview-practice/service` |
+| `domain/persona`, `domain/session`, `domain/credits` | `nodes/interview-practice/*` (delete credits) |
+| `infrastructure/llm/openrouter.ts` | **Delete** |
+| `infrastructure/gemini/*` | `providers/gemini` |
+| `infrastructure/supabase/*` | `providers/supabase` + node/platform `repo` |
 
-`src/application/practice-route/*`: canonical route-decision seam for all practice lifecycle routes. Re-exports domain types (`StartedSession`, `SessionReport`, `SessionTranscriptTurn`) for UI view components.
+### Horizontal layers (inside each vertical slice)
 
-`src/application/llm-runtime/*`: LLM capability layer construction from environment configuration.
+Every slice under `platform/shell`, `journey/brain`, and `nodes/*` uses the same **forward-only** layer stack. **UI** is **`app/*` only** (not a `ui/` folder inside slices).
 
-`src/domain/persona/*`: domain definitions for Ideal Customer Profile, Session Source, Persona Generation contract, and OpenRouter-backed persona generation behavior.
+```text
+Types → Config → Repo → Service → Runtime
+  ↑       ↑       ↑        ↑         ↑
+ innermost                              outermost (within slice)
+```
 
-`src/domain/session/*`: Generated Session Case aggregate shape, Started Session projection, Session Report and Transcript structures, Hidden Evaluation engine, Voice Runtime interface, and repository interfaces.
-
-`src/infrastructure/supabase/*`: Supabase adapters for auth context and repository persistence/decoding.
-
-`src/infrastructure/llm/openrouter.ts`: low-level non-live LLM transport for structured JSON completion.
-
-`src/infrastructure/gemini/*`: Gemini Live voice runtime adapter.
-
-`tests/*`: contract and seam tests for auth entry, profile/session source rules, generated case decode/persistence, OpenRouter client/generator behavior, route/action behavior, and module boundary enforcement.
-
-`docs/adr/*`: durable architecture/software decisions; architecture changes must reconcile with these.
+- **Types:** shapes, branded IDs, error unions (no Supabase rows, no fetch).
+- **Config:** env and per-founder settings resolution for this slice.
+- **Repo:** persistence; decode at boundary (parse, don't validate).
+- **Service:** use cases, policies, `Effect.runPromise` web adapters for `app/*`.
+- **Runtime:** long-running or provider-adjacent loops (voice, agent graph step).
 
 ## Architectural Invariants
 
-- V1 remains one Next.js TypeScript app; no split deployable services.
-- UI code in `app/*` renders state and triggers application seams. It does not implement domain rules, import from `src/domain/*`, import `effect`, or throw exceptions in production paths.
-- `src/application/*` composes workflows using Effect for typed failures, retries, and dependency management. It does not own persona truth, reportability, progression logic, or credit policy. Application modules provide thin `Effect.runPromise` wrappers for the Next.js edge.
-- Domain contracts (`src/domain/*`) are storage/provider-agnostic at their boundaries and use product language from `CONTEXT.md`.
-- Boundary inputs are parsed into typed domain shapes at ingress (parse, don't validate). Avoid passing unrefined external data plus ad-hoc boolean checks deeper into domain/application layers.
-- Supabase access stays behind repository/adaptor modules in `src/infrastructure/supabase/*`.
-- Non-live LLM transport stays in `src/infrastructure/llm/*`; domain modules own prompt/schema/quality logic for their use cases.
-- Customer Personas are generated fresh per Session from Session Source inputs; they are not fixed fixtures.
-- Generated Session Case is the internal aggregate for generated persona context and downstream evaluation/report auditing.
-- Voice Runtime remains a boundary seam; Gemini Live is the default adapter behind that seam.
-- Hidden Evaluation remains post-session and non-coaching in v1.
-- Domain types used by view components are re-exported through application modules, not imported directly from domain.
+- **One deployable:** single Next.js TypeScript modular monolith; no split services in v1.
+- **Vertical slices:** `platform/shell`, `journey/brain` (sibling), `nodes/*` are **deep modules** at product boundaries. **Forbidden:** `nodes/*` importing sibling `nodes/*`; any slice importing another slice's `repo/` or `service/`; **Command** nested inside `journey/brain` or vice versa as parent/child packages.
+- **Journey Brain sibling:** `src/journey/brain` is **not** under `src/platform/shell`. **Command** consumes brain output; **Command is not the brain.**
+- **Nodes are plugins:** prebuilt catalog; **Node Runtime** owns in-session authority for interview v1; brain observes **Node artifacts** and **Node Workspace** files.
+- **Layer direction (mechanical):** within each slice, dependencies flow **Types → Config → Repo → Service → Runtime** only. No layer skips, no reverse edges.
+- **Providers only:** cross-cutting integrations (Gemini, Supabase, workspace FS, future telemetry) enter slices **only** through `src/providers/*` interfaces — not direct `process.env`, SDK clients, or `src/infrastructure/*` in slice code.
+- **`app/*` thin:** no domain rules, no `effect`, no `throw` in production paths; no imports from `providers`, `journey/brain` internals, or slice layers other than published **service** facades.
+- **Parse at boundaries:** external/loose input becomes typed values at repo/provider/runtime edges; no ad-hoc boolean validation chains inward.
+- **Gemini-only LLM:** persona generation, hidden evaluation, and brain calls use **FounderGeminiProvider** (BYOK). OpenRouter and Credits are **removed**, not migrated.
+- **Platform store vs Node Workspace:** DB holds structured product truth; workspaces hold consolidated agent narrative. **Node Runtime** owns post-milestone sync; interview v1 must not require brain on every voice turn.
+- **Effect:** service/runtime/provider workflows use Effect; `Effect.runPromise` lives in `*/service/*` adapters, not in `app/*` route handlers.
+- **Reconciliation:** intentional invariant changes update this file and an ADR before code drifts.
 
 ## Boundaries
 
-`app -> application`: routes and server actions call seam/workflow functions only. They do not call Supabase tables, provider APIs, domain resolvers, or `Effect.runPromise` directly.
+### Slice dependency matrix (target)
 
-`application -> domain`: workflows pass learner/session inputs and coordinate domain interfaces; business policy stays in the owning domain module.
+| From → To | Allowed |
+|-----------|---------|
+| `app/*` | `platform/shell/service`, `nodes/*/service` facades only |
+| `platform/shell` | own layers, `platform/registry`, `platform/types`, `journey/brain/service` facade, `providers` |
+| `journey/brain` | own layers, `providers`, `platform/registry` (topology metadata) — **not** `nodes/*/repo` or `nodes/*/runtime` |
+| `nodes/interview-practice` | own layers, `providers` — **not** `journey/brain`, **not** other `nodes/*` |
+| `providers` | external packages only — **not** `platform`, `journey`, or `nodes` |
 
-`application -> infrastructure`: dependency wiring occurs at seams (for example repository and provider client construction), keeping external details out of UI.
+```text
+app/*  →  platform/shell/service  →  journey/brain/service  →  providers
+              ↓
+          nodes/*/service  →  nodes/*/runtime  →  providers
+          (does NOT import journey/brain in v1)
+```
 
-`domain -> infrastructure`: domain modules consume repository/provider interfaces and domain DTOs; row shapes, auth payloads, and HTTP response formats are decoded at infrastructure edges.
+### Layer edges (within each slice)
 
-`persona generation -> llm transport`: Persona Generation owns system/user prompt content, structured schema contract, decode failures, and quality gates; OpenRouter client owns HTTP protocol concerns only.
+- **Runtime → Service → Repo → Config → Types** (import direction: outer may import inner adjacent layer only).
+- **Service** is the **only** layer `app/*` may call for that slice.
+- **Repo/Runtime** implement ports defined in **Types**; they do not import **Service**.
 
-`hidden evaluation -> llm transport`: Hidden Evaluation owns judge prompt source, structured response contract, decode and retry policy, and transcript evidence quality gates; OpenRouter adapter owns transport translation only.
+### Product seams
 
-`session source -> profile repository`: active profile lookup happens once at Session start; Session Source is snapshotted into Generated Session Case for historical consistency.
+| Seam | Rule |
+|------|------|
+| **Command ↔ Journey Brain** | `platform/shell/service` → `journey/brain/service` facade only |
+| **Grid ↔ Nodes** | topology from `platform/registry` + node state; open **Active Node surface** via shell navigation |
+| **Interview Node ↔ Brain** | artifacts via **Platform store** + **Node Workspace** sync — not live voice coupling |
+| **Persona / evaluation ↔ LLM** | prompts/schemas in **service** or **runtime**; transport via **providers/gemini** implementing ports |
+| **Auth** | `app/auth/*` → `platform/shell/service` → **providers/supabase** (no direct Supabase client in `app/*`) |
 
-`future voice/report/progression seams`: add new modules under `src/domain/*` and `src/application/*` without bypassing the same boundary direction.
+### Data plane
+
+- **Platform store:** Supabase/Postgres — auth, sessions, reports JSON, progression, API key **handles** (not secrets in workspace files).
+- **Node Workspace:** per-founder, per-node paths via **WorkspaceProvider**; brain read/search; Node Runtime writes consolidated summaries.
 
 ## Cross-cutting Concerns
 
-`Boundary parsing`: external data is parsed/decoded into refined shapes at boundaries (Supabase row decoders, structured JSON decode paths, safe redirect path checks), then consumed as trusted typed values internally.
+**Mechanical enforcement (required as target lands):**
 
-`Error shaping`: use explicit failure categories for learner entry/start failures so redirects and UX outcomes are deterministic. Application workflows encode expected failures in the Effect error channel; `app/*` receives only redirect paths or rendered data.
+- **dependency-cruiser** or ESLint `import/no-restricted-paths` for slice matrix + per-slice layers.
+- **`tests/app-boundary-imports.test.ts`:** extend to forbid `app/*` → `src/infrastructure/*` and `src/providers/*` (legacy infra included during migration).
+- **`npm run architecture:check`** in CI (layer + slice rules); strict on `src/providers`, `src/platform`, `src/journey`, `src/nodes`; grandfather list for legacy until deleted.
+- Optional: vendor `scripts/check_layer_invariants.py` from architecture-md-manager skill with `--layers types,config,repo,service,runtime` and `--provider-dirs providers`.
 
-`Security and auth`: learner identity is resolved server-side via Supabase auth context; unauthenticated access redirects to auth entry points.
+**Boundary parsing:** Supabase rows, Gemini/LLM JSON, and redirect paths decoded once at repo/provider/runtime edges (Effect Schema where applicable per ADR-0013).
 
-`Observability`: provider and decode failures are surfaced as typed/domain errors with enough context for debugging without leaking provider payload shapes into UI.
+**Error shaping:** service facades map typed failures to stable categories for redirects and UI (no adapter error classes leaking to `app/*`).
 
-`Effect at boundaries`: application and infrastructure workflows use Effect for composition, typed errors, retries, and dependency injection. The Next.js edge (`app/*`) remains Promise-only — `Effect.runPromise` calls live in `src/application/*` web adapter modules, not in route handlers or server actions.
+**Security:** founder identity server-side via Supabase auth; **Founder API Key** encrypted/stored via platform repo — never logged or passed to client bundles.
 
-`Testing strategy`: prioritize behavior tests around domain/application boundaries and adapter contract tests; avoid brittle assertions on incidental provider payload formatting. Module boundary tests enforce that `app/*` imports only from `src/application/*`.
+**Composition:** one **composition root** per request/workflow builds Effect layers from **Providers** — avoid duplicating env reads and client construction in every server action.
+
+**Observability:** typed errors at boundaries; no provider payload shapes in UI.
+
+**Testing:** behavior through **service** facades and provider contract tests; structural tests for import rules; parse tests for repo/LLM decoders.
+
+**Migration:** stand up `providers/` + `platform/shell` + `journey/brain` + `nodes/interview-practice` beside legacy; cut routes; delete `domain/`, `application/`, `infrastructure/`, OpenRouter, Credits. See `docs/vision/architecture-platform-and-nodes.md` §5.

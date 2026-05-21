@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { PRODUCT_DISPLAY_NAME } from "@/src/product/brand";
+import {
+  PRODUCT_DESCRIPTION,
+  PRODUCT_DISPLAY_NAME,
+  PRODUCT_TAGLINE
+} from "@/src/product/brand";
 
 export default function Home() {
   return (
@@ -21,11 +25,9 @@ export default function Home() {
       <main className="landing-main">
         <section className="hero-section" aria-labelledby="hero-title">
           <div className="hero-copy">
-            <p className="eyebrow">Voice-first customer discovery practice</p>
+            <p className="eyebrow">{PRODUCT_TAGLINE}</p>
             <h1 id="hero-title">{PRODUCT_DISPLAY_NAME}</h1>
-            <p className="hero-promise">
-              Sharpen your skill to talk to your customers.
-            </p>
+            <p className="hero-promise">{PRODUCT_DESCRIPTION}</p>
             <p className="hero-detail">
               Practice real interview pressure with fresh Customer Personas,
               hidden Traps, and post-session feedback that rewards Learning

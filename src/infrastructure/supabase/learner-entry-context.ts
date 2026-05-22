@@ -1,7 +1,9 @@
 import type { GeneratedSessionCaseRepository } from "@/src/domain/session/generated-session-case-repository";
 import type { IdealCustomerProfileRepository } from "@/src/domain/persona/ideal-customer-profile-repository";
 import type { CreditLedgerRepository } from "@/src/domain/credits/credit-ledger-repository";
+import type { ProgressionRepository } from "@/src/domain/progression/progression-repository";
 import { createSupabaseCreditLedgerRepository } from "@/src/infrastructure/supabase/credit-ledgers";
+import { createSupabaseProgressionRepository } from "@/src/infrastructure/supabase/learner-progressions";
 import { createSupabaseGeneratedSessionCaseRepository } from "@/src/infrastructure/supabase/generated-session-cases";
 import { createSupabaseIdealCustomerProfileRepository } from "@/src/infrastructure/supabase/ideal-customer-profiles";
 import {
@@ -18,6 +20,7 @@ export type SupabaseLearnerEntryContextResult =
       idealCustomerProfileRepository: IdealCustomerProfileRepository;
       generatedSessionCaseRepository: GeneratedSessionCaseRepository;
       creditLedgerRepository: CreditLedgerRepository;
+      progressionRepository: ProgressionRepository;
     }
   | {
       ok: false;
@@ -43,6 +46,10 @@ export type SupabaseLearnerEntryContextError =
   | LearnerEntryContextDependencyError
   | LearnerEntryContextAuthQueryError;
 
+function isMissingAuthSession(error: { message?: string } | null): boolean {
+  return error?.message === "Auth session missing!";
+}
+
 export function getSupabaseLearnerEntryContextEffect(): Effect.Effect<
   SupabaseLearnerEntryContextResult,
   SupabaseLearnerEntryContextError,
@@ -58,6 +65,13 @@ export function getSupabaseLearnerEntryContextEffect(): Effect.Effect<
           cause
         })
     });
+
+    if (isMissingAuthSession(authResult.error)) {
+      return {
+        ok: false as const,
+        reason: "unauthenticated" as const
+      };
+    }
 
     if (authResult.error) {
       return yield* Effect.fail(
@@ -86,7 +100,8 @@ export function getSupabaseLearnerEntryContextEffect(): Effect.Effect<
         createSupabaseIdealCustomerProfileRepository(supabase),
       generatedSessionCaseRepository:
         createSupabaseGeneratedSessionCaseRepository(supabase),
-      creditLedgerRepository: createSupabaseCreditLedgerRepository(creditSupabase)
+      creditLedgerRepository: createSupabaseCreditLedgerRepository(creditSupabase),
+      progressionRepository: createSupabaseProgressionRepository(supabase)
     };
   });
 }

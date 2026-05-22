@@ -3,6 +3,7 @@ import { Data, Effect } from "effect";
 
 export type CreditLedgerRepositoryOperation =
   | "getOrInitializeForLearner"
+  | "claimFreeTrialForLearner"
   | "markFreeTrialUsed"
   | "applyCharge"
   | "applyRefund";
@@ -32,6 +33,9 @@ export type CreditLedgerRepository = {
   markFreeTrialUsed(
     learnerId: string
   ): Effect.Effect<CreditLedger, CreditLedgerRepositoryError>;
+  claimFreeTrialForLearner(
+    learnerId: string
+  ): Effect.Effect<boolean, CreditLedgerRepositoryError>;
   applyCharge(
     learnerId: string,
     credits: number
@@ -74,6 +78,15 @@ export function createInMemoryCreditLedgerRepository(
       const ledger = getOrCreate(learnerId);
       ledger.freeTrialUsed = true;
       return Effect.succeed({ ...ledger });
+    },
+
+    claimFreeTrialForLearner(learnerId) {
+      const ledger = getOrCreate(learnerId);
+      if (ledger.freeTrialUsed) {
+        return Effect.succeed(false);
+      }
+      ledger.freeTrialUsed = true;
+      return Effect.succeed(true);
     },
 
     applyCharge(learnerId, credits) {

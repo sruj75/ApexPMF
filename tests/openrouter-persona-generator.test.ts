@@ -4,6 +4,7 @@ import {
   PersonaGenerationDecodeError
 } from "../src/domain/persona/openrouter-persona-generator";
 import { createOpenRouterChatClient } from "../src/infrastructure/llm/openrouter";
+import { PRODUCT_APP_NAME } from "../src/product/brand";
 import { Either, Effect } from "effect";
 
 describe("OpenRouter Persona Generation", () => {
@@ -25,7 +26,7 @@ describe("OpenRouter Persona Generation", () => {
       chatClient: createOpenRouterChatClient({
         apiKey: "openrouter-key",
         model: "openai/gpt-5.2",
-        appTitle: "The Mom Test Simulator",
+        appTitle: PRODUCT_APP_NAME,
         siteUrl: "https://example.test",
         fetch
       })
@@ -57,7 +58,7 @@ describe("OpenRouter Persona Generation", () => {
       Authorization: "Bearer openrouter-key",
       "Content-Type": "application/json",
       "HTTP-Referer": "https://example.test",
-      "X-Title": "The Mom Test Simulator"
+      "X-Title": PRODUCT_APP_NAME
     });
     const body = JSON.parse(String(init?.body));
     expect(body).toMatchObject({
@@ -78,6 +79,7 @@ describe("OpenRouter Persona Generation", () => {
       "personaBehavior"
     );
     expect(JSON.stringify(body.messages)).toContain("personaBehavior");
+    expect(JSON.stringify(body.messages)).toContain(PRODUCT_APP_NAME);
     expect(JSON.stringify(body.messages)).toContain("Broad Practice Pool");
   });
 

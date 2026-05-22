@@ -45,6 +45,20 @@ export function createSupabaseCreditLedgerRepository(
       });
     },
 
+    claimFreeTrialForLearner(learnerId) {
+      return Effect.gen(function* () {
+        const result = yield* queryCreditLedger({
+          operation: "claimFreeTrialForLearner",
+          run: () =>
+            supabase.rpc("claim_credit_ledger_free_trial", {
+              p_learner_id: learnerId
+            })
+        });
+
+        return result.data === true;
+      });
+    },
+
     applyCharge(learnerId, credits) {
       return callLedgerMutation({
         supabase,

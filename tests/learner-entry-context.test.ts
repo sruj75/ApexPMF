@@ -35,6 +35,27 @@ vi.mock("@/src/infrastructure/supabase/credit-ledgers", () => ({
 import { getSupabaseLearnerEntryContextEffect } from "../src/infrastructure/supabase/learner-entry-context";
 
 describe("Supabase learner entry context", () => {
+  it("treats a missing Supabase auth session as an unauthenticated Learner", async () => {
+    const supabase = {
+      auth: {
+        getUser: vi.fn(async () => ({
+          data: { user: null },
+          error: { message: "Auth session missing!" }
+        }))
+      }
+    };
+
+    createSupabaseServerClientEffect.mockReturnValue(Effect.succeed(supabase));
+
+    const result = await Effect.runPromise(getSupabaseLearnerEntryContextEffect());
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "unauthenticated"
+    });
+    expect(createSupabaseAdminClientEffect).not.toHaveBeenCalled();
+  });
+
   it("wires the persistent Credit Ledger repository for authenticated Learners", async () => {
     const supabase = {
       auth: {

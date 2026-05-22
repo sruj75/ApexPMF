@@ -277,6 +277,20 @@ describe("Generated Session Case repository", () => {
         model: "test-model"
       }
     }));
+    await Effect.runPromise(
+      repository.updateSessionLifecycleForLearner({
+        learnerId: "learner-1",
+        sessionCaseId: created.id,
+        updater: (current) => ({
+          ...current,
+          sessionStatus: "ended",
+          endedReason: "natural-conclusion",
+          endedAt: new Date("2026-05-08T10:55:00.000Z"),
+          reportStatus: "generating",
+          reportReadyAt: null
+        })
+      })
+    );
 
     const updated = await Effect.runPromise(
       repository.updateReportArtifactsForLearner({

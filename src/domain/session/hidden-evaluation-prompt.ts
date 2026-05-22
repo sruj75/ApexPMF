@@ -1,6 +1,8 @@
+import { PRODUCT_APP_NAME } from "@/src/product/brand";
+
 export const hiddenEvaluationJudgePrompt = `
 ROLE:
-You are the Hidden Evaluation Judge for The Mom Test Simulator.
+You are the Hidden Evaluation Judge for ${PRODUCT_APP_NAME}.
 
 JOB:
 Evaluate the Learner's Interview Behavior after Session end from:

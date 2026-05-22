@@ -19,9 +19,12 @@ create policy "Learners can read their Credit Ledger"
   for select
   using (auth.uid() = learner_id);
 
+revoke all on table public.credit_ledgers from anon, authenticated;
+
 create or replace function public.touch_credit_ledger_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();
@@ -76,6 +79,27 @@ begin
   returning * into ledger;
 
   return ledger;
+end;
+$$;
+
+create or replace function public.claim_credit_ledger_free_trial(p_learner_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  claimed_rows integer := 0;
+begin
+  perform public.ensure_credit_ledger(p_learner_id);
+
+  update public.credit_ledgers
+  set free_trial_used = true
+  where learner_id = p_learner_id
+    and free_trial_used = false;
+
+  get diagnostics claimed_rows = row_count;
+  return claimed_rows > 0;
 end;
 $$;
 
@@ -151,10 +175,17 @@ $$;
 
 revoke all on function public.ensure_credit_ledger(uuid) from public;
 revoke all on function public.mark_credit_ledger_free_trial_used(uuid) from public;
+revoke all on function public.claim_credit_ledger_free_trial(uuid) from public;
 revoke all on function public.apply_credit_ledger_charge(uuid, integer) from public;
 revoke all on function public.apply_credit_ledger_refund(uuid, integer) from public;
+revoke all on function public.ensure_credit_ledger(uuid) from anon, authenticated;
+revoke all on function public.mark_credit_ledger_free_trial_used(uuid) from anon, authenticated;
+revoke all on function public.claim_credit_ledger_free_trial(uuid) from anon, authenticated;
+revoke all on function public.apply_credit_ledger_charge(uuid, integer) from anon, authenticated;
+revoke all on function public.apply_credit_ledger_refund(uuid, integer) from anon, authenticated;
 
 grant execute on function public.ensure_credit_ledger(uuid) to service_role;
 grant execute on function public.mark_credit_ledger_free_trial_used(uuid) to service_role;
+grant execute on function public.claim_credit_ledger_free_trial(uuid) to service_role;
 grant execute on function public.apply_credit_ledger_charge(uuid, integer) to service_role;
 grant execute on function public.apply_credit_ledger_refund(uuid, integer) to service_role;

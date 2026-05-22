@@ -1,22 +1,25 @@
 import { render, screen } from "@testing-library/react";
 import Home from "../app/page";
+import {
+  PRODUCT_DESCRIPTION,
+  PRODUCT_DISPLAY_NAME,
+  PRODUCT_TAGLINE
+} from "../src/product/brand";
 
 describe("Landing Page", () => {
-  it("communicates the practice promise with the Working Product Name", () => {
+  it("communicates the tagline, description, and display product name", () => {
     render(<Home />);
 
     expect(
-      screen.getByRole("heading", { name: /the mom test simulator/i })
+      screen.getByRole("heading", { name: PRODUCT_DISPLAY_NAME })
     ).toBeVisible();
-    expect(
-      screen.getByText(/sharpen your skill to talk to your customers/i)
-    ).toBeVisible();
+    expect(screen.getByText(PRODUCT_TAGLINE)).toBeVisible();
+    expect(screen.getByText(PRODUCT_DESCRIPTION)).toBeVisible();
   });
 
-  it("keeps The Mom Test relationship honest", () => {
+  it("does not claim official Mom Test product status", () => {
     render(<Home />);
 
-    expect(screen.getAllByText(/not affiliated/i)).toHaveLength(2);
     expect(
       screen.queryByText(/official mom test product/i)
     ).not.toBeInTheDocument();

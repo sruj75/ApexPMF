@@ -742,6 +742,61 @@ describe("Session Orchestrator — Progression integration", () => {
 
     expect(applyCompletedSessionSpy).toHaveBeenCalledTimes(0);
   });
+
+  it("applies Progression only once when report generation is triggered concurrently", async () => {
+    const { repository, sessionIds } = await createRepositoryWithEndedSessionFixtures();
+    const progressionRepository = createInMemoryProgressionRepository();
+    const progressionUpdater = createProgressionUpdater({ progressionRepository });
+    const applyCompletedSessionSpy = vi.spyOn(progressionUpdater, "applyCompletedSession");
+
+    let releaseGeneration: (() => void) | undefined;
+    const generationReleased = new Promise<void>((resolve) => {
+      releaseGeneration = resolve;
+    });
+    let generationStarts = 0;
+
+    const orchestrator = createSessionOrchestrator({
+      generatedSessionCaseRepository: repository,
+      reportGenerationCoordinator: {
+        generateForEndedSession() {
+          generationStarts += 1;
+          if (generationStarts === 2) {
+            releaseGeneration?.();
+          }
+          return Effect.promise(async () => {
+            await generationReleased;
+            return makeReadyReportGenerationResult();
+          });
+        }
+      },
+      progressionUpdater
+    });
+
+    await Effect.runPromise(
+      orchestrator.endSessionForLearner({
+        learnerId,
+        sessionId: sessionIds.naturalConclusion,
+        reason: "natural-conclusion"
+      })
+    );
+
+    await Promise.all([
+      Effect.runPromise(
+        orchestrator.runReportGeneratingFlowForLearner({
+          learnerId,
+          sessionId: sessionIds.naturalConclusion
+        })
+      ),
+      Effect.runPromise(
+        orchestrator.runReportGeneratingFlowForLearner({
+          learnerId,
+          sessionId: sessionIds.naturalConclusion
+        })
+      )
+    ]);
+
+    expect(applyCompletedSessionSpy).toHaveBeenCalledTimes(1);
+  });
 });
 
 async function createRepositoryWithEndedSessionFixtures(): Promise<{

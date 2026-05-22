@@ -1,4 +1,5 @@
 import type { OpenRouterChatClient } from "@/src/infrastructure/llm/openrouter";
+import { PRODUCT_APP_NAME } from "@/src/product/brand";
 import { Effect } from "effect";
 import {
   decodeGeneratedSessionCaseResponse,
@@ -66,7 +67,7 @@ function buildMessages(input: PersonaGenerationInput) {
     {
       role: "user" as const,
       content: [
-        "Create a Generated Session Case for The Mom Test Simulator.",
+        `Create a Generated Session Case for ${PRODUCT_APP_NAME}.`,
         `Generation nonce: ${input.generationNonce}`,
         `Session source: ${describeSessionSource(input.sessionSource)}`,
         "The Customer Persona must include Concrete History, a hidden Customer Fit, a Hidden Test Plan, and natural Traps.",

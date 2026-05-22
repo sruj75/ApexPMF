@@ -98,7 +98,17 @@ export function startPracticeForLearner(
     const ledger = yield* dependencies.creditLedgerRepository.getOrInitializeForLearner(
       learnerId
     );
-    const creditContext = resolveSessionCreditContext(ledger);
+    let creditContext = resolveSessionCreditContext(ledger);
+
+    if (creditContext.kind === "free-trial") {
+      const claimedFreeTrial =
+        yield* dependencies.creditLedgerRepository.claimFreeTrialForLearner(learnerId);
+      if (!claimedFreeTrial) {
+        const refreshedLedger =
+          yield* dependencies.creditLedgerRepository.getOrInitializeForLearner(learnerId);
+        creditContext = resolveSessionCreditContext(refreshedLedger);
+      }
+    }
 
     if (creditContext.kind === "insufficient-credits") {
       return yield* Effect.fail(
@@ -146,10 +156,6 @@ export function startPracticeForLearner(
         generationNonce,
         creditContext
       });
-
-    if (creditContext.kind === "free-trial") {
-      yield* dependencies.creditLedgerRepository.markFreeTrialUsed(learnerId);
-    }
 
     return toStartedSession(generatedSessionCase);
   });

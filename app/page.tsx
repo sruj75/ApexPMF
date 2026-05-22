@@ -1,11 +1,16 @@
 import Link from "next/link";
+import {
+  PRODUCT_DESCRIPTION,
+  PRODUCT_DISPLAY_NAME,
+  PRODUCT_TAGLINE
+} from "@/src/product/brand";
 
 export default function Home() {
   return (
     <div className="landing-shell">
       <aside className="landing-sidebar" aria-label="Site sidebar">
         <Link className="brand-link" href="/">
-          The Mom Test Simulator
+          {PRODUCT_DISPLAY_NAME}
         </Link>
         <nav className="site-nav" aria-label="Landing navigation">
           <a href="#features">Features</a>
@@ -15,20 +20,14 @@ export default function Home() {
             Log in
           </Link>
         </nav>
-        <p className="sidebar-note">
-          Independent customer discovery practice. Not affiliated with The Mom
-          Test.
-        </p>
       </aside>
 
       <main className="landing-main">
         <section className="hero-section" aria-labelledby="hero-title">
           <div className="hero-copy">
-            <p className="eyebrow">Voice-first customer discovery practice</p>
-            <h1 id="hero-title">The Mom Test Simulator</h1>
-            <p className="hero-promise">
-              Sharpen your skill to talk to your customers.
-            </p>
+            <p className="eyebrow">{PRODUCT_TAGLINE}</p>
+            <h1 id="hero-title">{PRODUCT_DISPLAY_NAME}</h1>
+            <p className="hero-promise">{PRODUCT_DESCRIPTION}</p>
             <p className="hero-detail">
               Practice real interview pressure with fresh Customer Personas,
               hidden Traps, and post-session feedback that rewards Learning
@@ -174,8 +173,7 @@ export default function Home() {
       </main>
 
       <footer className="site-footer">
-        <span>The Mom Test Simulator</span>
-        <span>Independent customer discovery practice. Not affiliated with The Mom Test.</span>
+        <span>{PRODUCT_DISPLAY_NAME}</span>
       </footer>
     </div>
   );

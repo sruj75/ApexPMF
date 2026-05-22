@@ -228,11 +228,36 @@ export function createSessionOrchestrator(input: {
             sessionEvaluation: result.status === "ready" ? result.evaluation : null
           });
         if (!persisted) {
-          return yield* missingSessionError({
+          const latest = yield* generatedSessionCaseRepository.getForLearner(
             learnerId,
+            sessionId
+          );
+          if (!latest) {
+            return yield* missingSessionError({
+              learnerId,
+              sessionId,
+              operation: "report-generating"
+            });
+          }
+
+          const latestDecision = resolveReportGeneratingDecision({
             sessionId,
-            operation: "report-generating"
+            generatedSessionCase: latest
           });
+          if (latestDecision.decision === "skip-generation") {
+            return reportGeneratingFlowOutcome({
+              reportStatus: latestDecision.reportStatus,
+              nextPath: latestDecision.nextPath
+            });
+          }
+
+          return yield* Effect.fail(
+            new SessionLifecycleRouteResolutionError({
+              learnerId,
+              sessionId,
+              operation: "report-generating"
+            })
+          );
         }
 
         if (result.status === "ready" && progressionUpdater) {

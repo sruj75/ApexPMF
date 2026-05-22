@@ -9,10 +9,11 @@ import {
   OpenRouterProviderError,
   type OpenRouterChatClient
 } from "@/src/infrastructure/llm/openrouter";
+import { PRODUCT_APP_NAME } from "@/src/product/brand";
 import { Data, Effect } from "effect";
 
 const defaultOpenRouterModel = "openrouter/free";
-const defaultOpenRouterAppTitle = "The Mom Test Simulator";
+const defaultOpenRouterAppTitle = PRODUCT_APP_NAME;
 
 export class NonLiveLlmProviderUnavailableError extends Data.TaggedError(
   "NonLiveLlmProviderUnavailableError"

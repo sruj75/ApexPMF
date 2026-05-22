@@ -454,7 +454,7 @@ describe("Generated Session Case Supabase mapping", () => {
   });
 
   it("encodes report artifacts update with JSON report and transcript payloads", async () => {
-    const { repository, update } = createRepositoryForReportArtifactsUpdate();
+    const { repository, update, eq } = createRepositoryForReportArtifactsUpdate();
 
     await repository.updateReportArtifactsForLearner({
       learnerId: "learner-1",
@@ -565,6 +565,12 @@ describe("Generated Session Case Supabase mapping", () => {
         })
       })
     );
+    expect(eq).toHaveBeenCalledWith("learner_id", "learner-1");
+    expect(eq).toHaveBeenCalledWith(
+      "id",
+      "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
+    );
+    expect(eq).toHaveBeenCalledWith("report_status", "generating");
   });
 });
 
@@ -729,15 +735,13 @@ function createRepositoryForReportArtifactsUpdate() {
     error: null
   }));
 
-  const update = vi.fn(() => ({
-    eq: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        select: vi.fn(() => ({
-          maybeSingle: updateMaybeSingle
-        }))
-      }))
+  const updateBuilder = {
+    eq: vi.fn(() => updateBuilder),
+    select: vi.fn(() => ({
+      maybeSingle: updateMaybeSingle
     }))
-  }));
+  };
+  const update = vi.fn(() => updateBuilder);
 
   const queryBuilder = {
     select: vi.fn(() => queryBuilder),
@@ -759,7 +763,8 @@ function createRepositoryForReportArtifactsUpdate() {
     repository: toPromiseRepository(
       createSupabaseGeneratedSessionCaseRepository(supabase as never)
     ),
-    update
+    update,
+    eq: updateBuilder.eq
   };
 }
 

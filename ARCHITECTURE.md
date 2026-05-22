@@ -1,127 +1,213 @@
 # Architecture
 
-This document is the architecture contract for the repository. Keep it aligned with `PRD.md`, `CONTEXT.md`, `SOFTWARE.md`, and `docs/adr/` decisions.
+Architecture contract for this repository. Align with `CONTEXT.md`, `SOFTWARE.md`, `docs/vision/architecture-platform-and-nodes.md`, `docs/vision/product-vision-grill-synthesis.md`, and `docs/adr/`. Narrative product detail (feature tour copy, onboarding screenshots) lives in `docs/vision/`; this file is the **map and enforceable rules** for agents and humans.
+
+**Status:** Code is mid-migration. **Target** layout and boundaries below are authoritative for new work. **Legacy** paths (`src/domain/*`, `src/application/*`, `src/infrastructure/*`, `app/practice/*`) remain until cutover; do not extend legacy patterns.
 
 ## Bird's-eye Overview
 
-The Mom Test Simulator is a modular-monolith Next.js app where a Learner starts practice, gets a fresh generated Customer Persona, and continues through a voice-first Session loop into post-session feedback.
+**ApexPMF** is a modular-monolith Next.js app. A **Founder account** (auth identity) may own multiple **Projects** (one startup idea each toward PMF). The product **shell** — **Command**, **Grid**, **Agent chat rail**, **Journey Brain**, **Node Workspaces**, and **Sessions** — runs inside exactly one **active Project** at a time, switched via a Vercel-style **Project switcher** on the **Command** top bar.
 
-Current implementation covers:
-- authenticated entry and route guards,
-- Active Ideal Customer Profile or Broad Practice Pool resolution,
-- Persona Generation through OpenRouter structured JSON,
-- persistence of Generated Session Case in Supabase,
-- Session lifecycle orchestration (end session, report generation),
-- Hidden Evaluation via LLM-as-judge after session end,
-- Session Report rendering with structured evidence and transcript,
-- Profile Settings CRUD for Ideal Customer Profiles,
-- redirect-based practice route lifecycle.
+Each **Node** on the **Grid** is a Codex-style **plugin** (**Node Runtime**, **Node Skill**, **Node Workspace**). **Journey Brain** (Deep Agents, TypeScript-first via `deepagentsjs`) spans the **active Project** only; it is **not** the in-session authority inside specialist **Node** UX (interview voice loop in v1).
 
-Application workflows use Effect for typed failures, dependency injection, retries, and resource management. The Next.js edge (`app/*`) remains Promise-only, calling thin `Effect.runPromise` wrappers in `src/application/*`.
+**First-run path:** sign up → **feature tour** (**Back** / **Next** only; **second-to-last** = **Founder API Key** form; **last** = startup name + create **Project**) → `/projects/[projectSlug]/command` **Command composer state** → **conversational onboarding** (**Founder context**) → **Command operational state** when context sufficient (**before** first **Session** required). Additional **Projects**: switcher inline create → **composer state** + onboarding (no tour, no API key step).
+
+**V1 shell:** real **Command** + **Grid** (sidebar only). **Grid** renders **only** shipped **Nodes** (one **Interview practice**—no skeleton locked placeholders). **Node unlock:** `locked` | `unlocked` per **Node** per **Project**; catalog sets **unlocked at boot** (conversation: pre-journey)—**no** `pre_journey` code category. **Start Practice** during **Command composer state** OK; **Command operational state** only after onboarding chat completes (not after **Session**). Shell routes are **Project-scoped**: `/projects/[projectSlug]/command`, `/projects/[projectSlug]/grid`, `/projects/[projectSlug]/nodes/interview-practice/…`. **Account** chrome: left sidebar **footer** (profile + **account menu** → **Settings**, **Founder API Key**, log out)—Vercel-style; not under `/projects/…`. **Founder API Key** is **account-scoped**. ICP, **Sessions**, **Progression**, interview **Profile Settings** are **Project-scoped**.
+
+**Data:** **Platform store** (Postgres/Supabase) holds **Project** records and **Project**-scoped product rows; **Node Workspace** paths are **per Project, per Node**. **Node Runtime** syncs DB → **Node Workspace** after milestones.
+
+**Providers:** BYOK **Founder API Key**; **Gemini only**. **No** OpenRouter, subscription billing, or Credits.
+
+**Runtime:** Effect at service/runtime/provider boundaries. `app/*` is Promise-only via `*/service/*` facades.
+
+```text
+Founder account (auth, Founder API Key)
+    │
+    ├── Project A ── active ──► Command | Grid | Active Node
+    │         └── Journey Brain + Node Workspaces + Platform rows (project_id)
+    └── Project B ── (inactive until switched)
+```
 
 ## Codemap
 
+### Target (authoritative for new code)
+
 ```text
 app/
-  auth/*
-  login
-  signup
-  dashboard
-  practice/*
-  profile/*
+  onboarding/tour/*                    # Feature tour (pre-shell; last step creates Project)
+  projects/[projectSlug]/
+    command/*                          # Command: composer state | operational state; Project switcher (top bar)
+    grid/*                             # Grid (= Playground)
+    nodes/interview-practice/*           # Interview practice Node only (simulator); not Customer interview (future)
+  settings/*                           # Account settings (Founder API Key); account-scoped, not /projects/…
+  auth/*, login, signup                # Delegate to platform/shell/service
 src/
-  application/start-session/*
-  application/end-session/*
-  application/generate-report/*
-  application/practice-route/*
-  application/llm-runtime/*
-  domain/persona/*
-  domain/session/*
-  infrastructure/supabase/*
-  infrastructure/llm/openrouter.ts
-  infrastructure/gemini/*
-  infrastructure/http/safe-next-path.ts
+  providers/                           # ONLY cross-cutting implementations
+    gemini/                            # BYOK Founder Gemini (account key, any Project)
+    supabase/                          # Auth + DB client factories
+    workspace/                         # Node Workspace virtual FS; paths: …/projects/{projectId}/nodes/{nodeId}/…
+  platform/
+    types/                             # FounderId, ProjectId, NodeId, …
+    registry/                          # Node catalog: unlock defaults (e.g. unlocked_at_boot); locked|unlocked per Project
+    shell/
+      types/
+      config/
+      repo/                            # projects, founder_api_keys (account), tour_completed, …
+      service/                         # Project resolution, switcher, tour, Command/Grid, account menu + API key
+      runtime/
+  journey/
+    brain/                             # Sibling of platform/shell — not nested under it
+      types/
+      config/
+      repo/
+      service/                         # Brain API; always receives ProjectId from shell facade
+      runtime/                         # Deep Agents graph steps, workspace tools
+  nodes/
+    interview-practice/                 # V1: Interview practice Node (simulator). Customer interview Node = future TBD
+      types/
+      config/
+      repo/                            # Sessions, reports, ICP, progression — project_id scoped
+      service/                         # Start/end session, report, profile, route policy
+      runtime/                         # Voice session loop, persona gen adapters, evaluation transport
 tests/*
 docs/adr/*
+docs/vision/*
 ```
 
-`app/*`: Next.js routes, server actions, and UI view components. Owns rendering and navigation only. Imports only from `src/application/*` — never from `src/domain/*`, `src/infrastructure/*`, or `effect` directly.
+**`app/onboarding/tour/*`:** first-run tour (**Back**, **Next** only). Penultimate: **Founder API Key** (**required** in v1—block **Next** until valid save). Final: **Project** name + create → `/projects/[projectSlug]/command` (**composer state**). Post-v1 optional key on tour: **TBD**.
 
-`app/practice/actions.ts`: practice entry action. Converts seam results into redirects.
+**`app/projects/[projectSlug]/command`:** **composer state** = center composer + onboarding chat until complete (agent onboarding prompt); **operational state** = CopilotKit/OpenUI after onboarding finishes—**not** triggered by **Session** alone. **Project switcher** inline-create → **composer state**.
 
-`app/practice/[sessionId]/actions.ts`: session end action. Delegates to session runtime seam and redirects.
+**`app/projects/[projectSlug]/*`:** layout resolves slug → `project_id`, founder ownership. **Agent chat rail** on **Grid**, operational **Command**, and **nodes**/**Active Node surfaces**—omitted in **Command composer state** only.
 
-`app/profile/actions.ts`: profile CRUD actions. Delegates parsing and repository calls to application seam functions.
+**`app/*` (shell):** imports **only** `platform/shell/service` and `nodes/*/service` facades (and re-exported view types). Never `providers`, `journey/brain` internals, `effect`, or slice `types/repo/runtime` directly.
 
-`app/profile/page.tsx`: profile page server component. Uses `getProfilePageData` seam for auth, profile list, and session source resolution.
+**`src/platform/shell/service`:** auth; **Project** CRUD and switcher (slug + id); feature-tour completion (account); **Founder API Key** (account); **Command**/**Grid**; **`journey/brain/service` facade** always passed `project_id` resolved from route slug.
 
-`src/application/start-session/*`: application seam for Start Practice flow, learner entry context, profile page data, and profile CRUD wrappers. Handles entry context, failure classification, and orchestration of domain/repository dependencies. Provides `practice-entry-web-adapter` as the thin `Effect.runPromise` boundary for `app/*`.
+**`src/journey/brain`:** long-horizon meta-agent per **Project**; **Journey milestone** replanning; attaches **Node** plugins via **Node Skill** (prompt baseline + progressive disclosure); read/write **Node Workspaces**; **Command** synthesis; no interview voice turns in v1.
 
-`src/application/end-session/*`: session orchestrator for end-session and report-generating lifecycle flows.
+**`src/nodes/interview-practice`:** **Node Runtime** for voice **Session**, persona, evaluation, report, **Profile Settings** / ICP, progression — all **`project_id`**-scoped. **Journey Brain** reads interview **Node** plugin outputs via **Node Workspace** sync and skills—not by owning interview routes.
 
-`src/application/generate-report/*`: report generation coordinator for post-session evaluation and report building.
+**`src/providers`:** Gemini BYOK, Supabase, workspace FS. Slices use provider interfaces only.
 
-`src/application/practice-route/*`: canonical route-decision seam for all practice lifecycle routes. Re-exports domain types (`StartedSession`, `SessionReport`, `SessionTranscriptTurn`) for UI view components.
+### Legacy (migrate away — do not extend)
 
-`src/application/llm-runtime/*`: LLM capability layer construction from environment configuration.
+```text
+app/dashboard, app/practice, app/profile
+src/application/*          # → nodes/interview-practice/service + platform/shell/service
+src/domain/*               # → nodes/interview-practice/{types,repo,service,runtime}
+src/infrastructure/*       # → src/providers/*
+```
 
-`src/domain/persona/*`: domain definitions for Ideal Customer Profile, Session Source, Persona Generation contract, and OpenRouter-backed persona generation behavior.
+| Legacy module | Target |
+|---------------|--------|
+| `application/start-session`, `end-session`, `generate-report`, `practice-route` | `nodes/interview-practice/service` |
+| `domain/persona`, `domain/session`, `domain/credits` | `nodes/interview-practice/*` (delete credits) |
+| `infrastructure/llm/openrouter.ts` | **Delete** |
+| `infrastructure/gemini/*` | `providers/gemini` |
+| `infrastructure/supabase/*` | `providers/supabase` + platform/node `repo` |
 
-`src/domain/session/*`: Generated Session Case aggregate shape, Started Session projection, Session Report and Transcript structures, Hidden Evaluation engine, Voice Runtime interface, and repository interfaces.
+**Migration note:** backfill one **Project** per existing founder before cutting shell routes.
 
-`src/infrastructure/supabase/*`: Supabase adapters for auth context and repository persistence/decoding.
+### Horizontal layers (inside each vertical slice)
 
-`src/infrastructure/llm/openrouter.ts`: low-level non-live LLM transport for structured JSON completion.
+Every slice under `platform/shell`, `journey/brain`, and `nodes/*` uses **Types → Config → Repo → Service → Runtime** (forward-only). **UI** is **`app/*` only**.
+```text
+Types → Config → Repo → Service → Runtime
+  ↑       ↑       ↑        ↑         ↑
+ innermost                              outermost (within slice)
+```
 
-`src/infrastructure/gemini/*`: Gemini Live voice runtime adapter.
-
-`tests/*`: contract and seam tests for auth entry, profile/session source rules, generated case decode/persistence, OpenRouter client/generator behavior, route/action behavior, and module boundary enforcement.
-
-`docs/adr/*`: durable architecture/software decisions; architecture changes must reconcile with these.
-
+- **Types:** shapes, branded IDs, error unions (no Supabase rows, no fetch).
+- **Config:** env and per-founder settings resolution for this slice.
+- **Repo:** persistence; decode at boundary (parse, don't validate).
+- **Service:** use cases, policies, `Effect.runPromise` web adapters for `app/*`.
+- **Runtime:** long-running or provider-adjacent loops (voice, agent graph step).
 ## Architectural Invariants
 
-- V1 remains one Next.js TypeScript app; no split deployable services.
-- UI code in `app/*` renders state and triggers application seams. It does not implement domain rules, import from `src/domain/*`, import `effect`, or throw exceptions in production paths.
-- `src/application/*` composes workflows using Effect for typed failures, retries, and dependency management. It does not own persona truth, reportability, progression logic, or credit policy. Application modules provide thin `Effect.runPromise` wrappers for the Next.js edge.
-- Domain contracts (`src/domain/*`) are storage/provider-agnostic at their boundaries and use product language from `CONTEXT.md`.
-- Boundary inputs are parsed into typed domain shapes at ingress (parse, don't validate). Avoid passing unrefined external data plus ad-hoc boolean checks deeper into domain/application layers.
-- Supabase access stays behind repository/adaptor modules in `src/infrastructure/supabase/*`.
-- Non-live LLM transport stays in `src/infrastructure/llm/*`; domain modules own prompt/schema/quality logic for their use cases.
-- Customer Personas are generated fresh per Session from Session Source inputs; they are not fixed fixtures.
-- Generated Session Case is the internal aggregate for generated persona context and downstream evaluation/report auditing.
-- Voice Runtime remains a boundary seam; Gemini Live is the default adapter behind that seam.
-- Hidden Evaluation remains post-session and non-coaching in v1.
-- Domain types used by view components are re-exported through application modules, not imported directly from domain.
+- **One deployable:** single Next.js TypeScript modular monolith.
+- **Two scopes:** **Founder account** (auth, **Founder API Key**, feature-tour-completed) vs **Project** (shell, brain, sessions, workspaces, **Founder context** for that startup).
+- **Active Project:** exactly one **Project** context per shell session; **Project switcher** changes it; **Command** must not blend two **Projects** in one view.
+- **Shell gate:** no **Command** or **Grid** until at least one **Project** exists (feature tour **last step**). First-run tour: **Back** / **Next** only (**no Skip**).
+- **Project routes:** shell modules live under `/projects/[projectSlug]/…`; slug unique per founder account.
+- **Project container lives in platform/shell:** not a fourth top-level slice beside `journey/` and `nodes/`.
+- **Vertical slices:** `platform/shell`, `journey/brain` (sibling), `nodes/*`. **Forbidden:** sibling `nodes/*` imports; cross-slice `repo`/`service` imports; **Command** nested under `journey/brain`.
+- **Journey Brain:** scoped to **active Project**; **Command** consumes brain output; **Command is not the brain.**
+- **Nodes are plugins:** **Node Runtime** owns in-session authority (interview v1); brain observes **Node artifacts** + **Node Workspace** files.
+- **Layer direction (mechanical):** **Types → Config → Repo → Service → Runtime** within each slice; no skips, no reverse edges.
+- **Providers only:** Gemini, Supabase, workspace FS via `src/providers/*` — no scattered `process.env` or SDK clients in slices.
+- **`app/*` thin:** no domain rules, no `effect`, no `throw` in production paths; service facades only.
+- **Parse at boundaries:** decode at repo/provider/runtime edges (parse, don't validate).
+- **Gemini-only;** OpenRouter and Credits **removed**.
+- **Platform store vs Node Workspace:** DB is structured truth (**project_id** on venture data); workspaces hold consolidated agent narrative per **Project** per **Node**.
+- **Effect:** `Effect.runPromise` in `*/service/*` adapters only, not in `app/*` handlers.
+- **Reconciliation:** invariant changes update this file and an ADR before code drifts.
 
 ## Boundaries
 
-`app -> application`: routes and server actions call seam/workflow functions only. They do not call Supabase tables, provider APIs, domain resolvers, or `Effect.runPromise` directly.
+### Slice dependency matrix (target)
 
-`application -> domain`: workflows pass learner/session inputs and coordinate domain interfaces; business policy stays in the owning domain module.
+| From → To | Allowed |
+|-----------|---------|
+| `app/*` | `platform/shell/service`, `nodes/*/service` facades only |
+| `platform/shell` | own layers, `platform/registry`, `platform/types`, `journey/brain/service` facade, `providers` |
+| `journey/brain` | own layers, `providers`, `platform/registry` — **not** `nodes/*/repo` or `nodes/*/runtime` |
+| `nodes/interview-practice` | own layers, `providers` — **not** `journey/brain`, **not** other `nodes/*` |
+| `providers` | external packages only |
 
-`application -> infrastructure`: dependency wiring occurs at seams (for example repository and provider client construction), keeping external details out of UI.
+```text
+app/*  →  platform/shell/service  →  journey/brain/service  →  providers
+              ↓ (ProjectId on every shell/brain call)
+          nodes/*/service  →  nodes/*/runtime  →  providers
+          (project_id from shell context; no journey/brain import in v1)
+```
 
-`domain -> infrastructure`: domain modules consume repository/provider interfaces and domain DTOs; row shapes, auth payloads, and HTTP response formats are decoded at infrastructure edges.
+### Layer edges (within each slice)
 
-`persona generation -> llm transport`: Persona Generation owns system/user prompt content, structured schema contract, decode failures, and quality gates; OpenRouter client owns HTTP protocol concerns only.
+- Outer layers import only the **adjacent inner** layer.
+- **`app/*` calls `service` only** for that slice.
+- **Repo/Runtime** implement ports from **Types**; they do not import **Service**.
 
-`hidden evaluation -> llm transport`: Hidden Evaluation owns judge prompt source, structured response contract, decode and retry policy, and transcript evidence quality gates; OpenRouter adapter owns transport translation only.
+### Product seams
 
-`session source -> profile repository`: active profile lookup happens once at Session start; Session Source is snapshotted into Generated Session Case for historical consistency.
+| Seam | Rule |
+|------|------|
+| **Onboarding → Shell** | Tour: API key (penultimate) → create **Project** (last) → `/projects/[projectSlug]/command` **composer** → chat → **operational** when context sufficient |
+| **Account vs Project** | Sidebar footer **account menu** + `app/settings/*`: **Founder API Key**, tour flags (account). `/projects/[projectSlug]/*`: **Command**/**Grid**/brain/sessions (**project_id**) |
+| **Command ↔ Journey Brain** | `platform/shell/service` → `journey/brain/service` with **ProjectId** |
+| **Project switcher** | `platform/shell/service` only; changes **active Project** then reloads shell routes |
+| **Grid ↔ Nodes** | `platform/registry` (per-**Node** `locked`/`unlocked`, boot defaults); **Grid** in **composer state**; v1 **Interview practice** unlocked at boot |
+| **Interview Node ↔ Brain** | **Platform store** + **Node Workspace** sync — no live voice coupling |
+| **Persona / evaluation ↔ LLM** | ports in node **runtime**; transport via **providers/gemini** |
+| **Auth** | `app/auth/*` → `platform/shell/service` → **providers/supabase** |
 
-`future voice/report/progression seams`: add new modules under `src/domain/*` and `src/application/*` without bypassing the same boundary direction.
+### Data plane
+
+- **Account tables:** auth user, **Founder API Key** handles (encrypted), `feature_tour_completed` (or equivalent).
+- **Project tables:** `projects` (founder_id, display name, slug/id); all venture rows include **`project_id`** (sessions, reports, progression, ICP, …).
+- **Node Workspace paths:** `founders/{founderId}/projects/{projectId}/nodes/{nodeId}/…` via **WorkspaceProvider**.
+- **RLS / access:** policies enforce `founder_id` + `project_id` (founder cannot read another founder's **Project**).
 
 ## Cross-cutting Concerns
 
-`Boundary parsing`: external data is parsed/decoded into refined shapes at boundaries (Supabase row decoders, structured JSON decode paths, safe redirect path checks), then consumed as trusted typed values internally.
+**Routing:** primary shell URLs always include **`/projects/[projectSlug]/…`**. Middleware/layout resolves slug → `project_id`, enforces founder ownership, sets **active Project**. Gates: no **Projects** → `/onboarding/tour`; tour incomplete (account flag) → tour; else → last active or first **Project** **Command** route.
 
-`Error shaping`: use explicit failure categories for learner entry/start failures so redirects and UX outcomes are deterministic. Application workflows encode expected failures in the Effect error channel; `app/*` receives only redirect paths or rendered data.
+**Request context:** composition root builds Effect layers from **Providers** with `founder_id` + `project_id` from resolved slug — not per-action env reads.
 
-`Security and auth`: learner identity is resolved server-side via Supabase auth context; unauthenticated access redirects to auth entry points.
+**Mechanical enforcement:**
 
-`Observability`: provider and decode failures are surfaced as typed/domain errors with enough context for debugging without leaking provider payload shapes into UI.
+- dependency-cruiser / ESLint boundaries for slice matrix + per-slice layers.
+- **`tests/app-boundary-imports.test.ts`:** forbid `app/*` → `infrastructure` / `providers`.
+- **`npm run architecture:check`** in CI; strict on `src/providers`, `src/platform`, `src/journey`, `src/nodes`.
+- Optional: `scripts/check_layer_invariants.py` (`--layers types,config,repo,service,runtime`, `--provider-dirs providers`).
+- **Project isolation tests:** switcher changes scope; repos reject missing/wrong `project_id`.
 
-`Effect at boundaries`: application and infrastructure workflows use Effect for composition, typed errors, retries, and dependency injection. The Next.js edge (`app/*`) remains Promise-only — `Effect.runPromise` calls live in `src/application/*` web adapter modules, not in route handlers or server actions.
+**Boundary parsing:** Supabase rows, LLM JSON, redirects decoded at repo/provider/runtime edges (Effect Schema per ADR-0013).
 
-`Testing strategy`: prioritize behavior tests around domain/application boundaries and adapter contract tests; avoid brittle assertions on incidental provider payload formatting. Module boundary tests enforce that `app/*` imports only from `src/application/*`.
+**Error shaping:** service facades map failures to stable categories; no adapter types in `app/*`.
+
+**Security:** server-side auth; API keys never in client bundles or **Node Workspace** markdown.
+
+**Testing:** behavior via **service** facades; structural import rules; parse tests for decoders.
+
+**Migration:** `projects` table + backfill; stand up project-scoped routes beside legacy; delete `domain/`, `application/`, `infrastructure/`, OpenRouter, Credits. See `docs/vision/architecture-platform-and-nodes.md` §5.

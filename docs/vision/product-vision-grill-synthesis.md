@@ -70,9 +70,10 @@ Traditional products use a **fixed sidebar** (e.g. Vercel: Overview, Deployments
 ### 3.4 Nodes
 
 - A **Node** is a **prebuilt** product surface in the PMF graph (tool + artifacts + place in topology)—**not** an LLM-generated tab on the fly.
-- **V1:** exactly **one** Node on the Grid: **customer interview simulator** (Mom Test voice **Session** practice)—the product already built.
-- **Later examples** (not v1): ICP → lead list (Orange Slice–style), interview capture → synthesis → roadmap-style outputs.
-- Draft full catalog and spine: `knowledge-graph/zero-to-pmf-mission-control-hub.md`, `knowledge-graph/zero-to-pmf-node-catalog.md` (IDs, deps, gates **not** final).
+- **V1:** exactly **one** Node on the Grid: **Interview practice** (Mom Test voice **Session** simulator with AI personas)—the product already built.
+- **Not v1:** **Customer interview Node** (real customer discovery interviews—capture, synthesis, etc.)—**TBD**, separate from practice.
+- **Later examples** (not v1): **Customer interview Node**, ICP → lead list, synthesis → roadmap-style outputs.
+- **Node catalog** and **Journey milestone** spine: **TBD** in `platform/registry` (first-principles iteration; PMF-canvas-style direction, e.g. Christian Strunk framework, not blind adoption). Former `knowledge-graph/` folder **deleted**.
 
 ---
 
@@ -96,8 +97,8 @@ Main panel
 
 - From **Grid**, the founder **clicks** a **Node** (same idea as “drill-in”; prefer plain language in UI).
 - Main panel becomes the **Active Node surface**—**fully interactive**, not read-only.
-- For the interview Node: existing chrome (**Practice Dashboard**: Start Practice, progression, reports, voice session flow).
-- **Practice Dashboard** ≠ **Command** / Dashboard / Mission Control (global ops module vs interview Node UI).
+- For **Interview practice Node**: existing chrome (**Practice Dashboard**: Start Practice, progression, reports, voice **Session** flow).
+- **Practice Dashboard** ≠ **Command** (global ops vs practice **Node** UI). ≠ future **Customer interview Node**.
 
 ### 4.3 Back to the map
 
@@ -115,7 +116,7 @@ Main panel
 
 **Evolving vision:**
 
-- Founders do **not** work all Nodes at once; focus follows the **current bottleneck** (e.g. weak interviews → interview Node).
+- Founders do **not** work all Nodes at once; focus follows the **current bottleneck** (e.g. weak discovery → **Interview practice** or **Customer interview Node** when it exists).
 - **Node work state** (product state, agent judgment, or both—**TBD**) marks progress; when a constraint is “good enough,” the brain steers to the next Node.
 - Sidebar may show only **active workset** Nodes (often one, sometimes two parallel); completed Nodes drop from prominence automatically.
 - Tied to **Command** “what now” story.
@@ -150,12 +151,12 @@ Influences named in discussion: *Thinking in Systems* (Donella Meadows), fast it
 | Area                                              | V1                                                                                                                                    |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | **Command**                                       | **Real** surface (CopilotKit/OpenUI), not a placeholder                                                                               |
-| **Grid**                                          | **One** Node (customer interview / Mom Test simulator)                                                                                |
-| **Active Node surface**                           | Full existing interview experience (voice Session, reports, credits, progression, etc.)                                               |
+| **Grid**                                          | **Interview practice Node** only on the map (no skeleton locked placeholders in v1)                                                    |
+| **Active Node surface**                           | Full existing interview experience (voice **Session**, reports, **Progression**, etc.) — **no** platform **Credits**                  |
 | **Routing**                                       | **New backend architecture**; **no** legacy top-level routes for this shell slice                                                     |
 | **Journey Brain + Workspace**                     | Whatever depth the **rebuilt backend** needs for Command + one Node + sessions (incremental; not “full multi-node brain” before ship) |
 | **Pinned Nodes / Node work state / auto workset** | **Deferred** until baseline loop works                                                                                                |
-| **Graph catalog**                                 | One shipped Node; `knowledge-graph/` drafts inform future topology only                                                               |
+| **Graph catalog**                                 | One shipped Node; full catalog + milestone spine **TBD** in `platform/registry`                                                       |
 
 
 **After login:** land on **Command** by default; reach interview practice via **Grid → Node → Active Node surface**.
@@ -176,7 +177,7 @@ Influences named in discussion: *Thinking in Systems* (Donella Meadows), fast it
 
 ## 7. Longer-term vision (post–v1, not finalized)
 
-- Expand **Grid** with many **prebuilt** Nodes and edges (gates, deps)—see node catalog.
+- Expand **Grid** with many **prebuilt** Nodes and edges (gates, deps)—catalog **TBD** in `platform/registry`.
 - **Flywheel:** outcome-linked learning (who reaches PMF faster, with what behaviors) to sharpen the agent—**privacy-preserving**, no fake “PMF probability” precision.
 - Examples: ICP → lead list, interview synthesis → product ideas / roadmap inputs.
 - **North Star** beyond PMF on the graph where appropriate.
@@ -188,7 +189,7 @@ Influences named in discussion: *Thinking in Systems* (Donella Meadows), fast it
 
 | #   | Topic                           | Resolution                                                                                                                 |
 | --- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| —   | Hero loop                       | **Command** + **Grid** + **Journey Brain**; interview Session is **one Node**, not the whole product                       |
+| —   | Hero loop                       | **Command** + **Grid** + **Journey Brain**; **Interview practice** is **one Node**, not the whole product                    |
 | —   | Node spawning                   | **Prebuilt** catalog; agent advises **pathing**, does not invent Node types ad hoc                                         |
 | 6   | TS vs Python for Deep Agents    | **TypeScript / deepagentsjs first**                                                                                        |
 | 7   | Founder Goal before heavy Nodes | **Deferred** (reframed after prebuilt-graph clarification)                                                                 |
@@ -218,8 +219,7 @@ Influences named in discussion: *Thinking in Systems* (Donella Meadows), fast it
 - Gate / dependency skip policy (confirm vs auto)
 - Where founders read Workspace files in the UI
 - External marketing copy for “fastest path to PMF”
-- Final Node catalog IDs, edges, and gates in `knowledge-graph/`
-- Renaming `knowledge-graph/zero-to-pmf-mission-control-hub.md` to align with **Command** naming (file still uses “mission control” in title)
+- Final **Node catalog** IDs, edges, **Journey milestone** spine, and gates in `platform/registry` (first-principles design **TBD**)
 
 ---
 
@@ -229,10 +229,8 @@ Influences named in discussion: *Thinking in Systems* (Donella Meadows), fast it
 | Doc                                                                                                              | Purpose                                                               |
 | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | `[CONTEXT.md](../../CONTEXT.md)`                                                                                 | Canonical language, relationships, Session/Node details               |
-| `[knowledge-graph/README.md](../../knowledge-graph/README.md)`                                                   | Research hub                                                          |
-| `[knowledge-graph/zero-to-pmf-mission-control-hub.md](../../knowledge-graph/zero-to-pmf-mission-control-hub.md)` | Draft PMF graph hub                                                   |
-| `[knowledge-graph/zero-to-pmf-node-catalog.md](../../knowledge-graph/zero-to-pmf-node-catalog.md)`               | Draft node catalog                                                    |
-| `[ARCHITECTURE.md](../../ARCHITECTURE.md)`                                                                       | Technical architecture contract (to be updated for rebuild)           |
+| `[ARCHITECTURE.md](../../ARCHITECTURE.md)`                                                                       | Technical architecture contract                                       |
+| `[architecture-platform-and-nodes.md](./architecture-platform-and-nodes.md)`                                     | Platform + node slices proposal                                       |
 | `[docs/adr/](../../docs/adr/)`                                                                                   | Durable engineering decisions (Session-era; reconcile as shell ships) |
 
 
@@ -246,7 +244,9 @@ Influences named in discussion: *Thinking in Systems* (Donella Meadows), fast it
 | **Command**             | Global operational sidebar module (= Dashboard = Mission Control)             |
 | **Grid**                | PMF node map sidebar module (= Playground)                                    |
 | **Active Node surface** | Full main-panel UI for one selected Node                                      |
-| **Practice Dashboard**  | Interview-practice chrome **inside** the interview Node’s Active Node surface |
+| **Interview practice Node** | Mom Test simulator (**v1**); not **Customer interview Node** (future)      |
+| **Customer interview Node** | Real customer interviews—**future** **TBD**                                 |
+| **Practice Dashboard**  | Chrome **inside** **Interview practice Node** only                           |
 | **Journey Brain**       | Shared Deep Agents runtime across Nodes                                       |
 | **Node Workspace**      | Per-**Node** plugin files for **Journey Brain** (markdown, summaries, SKILL) |
 | **Platform store**      | Postgres/Supabase — UI source of truth for sessions, reports, progression   |

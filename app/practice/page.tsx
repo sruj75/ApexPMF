@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getLearnerEntryContext } from "@/src/application/start-session/practice-entry-web-adapter";
 import { startPracticeAction } from "./actions";
 import { StartPracticeForm } from "./start-practice-form";
 
@@ -11,6 +13,11 @@ type PracticePageProps = {
 };
 
 export default async function PracticePage({ searchParams }: PracticePageProps) {
+  const entryContext = await getLearnerEntryContext();
+  if (!entryContext.ok) {
+    redirect("/login");
+  }
+
   const params = await searchParams;
   const error = Array.isArray(params?.error) ? params.error[0] : params?.error;
   const hasSessionCreationFailure = error === "session_creation_failed";

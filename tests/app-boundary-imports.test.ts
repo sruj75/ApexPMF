@@ -63,6 +63,50 @@ describe("App layer module boundary", () => {
     expect(violations).toEqual([]);
   });
 
+  it("app/* has no runtime imports from src/infrastructure/*", () => {
+    const violations: string[] = [];
+
+    for (const file of appFiles) {
+      const content = readFileSync(file, "utf-8");
+      const lines = content.split("\n");
+      const rel = file.replace(resolve(__dirname, "..") + "/", "");
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (
+          line.includes("@/src/infrastructure") &&
+          !line.trimStart().startsWith("//")
+        ) {
+          violations.push(`${rel}:${i + 1} — ${line.trim()}`);
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it("app/* has no runtime imports from src/providers/*", () => {
+    const violations: string[] = [];
+
+    for (const file of appFiles) {
+      const content = readFileSync(file, "utf-8");
+      const lines = content.split("\n");
+      const rel = file.replace(resolve(__dirname, "..") + "/", "");
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (
+          line.includes("@/src/providers") &&
+          !line.trimStart().startsWith("//")
+        ) {
+          violations.push(`${rel}:${i + 1} — ${line.trim()}`);
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
   it("app/* has no throw statements in production paths", () => {
     const violations: string[] = [];
 

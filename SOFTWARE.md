@@ -6,13 +6,13 @@ This document defines how the product should be implemented so the codebase stay
 
 Build v1 as a small set of deep domain modules with simple interfaces and hidden internal complexity.
 
-The product has inherently complex behavior: voice sessions, generated personas, hidden evaluation, reports, credits, progression, and privacy. The implementation should concentrate that complexity inside modules that own real domain knowledge rather than spread it across screens, prompt helpers, transport callbacks, or many tiny pass-through classes.
+The product has inherently complex behavior: voice sessions, generated personas, hidden evaluation, reports, progression, Founder API Key (BYOK Gemini), and privacy. The implementation should concentrate that complexity inside modules that own real domain knowledge rather than spread it across screens, prompt helpers, transport callbacks, or many tiny pass-through classes.
 
-Current software design score: 7/10. The PRD names strong module boundaries, but the code does not exist yet, so the remaining work is to preserve those boundaries during implementation with simple interfaces, clear invariants, and tests that exercise behavior through the module boundaries.
+Current software design score: 7/10. Strong module boundaries are documented; remaining work is finishing the migration to the target slice layout while preserving those boundaries.
 
 ## Current Stack Assumptions
 
-The current implementation direction is 100% TypeScript, Next.js for the app, Effect for typed effects/errors/retries/interruption/concurrency at domain and integration boundaries, Supabase for persistence/auth/data infrastructure, Gemini Live API as the v1 Voice Runtime default, and a normal LLM API path for non-live generation and evaluation calls.
+The implementation direction is 100% TypeScript, Next.js for the app, Effect for typed effects/errors/retries/interruption/concurrency at domain and integration boundaries, Supabase for persistence/auth/data infrastructure behind `src/providers/supabase`, and **Gemini Live API** as the v1 Voice Runtime default with **bring-your-own-key** (Founder API Key). Platform **Credits**, OpenRouter, and subscriptions are **removed** from the target product; legacy credit/OpenRouter code may still exist on disk until cutover—do not extend it.
 
 These choices should not leak through domain interfaces. Gemini event formats, Supabase table shapes, model prompts, and provider-specific response schemas belong behind module boundaries. Keep this boundary simple: one Voice Runtime adapter for Gemini is enough for v1, and use the small Effect surface needed for clear typed failures and resource control.
 
@@ -20,48 +20,56 @@ V1 should be a single Next.js app with strong internal module boundaries, not se
 
 Report generation and Progression updates should run in the direct post-Session app flow first. Use Effect timeouts, interruption, retries, and typed failures to keep that flow controlled; do not introduce background queues or workers until a concrete reliability or latency problem appears.
 
-Supabase should be used through a repository/data-access boundary. Domain modules speak in product concepts such as Generated Session Case, Session Transcript, Session Report, Credits, and Progression; they do not depend on tables, rows, storage buckets, or Supabase auth payloads.
+Supabase should be used through a repository/data-access boundary. Domain modules speak in product concepts such as Generated Session Case, Session Transcript, and Session Report; they do not depend on tables, rows, storage buckets, or Supabase auth payloads.
 
 ## Module Doctrine
 
 Deep modules should hide important decisions:
 
-- **Session Orchestrator** owns the Session lifecycle from `Start Practice` through `Report Generating State` and report routing. It coordinates lifecycle states, Natural Conclusion, and module calls, but it does not own credit rounding, reportability, report scoring, persona truth, Hidden Evaluation rules, or Progression movement.
+- **Session Orchestrator** owns the Session lifecycle from `Start Practice` through `Report Generating State` and report routing. It coordinates lifecycle states, Natural Conclusion, and module calls, but it does not own reportability, report scoring, persona truth, Hidden Evaluation rules, or Progression movement.
 - **Persona Generation** owns fresh LLM-generated Customer Persona creation from an Active Ideal Customer Profile or Broad Practice Pool seed. It is the source of truth for hidden backstory, Customer Fit, Traps, Concrete History, the truthfulness contract, and the Opening Context as a safe public projection of the Generated Session Case. It also owns a small local quality gate before Session start.
 - **Generated Session Case** is the central internal aggregate for an attempted or completed Session. It owns the durable record needed to audit fairness and report quality: generated persona, hidden backstory, Customer Fit, Hidden Test Plan, Traps, transcript, evaluation artifacts, report, and audit context.
 - **Voice Runtime** owns voice transport, transcription, persona speech, interruption behavior, latency, and voice failure details. It may express unreliable social signals, but it must enforce the persona truthfulness contract by not inventing false Concrete History outside the Generated Session Case.
 - **Hidden Evaluation** owns Interview Behavior assessment without leaking live coaching into the user experience. In v1, it runs after the Session ends from the structured transcript and Generated Session Case, unless the voice runtime provides cheap structured signals worth preserving without acting on live.
 - **Report Builder** owns the transformation from transcript, evaluation, traps, and case context into a Session Report. It also owns the final decision that a completed or failed Session has enough evidence to generate a full or partial report. The saved Session Report should be structured data as the source of truth, with user-facing prose as display content.
-- **Credits** owns free trial, paid usage, duration rounding, credit exhaustion, and fair failure handling.
 - **Progression** owns skill movement, Achievement Nodes, and the credibility gate for Global Ranking. In v1, it updates only from the saved Session Report, not raw transcript, hidden artifacts, or separate evaluation summary fields.
 
-Each module should expose the simplest interface that covers current v1 needs. Avoid per-screen logic that knows hidden test-plan details, prompt internals, credit rounding rules, voice-provider mechanics, or progression thresholds.
+Each module should expose the simplest interface that covers current v1 needs. Avoid per-screen logic that knows hidden test-plan details, prompt internals, voice-provider mechanics, or progression thresholds.
 
-## Initial Code Organization
+## Target Code Organization
 
-Use a light modular-monolith folder structure:
+Use the light modular-monolith folder structure from `ARCHITECTURE.md`:
 
 ```text
 app/
+  onboarding/tour/*
+  projects/[projectSlug]/pitwall/*, grid/*, nodes/interview-practice/*
+  settings/*, auth/*, login, signup
 src/
-  domain/
-    session/
-    persona/
-    evaluation/
-    report/
-    credits/
-    progression/
-  application/
-    start-session/
-    end-session/
-    generate-report/
-  infrastructure/
-    supabase/
-    gemini/
-    llm/
+  providers/          # gemini, supabase, workspace — only cross-cutting implementations
+  platform/
+    types/, registry/
+    shell/            # types, config, repo, service, runtime
+  journey/
+    brain/            # types, config, repo, service, runtime
+  nodes/
+    interview-practice/   # types, config, repo, service, runtime
+tests/*
+docs/adr/*
 ```
 
-The exact names can evolve, but the dependency direction should stay stable: UI calls application workflows, application workflows coordinate domain modules, infrastructure adapts external systems, and domain modules do not import UI or provider clients.
+Within each vertical slice, dependency direction is **Types → Config → Repo → Service → Runtime**. UI calls **service** facades only; service coordinates domain rules; repo/runtime use **providers**.
+
+## Legacy (migrating — do not extend)
+
+On-disk legacy layout remains until cutover. Do not add features here:
+
+```text
+app/dashboard, app/practice, app/profile
+src/application/*, src/domain/* (including src/domain/credits), src/infrastructure/*
+```
+
+See [docs/MIGRATION-MAP.md](docs/MIGRATION-MAP.md) and the legacy table in `ARCHITECTURE.md`.
 
 ## Complexity Rules
 
@@ -74,7 +82,7 @@ The exact names can evolve, but the dependency direction should stay stable: UI 
 - Use Gemini directly through the Voice Runtime boundary; do not build a broad multi-provider voice abstraction before the product needs it.
 - Let Persona Generation, Hidden Evaluation, and Report Builder own their own LLM prompts, schemas, parsing, retries, and domain validation. Share only low-level LLM transport concerns such as API execution, keys, logging, and timeouts.
 - Use TypeScript across the app and backend code. Do not introduce a second implementation language in v1.
-- Use Effect where it reduces real complexity: typed domain failures, retries, interruption, concurrency, resource cleanup, and observability around voice, LLM, Supabase, credits, and report generation.
+- Use Effect where it reduces real complexity: typed domain failures, retries, interruption, concurrency, resource cleanup, and observability around voice, LLM, Supabase, and report generation.
 - Use Effect Schema at external boundaries: LLM responses, Gemini event translation, Supabase row translation, and user-created Ideal Customer Profile input.
 - Keep Effect code readable and local to meaningful boundaries. Avoid abstract Effect machinery when plain TypeScript is clearer.
 - Keep v1 as a modular monolith: one deployable Next.js app with explicit internal modules.
@@ -83,7 +91,7 @@ The exact names can evolve, but the dependency direction should stay stable: UI 
 - Push defaults and recovery behavior downward so UI callers do not need to coordinate special cases.
 - Tests should verify product behavior and domain rules through module boundaries, not private prompt wording or incidental implementation details.
 - Comments should document module contracts, invariants, and design intent where code alone cannot explain why the boundary exists.
-- End states may trigger report generation, but reportability belongs to Report Builder, not Session Orchestrator, Voice Runtime, Credits, or UI code.
+- End states may trigger report generation, but reportability belongs to Report Builder, not Session Orchestrator, Voice Runtime, or UI code.
 - Persona truth is generated once and preserved in the Generated Session Case. Runtime behavior may be socially unreliable, but Concrete History must stay consistent with that preserved truth.
 - Session Orchestrator should stay boring: it knows the lifecycle and end reasons, then delegates product rules to the modules that own them.
 - Progression consumes saved Session Reports only in v1. Report Builder is responsible for producing the report content Progression can learn from.
@@ -100,10 +108,10 @@ The exact names can evolve, but the dependency direction should stay stable: UI 
 ## Red Flags
 
 - UI code decides whether a Session has enough evidence for a partial report.
-- Voice Runtime or Credits decides whether a failed Session deserves a partial report.
-- Session Orchestrator contains credit rounding, report scoring, persona truth, evaluation thresholds, or progression formulas.
+- Voice Runtime decides whether a failed Session deserves a partial report.
+- Session Orchestrator contains report scoring, persona truth, evaluation thresholds, or progression formulas.
 - Voice Runtime or post-session Hidden Evaluation decides Natural Conclusion.
-- UI code calculates Progression, chooses Traps, rounds Credits, branches on raw voice-provider events, or inspects Hidden Test Plan.
+- UI code calculates Progression, chooses Traps, branches on raw voice-provider events, or inspects Hidden Test Plan.
 - Tests assert exact prompt wording, provider event payloads, or scoring artifact structure instead of domain outcomes.
 - Domain modules import Supabase clients directly or pass database row shapes through their interfaces.
 - Voice Runtime grows provider-switching abstractions that are not needed for the Gemini v1 path.
@@ -111,7 +119,7 @@ The exact names can evolve, but the dependency direction should stay stable: UI 
 - Effect is used to wrap every small pure function or to introduce layers where a direct function would be simpler.
 - Internal domain code becomes a schema factory instead of using clear typed domain objects and invariants.
 - Non-TypeScript services appear in v1 without a hard runtime reason.
-- Persona Generation, Voice Runtime, Hidden Evaluation, Report Builder, Credits, or Progression become separate deployable services before there is a concrete need.
+- Persona Generation, Voice Runtime, Hidden Evaluation, Report Builder, or Progression become separate deployable services before there is a concrete need.
 - Domain modules import UI components, Next.js request objects, Supabase clients, Gemini clients, or raw LLM clients directly.
 - Background queues, workers, or job orchestration appear before report generation or progression updates have proven they need them.
 - Progression or UI parses report prose to recover fields that should have been stored structurally.
@@ -122,7 +130,6 @@ The exact names can evolve, but the dependency direction should stay stable: UI 
 - Persona quality checks become a separate QA service, elaborate scoring system, or unbounded regeneration loop.
 - Report rendering code knows hidden persona backstory or hidden test-plan structure.
 - Voice-provider event shapes appear outside the Voice Runtime boundary.
-- Credit rounding rules appear in multiple modules.
 - Progression, Achievement Nodes, and Global Ranking thresholds are scattered across dashboard code.
 - Progression inspects raw transcript, hidden test-plan data, evaluation artifacts, or side-channel evaluation summaries.
 - Persona truthfulness rules are duplicated between generation, runtime behavior, and evaluation.
@@ -130,6 +137,7 @@ The exact names can evolve, but the dependency direction should stay stable: UI 
 - Hidden Evaluation adds live concurrency or in-session feedback pressure without a concrete v1 need.
 - Multiple modules invent separate partial Session state records instead of reading from or contributing to the Generated Session Case.
 - A new class or helper only forwards data without hiding any decision.
+- New code added under legacy `src/domain/credits` or OpenRouter infrastructure instead of deleting/migrating those paths.
 
 ## Review Question
 

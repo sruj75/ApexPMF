@@ -92,6 +92,8 @@ docs/vision/*
 
 ### Legacy (migrate away — do not extend)
 
+Agent routing table: [docs/MIGRATION-MAP.md](docs/MIGRATION-MAP.md).
+
 ```text
 app/dashboard, app/practice, app/profile
 src/application/*          # → nodes/interview-practice/service + platform/shell/service
@@ -196,9 +198,9 @@ app/*  →  platform/shell/service  →  journey/brain/service  →  providers
 
 **Mechanical enforcement:**
 
-- dependency-cruiser / ESLint boundaries for slice matrix + per-slice layers.
-- **`tests/app-boundary-imports.test.ts`:** forbid `app/*` → `infrastructure` / `providers`.
-- **`npm run architecture:check`** in CI; strict on `src/providers`, `src/platform`, `src/journey`, `src/nodes`.
+- **[`.dependency-cruiser.cjs`](.dependency-cruiser.cjs)** — deny-list (`forbidden` rules only; no global `allowed` allow-list). Run via **`npm run architecture:check`** (CI fast job). Errors on `app/*`, `providers`, and `platform` boundaries; `domain-no-infrastructure` is warn with a `pathNot` carve-out for the OpenRouter generator until removal.
+- **`tests/app-boundary-imports.test.ts`:** forbid `app/*` → `domain`, `infrastructure`, `providers`, `effect`, and `throw`.
+- Auth routes use [`src/platform/shell/service/auth-route-support.ts`](src/platform/shell/service/auth-route-support.ts) instead of direct infrastructure imports.
 - Optional: `scripts/check_layer_invariants.py` (`--layers types,config,repo,service,runtime`, `--provider-dirs providers`).
 - **Project isolation tests:** switcher changes scope; repos reject missing/wrong `project_id`.
 

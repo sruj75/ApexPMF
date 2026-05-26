@@ -37,7 +37,7 @@ export function decodeGeneratedSessionCaseRow(
       const decodedRow = decodeGeneratedSessionCaseRowSchema(row, operation);
       return {
         id: decodedRow.id,
-        learnerId: decodedRow.learner_id,
+        learnerId: decodedRow.founder_id,
         sessionSource: decodeSessionSourceOrThrow(decodedRow, operation),
         openingContext: decodedRow.opening_context,
         customerPersona: decodedRow.customer_persona,
@@ -85,7 +85,7 @@ export function toInsertRow(
   input: CreateGeneratedSessionCaseInput
 ) {
   return {
-    learner_id: learnerId,
+    founder_id: learnerId,
     ...sourceColumns(input.sessionSource),
     opening_context: input.openingContext,
     light_persona_label: input.customerPersona.lightPersonaLabel,

@@ -10,7 +10,7 @@ import {
 import { formatParseErrorDetails } from "./supabase-row-decode-error";
 
 const progressionColumns =
-  "learner_id, completed_session_count, progression_score, achievement_nodes";
+  "founder_id, completed_session_count, progression_score, achievement_nodes";
 
 const AchievementNodeRowSchema = Schema.Struct({
   id: Schema.String,
@@ -19,7 +19,7 @@ const AchievementNodeRowSchema = Schema.Struct({
 });
 
 const ProgressionRowSchema = Schema.Struct({
-  learner_id: Schema.String,
+  founder_id: Schema.String,
   completed_session_count: Schema.Number,
   progression_score: Schema.Number,
   achievement_nodes: Schema.Array(AchievementNodeRowSchema)
@@ -39,7 +39,7 @@ export function createSupabaseProgressionRepository(
             supabase
               .from("learner_progressions")
               .select(progressionColumns)
-              .eq("learner_id", learnerId)
+              .eq("founder_id", learnerId)
               .maybeSingle()
         });
 
@@ -55,7 +55,7 @@ export function createSupabaseProgressionRepository(
           run: () =>
             supabase
               .from("learner_progressions")
-              .insert({ learner_id: learnerId })
+              .insert({ founder_id: learnerId })
               .select(progressionColumns)
               .single()
         });
@@ -81,7 +81,7 @@ export function createSupabaseProgressionRepository(
             supabase
               .from("learner_progressions")
               .select(progressionColumns)
-              .eq("learner_id", learnerId)
+              .eq("founder_id", learnerId)
               .single()
         });
 
@@ -107,7 +107,7 @@ export function createSupabaseProgressionRepository(
                   achievementNodeToRow
                 )
               })
-              .eq("learner_id", learnerId)
+              .eq("founder_id", learnerId)
               .select(progressionColumns)
               .single()
         });
@@ -172,7 +172,7 @@ function decodeProgression(
 
 function toProgression(row: ProgressionRow): LearnerProgression {
   return {
-    learnerId: row.learner_id,
+    learnerId: row.founder_id,
     completedSessionCount: row.completed_session_count,
     progressionScore: row.progression_score,
     achievementNodes: row.achievement_nodes.map((a) => ({

@@ -103,7 +103,7 @@ const ReportStatusSchema = Schema.Literal(
 
 const GeneratedSessionCaseRowSchema = Schema.Struct({
   id: Schema.String,
-  learner_id: Schema.String,
+  founder_id: Schema.String,
   source_kind: SourceKindSchema,
   source_profile_id: Schema.NullOr(Schema.String),
   source_snapshot: Schema.Unknown,
@@ -148,7 +148,7 @@ export type GeneratedSessionCaseRow = Schema.Schema.Type<
 
 export const generatedSessionCaseColumns = [
   "id",
-  "learner_id",
+  "founder_id",
   "source_kind",
   "source_profile_id",
   "source_snapshot",

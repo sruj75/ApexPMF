@@ -33,7 +33,7 @@ export function createSupabaseGeneratedSessionCaseRepository(
             supabase
               .from("generated_session_cases")
               .select(generatedSessionCaseColumns)
-              .eq("learner_id", learnerId)
+              .eq("founder_id", learnerId)
               .eq("id", sessionCaseId)
               .maybeSingle()
         });
@@ -54,7 +54,7 @@ export function createSupabaseGeneratedSessionCaseRepository(
             supabase
               .from("generated_session_cases")
               .select(generatedSessionCaseColumns)
-              .eq("learner_id", input.learnerId)
+              .eq("founder_id", input.learnerId)
               .eq("id", input.sessionCaseId)
               .maybeSingle()
         });
@@ -74,7 +74,7 @@ export function createSupabaseGeneratedSessionCaseRepository(
             supabase
               .from("generated_session_cases")
               .update(toLifecycleUpdateRow(nextLifecycle))
-              .eq("learner_id", input.learnerId)
+              .eq("founder_id", input.learnerId)
               .eq("id", input.sessionCaseId)
               .select(generatedSessionCaseColumns)
               .single()
@@ -101,7 +101,7 @@ export function createSupabaseGeneratedSessionCaseRepository(
                 session_transcript: input.sessionTranscript,
                 session_evaluation: input.sessionEvaluation
               })
-              .eq("learner_id", input.learnerId)
+              .eq("founder_id", input.learnerId)
               .eq("id", input.sessionCaseId)
               .eq("report_status", "generating")
               .select(generatedSessionCaseColumns)
@@ -129,7 +129,7 @@ export function createSupabaseGeneratedSessionCaseRepository(
               .update({
                 credit_charge: input.creditCharge
               })
-              .eq("learner_id", input.learnerId)
+              .eq("founder_id", input.learnerId)
               .eq("id", input.sessionCaseId)
               .select(generatedSessionCaseColumns)
               .maybeSingle()

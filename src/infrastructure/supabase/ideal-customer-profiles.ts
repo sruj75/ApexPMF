@@ -19,11 +19,11 @@ import {
 
 const adapterName = "ideal_customer_profiles";
 const idealCustomerProfileColumns =
-  "id, learner_id, name, customer_description, notes, is_active, created_at, updated_at";
+  "id, founder_id, name, customer_description, notes, is_active, created_at, updated_at";
 
 const IdealCustomerProfileRowSchema = Schema.Struct({
   id: Schema.String,
-  learner_id: Schema.String,
+  founder_id: Schema.String,
   name: Schema.String,
   customer_description: Schema.String,
   notes: Schema.NullOr(Schema.String),
@@ -48,7 +48,7 @@ export function createSupabaseIdealCustomerProfileRepository(
             supabase
               .from("ideal_customer_profiles")
               .select(idealCustomerProfileColumns)
-              .eq("learner_id", learnerId)
+              .eq("founder_id", learnerId)
               .order("updated_at", { ascending: false })
         });
 
@@ -65,7 +65,7 @@ export function createSupabaseIdealCustomerProfileRepository(
             supabase
               .from("ideal_customer_profiles")
               .select(idealCustomerProfileColumns)
-              .eq("learner_id", learnerId)
+              .eq("founder_id", learnerId)
               .eq("is_active", true)
               .maybeSingle()
         });
@@ -108,7 +108,7 @@ export function createSupabaseIdealCustomerProfileRepository(
                 customer_description: input.customerDescription,
                 notes: input.notes
               })
-              .eq("learner_id", learnerId)
+              .eq("founder_id", learnerId)
               .eq("id", profileId)
               .select(idealCustomerProfileColumns)
               .maybeSingle()
@@ -150,7 +150,7 @@ export function createSupabaseIdealCustomerProfileRepository(
 
 function toInsertRow(learnerId: string, input: IdealCustomerProfileInput) {
   return {
-    learner_id: learnerId,
+    founder_id: learnerId,
     name: input.name,
     customer_description: input.customerDescription,
     notes: input.notes
@@ -232,7 +232,7 @@ function decodeDetail(input: {
 function toIdealCustomerProfile(row: IdealCustomerProfileRow): IdealCustomerProfile {
   return {
     id: row.id,
-    learnerId: row.learner_id,
+    learnerId: row.founder_id,
     name: row.name,
     customerDescription: row.customer_description,
     notes: row.notes,

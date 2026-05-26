@@ -565,7 +565,7 @@ describe("Generated Session Case Supabase mapping", () => {
         })
       })
     );
-    expect(eq).toHaveBeenCalledWith("learner_id", "learner-1");
+    expect(eq).toHaveBeenCalledWith("founder_id", "learner-1");
     expect(eq).toHaveBeenCalledWith(
       "id",
       "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec"
@@ -801,7 +801,7 @@ async function runEffectOrThrow<Success, Error>(
 
 const validGeneratedSessionCaseRow = {
   id: "a0b6c66a-9f8a-4129-a4d8-9e5a9208ebec",
-  learner_id: "learner-1",
+  founder_id: "learner-1",
   source_kind: "active-ideal-customer-profile",
   source_profile_id: "profile-1",
   source_snapshot: {

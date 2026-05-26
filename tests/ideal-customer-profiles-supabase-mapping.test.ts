@@ -225,7 +225,7 @@ function createRepository(input: {
 
 const validProfileRow = {
   id: "profile-1",
-  learner_id: "learner-1",
+  founder_id: "learner-1",
   name: "Finance operators",
   customer_description: "Controllers at growth SaaS companies",
   notes: null,

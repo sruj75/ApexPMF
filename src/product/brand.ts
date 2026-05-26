@@ -8,7 +8,8 @@
  *   `X-Title`, and other provider/metadata surfaces (ASCII only, no emoji).
  */
 export const PRODUCT_DISPLAY_NAME = "ApexPMF" as const;
-export const PRODUCT_TAGLINE = "Speedrun Product-Market Fit" as const;
+export const PRODUCT_TAGLINE =
+  "Your Fastest Path to Product-Market Fit" as const;
 export const PRODUCT_DESCRIPTION =
   "AI agent that finds you product-market fit the fastest way possible" as const;
 export const PRODUCT_APP_NAME = "ApexPMF" as const;

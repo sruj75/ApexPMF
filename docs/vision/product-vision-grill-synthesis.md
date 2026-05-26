@@ -13,7 +13,7 @@ This document captures what the founder described during a **grill-with-docs** s
 
 ## 1. One-line thesis
 
-**ApexPMF** is a PMF copilot for founders: a persistent **Journey Brain** plus **Workspace** artifacts, surfaced through **Command** (operational intelligence) and **Grid** (PMF node map), so founders move from zero toward product-market fit with **systems-thinking speed**—not only a checklist of tools.
+**ApexPMF** is a PMF copilot for founders: a persistent **Journey Brain** plus **Workspace** artifacts, surfaced through **Pitwall** (operational intelligence) and **Grid** (PMF node map), so founders move from zero toward product-market fit with **systems-thinking speed**—not only a checklist of tools.
 
 ---
 
@@ -37,15 +37,15 @@ Traditional products use a **fixed sidebar** (e.g. Vercel: Overview, Deployments
 
 | Surface           | Canonical name | Informal aliases                   | Role                                                                                                                                                                                                                         |
 | ----------------- | -------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Operational brain | **Command**    | **Dashboard**, **Mission Control** | Intelligent, evolving view: what’s going on, weekly focus, validated **Bottleneck**, what to do now. Built with [CopilotKit](https://github.com/copilotkit/copilotkit) and/or [OpenUI](https://github.com/thesysdev/openui). |
+| Operational brain | **Pitwall**    | _(retired: Command, Dashboard, Mission Control)_ | Intelligent, evolving view: what’s going on, weekly focus, validated **Bottleneck**, what to do now. Built with [CopilotKit](https://github.com/copilotkit/copilotkit) and/or [OpenUI](https://github.com/thesysdev/openui). |
 | PMF map + tools   | **Grid**       | **Playground**                     | **Prebuilt** graph of **Nodes** toward PMF (and **North Star**). Click a **Node** → full **Active Node surface** for that tool.                                                                                              |
 
 
 **Naming rules:**
 
-- **Command**, **Dashboard**, and **Mission Control** = **same module** (three words, one thing).
+- **Pitwall** is the sole name for this module (retired: Command, Dashboard, Mission Control).
 - **Grid** and **Playground** = **same module**.
-- Do **not** use **Mission Control** for the whole app or for **Grid**.
+- Do **not** use retired names (**Command**, **Dashboard**, **Mission Control**) for the whole app or for **Grid**.
 
 ### 3.2 Journey Brain (backend “OpenClaw-shaped” agent)
 
@@ -65,7 +65,7 @@ Traditional products use a **fixed sidebar** (e.g. Vercel: Overview, Deployments
 
 **v1:** Workspace bytes **persist** across visits; primary backing is **Platform store** (Postgres / LangGraph-style persistence). Object buckets and sandboxes deferred until scale or untrusted execution Nodes need them.
 
-**Founder read access:** v1 should allow founders to **read** Workspace artifacts; **where** in the UI is **TBD** (not assumed to live only inside Command). In-UI raw file editing is **not** committed for v1.
+**Founder read access:** v1 should allow founders to **read** Workspace artifacts; **where** in the UI is **TBD** (not assumed to live only inside Pitwall). In-UI raw file editing is **not** committed for v1.
 
 ### 3.4 Nodes
 
@@ -83,12 +83,12 @@ Traditional products use a **fixed sidebar** (e.g. Vercel: Overview, Deployments
 
 ```
 Sidebar (always)
-├── Command          ← default home after login
+├── Pitwall          ← default home after login
 ├── Grid
 └── [Pinned Nodes…] ← optional; rules TBD
 
 Main panel
-├── Command view     ← CopilotKit / OpenUI operational UI
+├── Pitwall view     ← CopilotKit / OpenUI operational UI
 ├── Grid map view    ← node graph (v1: one node)
 └── Active Node surface ← full-width when a Node is selected from Grid
 ```
@@ -98,17 +98,17 @@ Main panel
 - From **Grid**, the founder **clicks** a **Node** (same idea as “drill-in”; prefer plain language in UI).
 - Main panel becomes the **Active Node surface**—**fully interactive**, not read-only.
 - For **Interview practice Node**: existing chrome (**Practice Dashboard**: Start Practice, progression, reports, voice **Session** flow).
-- **Practice Dashboard** ≠ **Command** (global ops vs practice **Node** UI). ≠ future **Customer interview Node**.
+- **Practice Dashboard** ≠ **Pitwall** (global ops vs practice **Node** UI). ≠ future **Customer interview Node**.
 
 ### 4.3 Back to the map
 
 - Baseline: small `**<`** (or similar) control from **Active Node surface** back to **Grid** map.
 - Breadcrumbs and fuller navigation IA: **not finalized**.
 
-### 4.4 Command vs Grid (Q8)
+### 4.4 Pitwall vs Grid (Q8)
 
-- **Strict separation** in v1: Command does **not** host the full graph as its main canvas; Grid does **not** replace Command’s “what now” panel.
-- **Cross-links** between modules are fine; **duplicating** the full graph inside Command is not.
+- **Strict separation** in v1: Pitwall does **not** host the full graph as its main canvas; Grid does **not** replace Pitwall’s “what now” panel.
+- **Cross-links** between modules are fine; **duplicating** the full graph inside Pitwall is not.
 
 ### 4.5 Pinned Nodes (vision, not v1-final)
 
@@ -119,13 +119,13 @@ Main panel
 - Founders do **not** work all Nodes at once; focus follows the **current bottleneck** (e.g. weak discovery → **Interview practice** or **Customer interview Node** when it exists).
 - **Node work state** (product state, agent judgment, or both—**TBD**) marks progress; when a constraint is “good enough,” the brain steers to the next Node.
 - Sidebar may show only **active workset** Nodes (often one, sometimes two parallel); completed Nodes drop from prominence automatically.
-- Tied to **Command** “what now” story.
+- Tied to **Pitwall** “what now” story.
 
 **Deferred:** confirm-first vs auto-advance when leaving a Node; pin caps and overflow.
 
 ---
 
-## 5. Systems thinking (how Command should “think”)
+## 5. Systems thinking (how Pitwall should “think”)
 
 The product optimizes **how** the startup runs, not only **which** Node is next.
 
@@ -139,7 +139,7 @@ The product optimizes **how** the startup runs, not only **which** Node is next.
 
 **Core truth:** a system improves at the speed of its **tightest bottleneck**—but do not “attack constraints” blindly; validate first.
 
-**Command’s job (metaphor, not user-facing copy):** give founders an operational picture similar to what a fast operator keeps in their head—bottleneck, leverage, next action—without requiring them to map the system themselves.
+**Pitwall’s job (metaphor, not user-facing copy):** give founders an operational picture similar to what a fast operator keeps in their head—bottleneck, leverage, next action—without requiring them to map the system themselves.
 
 Influences named in discussion: *Thinking in Systems* (Donella Meadows), fast iteration / constraint focus (discussed in terms of how certain builders are praised for speed—not literal “Elon mode” in the UI).
 
@@ -150,16 +150,16 @@ Influences named in discussion: *Thinking in Systems* (Donella Meadows), fast it
 
 | Area                                              | V1                                                                                                                                    |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **Command**                                       | **Real** surface (CopilotKit/OpenUI), not a placeholder                                                                               |
+| **Pitwall**                                       | **Real** surface (CopilotKit/OpenUI), not a placeholder                                                                               |
 | **Grid**                                          | **Interview practice Node** only on the map (no skeleton locked placeholders in v1)                                                    |
 | **Active Node surface**                           | Full existing interview experience (voice **Session**, reports, **Progression**, etc.) — **no** platform **Credits**                  |
 | **Routing**                                       | **New backend architecture**; **no** legacy top-level routes for this shell slice                                                     |
-| **Journey Brain + Workspace**                     | Whatever depth the **rebuilt backend** needs for Command + one Node + sessions (incremental; not “full multi-node brain” before ship) |
+| **Journey Brain + Workspace**                     | Whatever depth the **rebuilt backend** needs for Pitwall + one Node + sessions (incremental; not “full multi-node brain” before ship) |
 | **Pinned Nodes / Node work state / auto workset** | **Deferred** until baseline loop works                                                                                                |
 | **Graph catalog**                                 | One shipped Node; full catalog + milestone spine **TBD** in `platform/registry`                                                       |
 
 
-**After login:** land on **Command** by default; reach interview practice via **Grid → Node → Active Node surface**.
+**After login:** land on **Pitwall** by default; reach interview practice via **Grid → Node → Active Node surface**.
 
 **Still includes (inside interview Node):** Landing Page, auth, Profile Settings, **Founder API Key** setup, Start Practice, Voice Conversation, Session Report, Report Generating State, Progression, Achievement Nodes, Insufficient Data State for ranking—per `CONTEXT.md`.
 
@@ -189,16 +189,16 @@ Influences named in discussion: *Thinking in Systems* (Donella Meadows), fast it
 
 | #   | Topic                           | Resolution                                                                                                                 |
 | --- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| —   | Hero loop                       | **Command** + **Grid** + **Journey Brain**; **Interview practice** is **one Node**, not the whole product                    |
+| —   | Hero loop                       | **Pitwall** + **Grid** + **Journey Brain**; **Interview practice** is **one Node**, not the whole product                    |
 | —   | Node spawning                   | **Prebuilt** catalog; agent advises **pathing**, does not invent Node types ad hoc                                         |
 | 6   | TS vs Python for Deep Agents    | **TypeScript / deepagentsjs first**                                                                                        |
 | 7   | Founder Goal before heavy Nodes | **Deferred** (reframed after prebuilt-graph clarification)                                                                 |
-| 8   | Command vs Grid                 | **Strict separation** + links                                                                                              |
+| 8   | Pitwall vs Grid                 | **Strict separation** + links                                                                                              |
 | 9   | Skip gates / deps               | **Deferred**                                                                                                               |
 | 11  | Back to Grid map                | `**<`-style control**; breadcrumbs **TBD**                                                                                 |
 | 12  | Sidebar pins                    | **Vision in flux** (active workset + Node work state); manual pin sketch may coexist until reconciled                      |
 | 13  | Public promise framing          | **Deferred**; intent = operational velocity, not forced outcome vs capability marketing split                              |
-| 14  | Simplest v1 spine               | **Real Command** + **Grid (one Node)** + **interactive** Active Node surface; rebuild architecture, no legacy shell routes |
+| 14  | Simplest v1 spine               | **Real Pitwall** + **Grid (one Node)** + **interactive** Active Node surface; rebuild architecture, no legacy shell routes |
 | 15  | LLM provider                    | **Gemini only**; delete OpenRouter                                                                                       |
 | 16  | Billing                         | **BYOK** (**Founder API Key**); no subscription or Credits                                                               |
 | —   | `journey/brain` vs platform     | **Sibling slice** — not nested under `platform/shell`; see `[architecture-platform-and-nodes.md](./architecture-platform-and-nodes.md)` §8 |
@@ -241,7 +241,7 @@ Influences named in discussion: *Thinking in Systems* (Donella Meadows), fast it
 
 | Term                    | Meaning                                                                       |
 | ----------------------- | ----------------------------------------------------------------------------- |
-| **Command**             | Global operational sidebar module (= Dashboard = Mission Control)             |
+| **Pitwall**             | Global operational sidebar module (retired: Command, Dashboard, Mission Control) |
 | **Grid**                | PMF node map sidebar module (= Playground)                                    |
 | **Active Node surface** | Full main-panel UI for one selected Node                                      |
 | **Interview practice Node** | Mom Test simulator (**v1**); not **Customer interview Node** (future)      |

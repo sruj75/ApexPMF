@@ -13,14 +13,14 @@ Decisions from the **Projects + shell** grill. Full glossary: `CONTEXT.md`. Arch
 
 - **Founder account** — auth, **Founder API Key** (required on feature tour penultimate step in v1), **account menu** in sidebar footer.
 - **Project** — one startup idea; shell scoped to **active Project**; routes `/projects/[projectSlug]/…`.
-- Multi-project; **Project switcher** on **Command** top bar (Vercel-style); inline create → new slug → **Command composer state**.
+- Multi-project; **Project switcher** on **Pitwall** top bar (Vercel-style); inline create → new slug → **Pitwall composer state**.
 
-## Onboarding & Command
+## Onboarding & Pitwall
 
 1. Sign in → **feature tour** (Back/Next only, no Skip) → penultimate **API key** → last step name **Project**.
-2. `/projects/[slug]/command` → **Command composer state** (v0 center composer + ChatGPT-style onboarding chat).
-3. Onboarding **must finish** (agent onboarding system prompt) → **Command operational state** (dashboard). **Sessions do not** unlock operational Command early.
-4. **Grid** + **Start Practice** available during composer (soft nudges). **Agent chat rail** on Grid, operational Command, Active Node—not on composer.
+2. `/projects/[slug]/pitwall` → **Pitwall composer state** (v0 center composer + ChatGPT-style onboarding chat).
+3. Onboarding **must finish** (agent onboarding system prompt) → **Pitwall operational state** (dashboard). **Sessions do not** unlock operational Pitwall early.
+4. **Grid** + **Start Practice** available during composer (soft nudges). **Agent chat rail** on Grid, operational Pitwall, Active Node—not on composer.
 
 ## Nodes (v1)
 

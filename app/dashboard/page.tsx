@@ -58,7 +58,7 @@ export default async function DashboardPage() {
           />
         </section>
 
-        <section className="dashboard-command" aria-label="Practice status">
+        <section className="practice-dashboard-status" aria-label="Practice status">
           <article className="dashboard-card dashboard-primary-card">
             <p className="dashboard-card-label">Next Session source</p>
             <h2>{nextSessionSource.title}</h2>

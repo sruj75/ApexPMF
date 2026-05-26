@@ -8,7 +8,7 @@ source: Founder grill session; reconcile with `ARCHITECTURE.md` when accepted
 
 # Architecture proposal — platform shell + node slices
 
-**Problem:** The refactor is bigger than the customer interview simulator. It adds **Command**, **Grid**, **Journey Brain**, per-node **Workspace** namespaces, and BYOK Gemini—while keeping agent-generated code coherent ([Harness engineering](https://openai.com/index/harness-engineering/) style boundaries + [deep modules](https://www.amazon.com/Philosophy-Software-Design-2nd/dp/173210221X)).
+**Problem:** The refactor is bigger than the customer interview simulator. It adds **Pitwall**, **Grid**, **Journey Brain**, per-node **Workspace** namespaces, and BYOK Gemini—while keeping agent-generated code coherent ([Harness engineering](https://openai.com/index/harness-engineering/) style boundaries + [deep modules](https://www.amazon.com/Philosophy-Software-Design-2nd/dp/173210221X)).
 
 **Recommendation:** Do **not** choose vertical *or* horizontal. Use **both**:
 
@@ -21,8 +21,8 @@ source: Founder grill session; reconcile with `ARCHITECTURE.md` when accepted
 
 | Boundary | Owns | v1 |
 |----------|------|-----|
-| **Platform shell** | Auth entry, **Command**, **Grid** topology, founder profile, **Founder API Key** settings, navigation | Real **Command** + **Grid** with one **Node** |
-| **Journey Brain** | Deep Agents runtime; reads/writes **Node Workspaces** across **Node** plugins; **Command** “what now”; **Grid** pathing | Minimal depth for one **Node** + future hooks |
+| **Platform shell** | Auth entry, **Pitwall**, **Grid** topology, founder profile, **Founder API Key** settings, navigation | Real **Pitwall** + **Grid** with one **Node** |
+| **Journey Brain** | Deep Agents runtime; reads/writes **Node Workspaces** across **Node** plugins; **Pitwall** “what now”; **Grid** pathing | Minimal depth for one **Node** + future hooks |
 | **Node: interview-practice** | Voice **Session**, persona, hidden evaluation, report, progression inside that **Node** | Current simulator, moved under `nodes/` |
 | **Providers** | Gemini (voice + LLM), Supabase, encrypted key storage, workspace backend | BYOK; **no** OpenRouter; **no** Credits |
 
@@ -36,7 +36,7 @@ source: Founder grill session; reconcile with `ARCHITECTURE.md` when accepted
 
 ```text
                     ┌─────────────────────────────────────┐
-                    │  app/  (thin UI: Command, Grid,    │
+                    │  app/  (thin UI: Pitwall, Grid,    │
                     │        Node Active Node surfaces)   │
                     └─────────────────┬───────────────────┘
                                       │
@@ -45,7 +45,7 @@ source: Founder grill session; reconcile with `ARCHITECTURE.md` when accepted
    ┌──────────────┐           ┌──────────────┐           ┌──────────────────┐
    │ platform/    │           │ journey/     │           │ nodes/           │
    │ shell        │           │ brain        │           │ interview-practice│
-   │ (Command,    │           │ (Deep Agents,│           │ (Session loop)   │
+   │ (Pitwall,    │           │ (Deep Agents,│           │ (Session loop)   │
    │  Grid, BYOK)  │           │  Workspace)  │           │                  │
    └──────┬───────┘           └──────┬───────┘           └────────┬─────────┘
           │                          │                            │
@@ -85,7 +85,7 @@ Types → Config → Repo → Service → Runtime
 | **Only** global `domain/session`, `domain/credits` | Shallow shared modules; **Node** knowledge leaks across unrelated tools |
 | **Temporal folders** (`read/`, `process/`, `write/`) | Information leakage across phases |
 | **Copy-paste layer stacks per Node with no shared Providers** | Duplicated Gemini/key logic; drift |
-| **Mission Control as a god package** | “Command” is one **module** in **platform shell**, not the whole tree |
+| **Pitwall as a god package** | **Pitwall** is one **module** in **platform shell**, not the whole tree |
 
 ---
 
@@ -112,7 +112,7 @@ Everything that is not owned by one product slice enters through **Providers**:
 | `src/application/start-session`, `end-session`, … | `src/nodes/interview-practice/service` + thin `app/nodes/interview/*` |
 | `src/infrastructure/llm/openrouter.ts` | **Delete**; Gemini-only in `providers/gemini` |
 | `src/domain/credits/*` | **Delete** for refactor |
-| `app/dashboard`, `app/practice` | `app/command`, `app/grid`, `app/nodes/interview` |
+| `app/dashboard`, `app/practice` | `app/pitwall`, `app/grid`, `app/nodes/interview` |
 | (new) | `src/platform/shell`, `src/journey/brain` |
 
 Migrate **incrementally:** stand up `providers/` + `platform/shell` + `nodes/interview-practice` beside legacy paths, cut over routes, then delete legacy.
@@ -152,10 +152,10 @@ Agents ship faster when **invariants** are mechanical, not tribal.
 | Piece | Role | Folder |
 |-------|------|--------|
 | **Journey Brain** | Agent spine (Deep Agents); attaches to **Node** plugins; reads **Node Workspaces** | `src/journey/brain/` |
-| **Platform shell** | UI shell: auth, **Command** + **Grid**, open **Node**, BYOK settings | `src/platform/shell/` |
+| **Platform shell** | UI shell: auth, **Pitwall** + **Grid**, open **Node**, BYOK settings | `src/platform/shell/` |
 | **Node** (e.g. interview) | **Plugin**: **Node Runtime** + DB truth + sync into **Node Workspace** | `src/nodes/interview-practice/` |
 
-**Command is not the brain.** Command **consumes** brain output (bottleneck, what next). Nesting `journey/brain` under `platform/shell` would turn platform into a god package (Deep Agents, skills, graph runtime, CopilotKit wiring).
+**Pitwall is not the brain.** Pitwall **consumes** brain output (bottleneck, what next). Nesting `journey/brain` under `platform/shell` would turn platform into a god package (Deep Agents, skills, graph runtime, CopilotKit wiring).
 
 **Dependency direction:**
 
@@ -170,7 +170,7 @@ Optional: `platform/registry` — **Node** catalog / graph topology shared by **
 
 ### Still open (smaller)
 
-1. **Command → brain** only via `platform/shell/service` facade. **Recommend:** yes.
+1. **Pitwall → brain** only via `platform/shell/service` facade. **Recommend:** yes.
 2. **Shared types** in `platform/types` (`FounderId`, `NodeId`, paths). **Recommend:** yes.
 
 ---
@@ -186,7 +186,7 @@ That matches your sentence: **each node in the grid is its own workspace** — s
 ```text
 Founder
    │
-   ├─► Command  ─────────► asks Journey Brain: "what's the bottleneck? what next?"
+   ├─► Pitwall  ─────────► asks Journey Brain: "what's the bottleneck? what next?"
    │
    ├─► Grid     ─────────► map of Nodes; founder clicks one
    │
@@ -204,11 +204,11 @@ Founder
 
 When the founder is inside the interview Node, they are mostly using **Node logic** (start practice, talk to persona, get report). The brain is **not** replacing that loop in v1.
 
-When they are on Command, they are mostly seeing **brain output** (synthesis, bottleneck, next step)—grounded in Workspace from **all** Nodes they have touched.
+When they are on Pitwall, they are mostly seeing **brain output** (synthesis, bottleneck, next step)—grounded in Workspace from **all** Nodes they have touched.
 
 When they are on the Grid, they see **topology + state** (which Nodes exist, maybe “you are here / recommended next”). The brain may have suggested that path; the Grid is the **map, not the brain**.
 
-**So:** Nodes are where work happens. Command is where sense-making happens. The brain is the continuous thread behind both.
+**So:** Nodes are where work happens. Pitwall is where sense-making happens. The brain is the continuous thread behind both.
 
 ### OpenClaw mental model (tightened)
 
@@ -220,7 +220,7 @@ Map that to ApexPMF:
 |---------------|--------------|
 | Workspace | **Workspace** (partitioned per Node + shared founder-level context if you want) |
 | Tools (bash, edit file, …) | **Node surfaces** + a small set of **brain tools** (read workspace, suggest next node, maybe run synthesis)—not “the whole UI is the tool” |
-| User chats with agent | **Command** + future chat-like affordances |
+| User chats with agent | **Pitwall** + future chat-like affordances |
 | Agent does work in files | After interview Node: notes, report summaries land in that Node’s workspace; brain can merge into “problem synthesis” later |
 
 The interview Node is like a **heavy tool** the founder opens: it has its own UX and rules (Mom Test, voice, traps). When they close it, **artifacts** remain in that Node’s workspace for the brain to use elsewhere.
@@ -232,19 +232,19 @@ You are **not** rebuilding “interview as a chat with the meta agent” for v1.
 Think **spine + plugins**, not “brain folder inside every node”:
 
 ```text
-        Journey Brain  ←── one runtime, one Workspace API, pathing, Command feed
+        Journey Brain  ←── one runtime, one Workspace API, pathing, Pitwall feed
               │
     ┌─────────┼─────────┐
     │         │         │
  platform   Node A    Node B
- (Command,  (interview) (future)
+ (Pitwall,  (interview) (future)
   Grid)      deep      deep
              module    module
 ```
 
 - **Journey Brain** = shared spine (Deep Agents, TS-first, BYOK Gemini key via Providers).
 - **Each Node** = vertical slice (deep module): owns Session/persona/report **inside** `interview-practice`.
-- **Platform shell** = Command + Grid + auth + “open this Node” — does **not** own persona generation or voice.
+- **Platform shell** = Pitwall + Grid + auth + “open this Node” — does **not** own persona generation or voice.
 
 This is the same **sibling** layout as §8: `journey/brain` beside `platform/shell` and `nodes/*`, not nested under platform.
 

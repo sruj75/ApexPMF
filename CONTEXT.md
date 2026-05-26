@@ -1,48 +1,61 @@
 # ApexPMF
 
-The authenticated ApexPMF shell for a **Founder** account: the **Founder** may own multiple **Projects** (one startup idea each toward PMF). The **shell** (**Command**, **Grid**, **Agent chat rail**, **Journey Brain**, **Node Workspaces**, **Sessions**) runs inside exactly one **active Project** at a time, switched via a Vercel-style **Project switcher** in the **Command** top bar. **Founder API Key** is configured once per **account**, not per **Project**. Primary sidebar modules per **Project** are **Command** and **Grid** only in v1 (no Overview/Analytics-style tabs yet). _Informal aliases_: **Command** is also called **Dashboard** or **Mission Control**; **Grid** is also called **Playground**. **V1** ships a **real Command**, a **Grid** with one **Node** (**Interview practice** simulator), and a fully interactive **Active Node surface** for that **Node**—opened from the **Grid** by normal interaction (for example click), not a read-only preview. A separate **Customer interview** **Node** (real customer conversations) is **future**—**not** the simulator.
+The authenticated ApexPMF shell for a **Founder** account: the **Founder** may own multiple **Projects** (one startup idea each toward PMF). The **shell** (**Pitwall**, **Grid**, **Agent chat rail**, **Journey Brain**, **Node Workspaces**, **Sessions**) runs inside exactly one **active Project** at a time, switched via a Vercel-style **Project switcher** in the **Pitwall** top bar. **Founder API Key** is configured once per **account**, not per **Project**. Primary sidebar modules per **Project** are **Pitwall** and **Grid** only in v1 (no Overview/Analytics-style tabs yet). _Informal alias_: **Grid** is also called **Playground**. **V1** ships a **real Pitwall**, a **Grid** with one **Node** (**Interview practice** simulator), and a fully interactive **Active Node surface** for that **Node**—opened from the **Grid** by normal interaction (for example click), not a read-only preview. A separate **Customer interview** **Node** (real customer conversations) is **future**—**not** the simulator.
 
 ## Language
 
-**Command**:
-The primary sidebar **module** for working with the **active Project**. It has two canvas modes: **Command composer state** (onboarding chat until complete) and **Command operational state** (dashboard after onboarding finishes per agent onboarding prompt). _Informal aliases_: **Dashboard**, **Mission Control** (all three names refer to this same module).
-_Avoid_: Using **Mission Control** for the whole app shell or **Grid**; showing a full operational dashboard before there is data; confusing **Command** with interview **Practice Dashboard** chrome
+**Pitwall**:
+The primary sidebar **module** for working with the **active Project**. It has two canvas modes: **Pitwall composer state** (onboarding chat until complete) and **Pitwall operational state** (operational synthesis after onboarding finishes per agent onboarding prompt).
+_Avoid_: Using **Mission Control**, **Command**, or **Dashboard** for this module; using retired names for the whole app shell or **Grid**; showing full operational synthesis before there is data; confusing **Pitwall** with interview **Practice Dashboard** chrome
 
-**Command composer state**:
-The default **Command** canvas when a **Project** has little or no operational data yet: a v0-style **center composer** (prompt input) and a ChatGPT-style conversation thread in the main panel where the **Journey Brain** gathers **Founder context** about the startup. No bottleneck widgets, weekly focus cards, or CopilotKit/OpenUI operational dashboard yet. Reference: `docs/vision/onboarding-reference/Screenshot_2026-05-22_at_11.32.24_AM-*.png` (composer), `…_11.35.20_AM-*.png` (conversation).
-_Avoid_: Empty placeholder **Command** with no agent conversation; a separate onboarding page that duplicates this chat
+**Pitwall composer state**:
+The default **Pitwall** canvas when a **Project** has little or no operational data yet: a v0-style **center composer** (prompt input) and a ChatGPT-style conversation thread in the main panel where the **Journey Brain** gathers **Founder context** about the startup. No bottleneck widgets, weekly focus cards, or CopilotKit/OpenUI operational dashboard yet. Reference: `docs/vision/onboarding-reference/Screenshot_2026-05-22_at_11.32.24_AM-*.png` (composer), `…_11.35.20_AM-*.png` (conversation).
+_Avoid_: Empty placeholder **Pitwall** with no agent conversation; a separate onboarding page that duplicates this chat
 
-**Command operational state**:
-The **Command** canvas once **`ONBOARDING.md`** onboarding is **finished** and **`ONBOARDING.md`** is removed/archived—required **Founder context** must be gathered in that ritual (not substitutable by **Interview practice Sessions** or **Node artifacts** alone). Then real operational synthesis can render (weekly focus, **Bottleneck**, what next)—**CopilotKit** and/or **OpenUI**. May coexist with **Agent chat rail** on the right.
-_Avoid_: Fake/static dashboard before onboarding completes; promoting to operational **Command** because a **Session** finished; calling composer state "broken Command"
+**Pitwall operational state**:
+The **Pitwall** canvas once **`ONBOARDING.md`** onboarding is **finished** and **`ONBOARDING.md`** is removed/archived—required **Founder context** must be gathered in that ritual (not substitutable by **Interview practice Sessions** or **Node artifacts** alone). Then real operational synthesis can render (weekly focus, **Bottleneck**, what next)—**CopilotKit** and/or **OpenUI**. May coexist with **Agent chat rail** on the right.
+_Avoid_: Fake/static dashboard before onboarding completes; promoting to operational **Pitwall** because a **Session** finished; calling composer state "broken Pitwall"
 
-**Command composer**:
-The centered prompt input in **Command composer state** (v0-style "what do you want to work on" pattern); primary input for **conversational onboarding** and ongoing **Journey Brain** dialogue in that state.
+**Pitwall composer**:
+The centered prompt input in **Pitwall composer state** (v0-style "what do you want to work on" pattern); primary input for **conversational onboarding** and ongoing **Journey Brain** dialogue in that state.
 _Avoid_: Confusing with interview voice input or **Grid** search
 
+
+**Command** (deprecated term):
+Do **not** use for the global shell module. Prefer **Pitwall**. Legacy docs and issues may say **Command**, **Dashboard**, or **Mission Control** until renamed.
+_Avoid_: Using any retired name in new product copy or routes
+
+**Dashboard** (deprecated term, global module):
+Do **not** use for the global operational sidebar module. Prefer **Pitwall**. **Practice Dashboard** is a different term (interview **Node** chrome only).
+_Avoid_: Collapsing **Pitwall** and **Practice Dashboard**
+
+**Mission Control** (deprecated term):
+Do **not** use. Prefer **Pitwall** for the global operational sidebar module.
+_Avoid_: Using **Mission Control** for the whole app shell or **Grid**
+
 **Agent chat rail**:
-A persistent right-side chat panel (Cursor IDE–style) on **Grid**, **Command operational state**, and **Active Node surfaces**—**v1 includes Grid** even when only **Interview practice** is on the map. **Not** shown in **Command composer state** (center composer thread is enough). Product metaphor: **Cursor for getting to PMF**, not Cursor for coding.
-_Avoid_: Three chat surfaces at once (composer thread + rail + practice voice); rail on **Command composer state**
+A persistent right-side chat panel (Cursor IDE–style) on **Grid**, **Pitwall operational state**, and **Active Node surfaces**—**v1 includes Grid** even when only **Interview practice** is on the map. **Not** shown in **Pitwall composer state** (center composer thread is enough). Product metaphor: **Cursor for getting to PMF**, not Cursor for coding.
+_Avoid_: Three chat surfaces at once (composer thread + rail + practice voice); rail on **Pitwall composer state**
 
 **Agent mission**:
 The product-owned objective for the **Journey Brain**, set via **configure system prompt** (for example steer the **Founder** from zero toward product-market fit)—**not** a free-form goal the **Founder** authors. Prompt wording lives in implementation config, not in founder-facing "goal" settings.
 _Avoid_: **Founder Goal** as a text box the **Founder** must write; documenting system-prompt prose in `CONTEXT.md`
 
 **Project**:
-One startup idea the **Founder** is taking toward PMF inside ApexPMF; the scope boundary for **Command**, **Grid**, **Journey Brain** continuity, **Node Workspaces**, **Sessions**, and **Founder context** for that venture. A **Founder** account may own many **Projects** but works in one **active Project** at a time (Vercel-style).
+One startup idea the **Founder** is taking toward PMF inside ApexPMF; the scope boundary for **Pitwall**, **Grid**, **Journey Brain** continuity, **Node Workspaces**, **Sessions**, and **Founder context** for that venture. A **Founder** account may own many **Projects** but works in one **active Project** at a time (Vercel-style).
 _Avoid_: Supabase infrastructure "project"; calling **Project** a **Node Workspace**; using "workspace" alone when you mean this container
 
 **Active Project**:
 The **Project** currently selected in the shell; all authenticated product routes and agent memory for the shell refer to this **Project** until the **Founder** switches.
-_Avoid_: Mixing data from two **Projects** in one **Command** view without an explicit switch
+_Avoid_: Mixing data from two **Projects** in one **Pitwall** view without an explicit switch
 
 **Project switcher**:
-Top-bar control on **Command** (Vercel-style: searchable list, **create new Project** inline). Creating a **Project** uses a small name field in the dropdown (**Option A**); on save, navigate to `/projects/[projectSlug]/command` in **Command composer state** and start **conversational onboarding** for that venture. Switching **Projects** changes **Project route** and loads that **Project**'s **Command** mode (composer vs operational) from its data.
+Top-bar control on **Pitwall** (Vercel-style: searchable list, **create new Project** inline). Creating a **Project** uses a small name field in the dropdown (**Option A**); on save, navigate to `/projects/[projectSlug]/pitwall` in **Pitwall composer state** and start **conversational onboarding** for that venture. Switching **Projects** changes **Project route** and loads that **Project**'s **Pitwall** mode (composer vs operational) from its data.
 _Avoid_: Full-page create flow for v1 additional **Projects**; switching **Project** without updating the URL
 
 **Project route**:
-URL segment that scopes the shell to one **Project**, for example `/projects/[projectSlug]/command`, `/projects/[projectSlug]/grid`, `/projects/[projectSlug]/nodes/interview-practice/...`. **projectSlug** is unique per **Founder account**; stable **Project** id lives in the **Platform store**.
-_Avoid_: **Active Project** only in cookies with opaque `/command` URLs; query-param project switching as the primary model
+URL segment that scopes the shell to one **Project**, for example `/projects/[projectSlug]/pitwall`, `/projects/[projectSlug]/grid`, `/projects/[projectSlug]/nodes/interview-practice/...`. **projectSlug** is unique per **Founder account**; stable **Project** id lives in the **Platform store**. Slug policy is service-owned: derive from project display name, enforce per-account uniqueness with readable suffixes (`-2`, `-3`, ...), and keep slug stable after create even if display name changes.
+_Avoid_: **Active Project** only in cookies with opaque `/pitwall` URLs; query-param project switching as the primary model
 
 **Founder account**:
 The authenticated identity (auth user) that may own multiple **Projects** and one **Founder API Key** shared across all **Projects**.
@@ -53,23 +66,23 @@ Basic information about the **active Project**'s startup (fields and schema **TB
 _Avoid_: Lesson-style onboarding screens; treating **Founder context** as the same thing as **Agent mission**; storing **Founder context** at account level when it describes one venture only
 
 **Grid**:
-The sidebar **module** whose default view is the PMF **Node** graph; selecting an **unlocked** **Node** opens its **Active Node surface** in the main panel until the **Founder** returns to the map (baseline: compact **back** affordance such as `<`; breadcrumbs and fuller nav IA **not** finalized). Available during **Command composer state** (onboarding)—the **Journey Brain** may nudge "finish context first" but does not hard-block the sidebar. **V1:** shows **only** shipped **Nodes** (one interview practice **Node**)—**no** skeleton map of locked future **Nodes** until the **Node catalog** spine exists in `platform/registry`. _Informal alias_: **Playground** (same module).
-_Avoid_: Treating **Grid** as a throwaway demo; locking **Grid** until **Command operational state** in v1; grayed placeholder **Nodes** on the map in v1
+The sidebar **module** whose default view is the PMF **Node** graph; selecting an **unlocked** **Node** opens its **Active Node surface** in the main panel until the **Founder** returns to the map (baseline: compact **back** affordance such as `<`; breadcrumbs and fuller nav IA **not** finalized). Available during **Pitwall composer state** (onboarding)—the **Journey Brain** may nudge "finish context first" but does not hard-block the sidebar. **V1:** shows **only** shipped **Nodes** (one interview practice **Node**)—**no** skeleton map of locked future **Nodes** until the **Node catalog** spine exists in `platform/registry`. _Informal alias_: **Playground** (same module).
+_Avoid_: Treating **Grid** as a throwaway demo; locking **Grid** until **Pitwall operational state** in v1; grayed placeholder **Nodes** on the map in v1
 
 **Active Node surface**:
-The full-width main-panel experience for one selected **Node** from the **Grid** (for example click). For **Interview practice**, this hosts the Mom Test voice **Session** simulator (progress, reports). A widget-style layout here is **not** the global **Command** module. A **Founder** may pin this **Node** from the graph or from in-surface settings so it also appears as a **Pinned Node**; a compact control (for example `<`) returns to the **Grid** map, with richer breadcrumbs later.
-_Avoid_: Calling node open "drill-in" in user-facing copy if the team prefers plain language ("open the **Node**"); confusing global **Command** with **Node**-local layouts; hosting **Customer interview** (real interviews) UX inside the practice simulator **Node**
+The full-width main-panel experience for one selected **Node** from the **Grid** (for example click). For **Interview practice**, this hosts the Mom Test voice **Session** simulator (progress, reports). A widget-style layout here is **not** the global **Pitwall** module. A **Founder** may pin this **Node** from the graph or from in-surface settings so it also appears as a **Pinned Node**; a compact control (for example `<`) returns to the **Grid** map, with richer breadcrumbs later.
+_Avoid_: Calling node open "drill-in" in user-facing copy if the team prefers plain language ("open the **Node**"); confusing global **Pitwall** with **Node**-local layouts; hosting **Customer interview** (real interviews) UX inside the practice simulator **Node**
 
 **Pinned Node**:
-A sidebar shortcut to an **Active Node surface** for a specific **Node**, listed after **Command** and **Grid**. May be **Founder**-initiated (pin from graph or settings) and/or **system- or agent-surfaced** as part of the **active workset** when the **Journey Brain** steers the **Founder** toward current bottlenecks—exact rules **not** finalized.
+A sidebar shortcut to an **Active Node surface** for a specific **Node**, listed after **Pitwall** and **Grid**. May be **Founder**-initiated (pin from graph or settings) and/or **system- or agent-surfaced** as part of the **active workset** when the **Journey Brain** steers the **Founder** toward current bottlenecks—exact rules **not** finalized.
 _Avoid_: Treating pins as a second graph; treating sidebar clutter as acceptable without a future cap, overflow, or auto-retire story once behavior ships
 
 **Active workset**:
-The small set of **Nodes** treated as live work at once (often one bottleneck-focused **Node**, sometimes two in parallel per current vision); expected to align with **Command** "what now" and with which **Pinned Nodes** deserve prominence when auto-surfacing exists.
+The small set of **Nodes** treated as live work at once (often one bottleneck-focused **Node**, sometimes two in parallel per current vision); expected to align with **Pitwall** "what now" and with which **Pinned Nodes** deserve prominence when auto-surfacing exists.
 _Avoid_: Implying every catalog **Node** is simultaneously actionable
 
 **Node work state**:
-Where a **Node** sits in its lifecycle for a **Founder** (for example not started, in active attack, satisfied enough to move on); may combine deterministic product state and **Journey Brain** judgment—**not** finalized, but drives pathing, **Command** focus, and envisioned auto pin/unpin behavior.
+Where a **Node** sits in its lifecycle for a **Founder** (for example not started, in active attack, satisfied enough to move on); may combine deterministic product state and **Journey Brain** judgment—**not** finalized, but drives pathing, **Pitwall** focus, and envisioned auto pin/unpin behavior.
 _Avoid_: Pretending "done" is always a binary checkbox unless the product defines it that way
 
 **Journey Brain**:
@@ -121,7 +134,7 @@ The agent-facing file tree for one **Node** **plugin** (markdown and other paths
 _Avoid_: Calling **Node Workspace** "the database"; expecting the brain to load unconsolidated raw telemetry by default
 
 **Platform store**:
-The **database** (for example Postgres via Supabase): source of truth for traditional web-app state—auth, **Founder API Key** handles (account-scoped), **Project** records, **Project**-scoped **Session** rows, **Session Report** JSON, progression, and other product UI data. After meaningful **Node Runtime** events, consolidated summaries are **synced** into the matching **Node Workspace** under that **Project** so **Command** and the **Journey Brain** share one story without duplicating authority.
+The **database** (for example Postgres via Supabase): source of truth for traditional web-app state—auth, **Founder API Key** handles (account-scoped), **Project** records, **Project**-scoped **Session** rows, **Session Report** JSON, progression, and other product UI data. After meaningful **Node Runtime** events, consolidated summaries are **synced** into the matching **Node Workspace** under that **Project** so **Pitwall** and the **Journey Brain** share one story without duplicating authority.
 _Avoid_: Using "platform store" when you mean **Node Workspace** files; storing **Founder API Key** secrets only in markdown files
 
 **Founder**:
@@ -138,10 +151,10 @@ _Avoid_: Busywork, unfalsified "blockers," optimizing metrics unrelated to the s
 
 **North Star**:
 The long-horizon anchor beyond PMF (vision of the company or product at scale); the **Grid** graph may extend past PMF toward it, distinct from **Agent mission** and from the PMF verdict itself.
-_Avoid_: Collapsing **North Star**, PMF, **Agent mission**, and weekly **Command** focus into one undifferentiated "goal"
+_Avoid_: Collapsing **North Star**, PMF, **Agent mission**, and weekly **Pitwall** focus into one undifferentiated "goal"
 
 **Feature tour**:
-A first-run multi-step product tour shown **after sign-in** and **before** the **Project** shell. Centered modal with progress (step dots), **Back**, and **Next** only on first run—**no Skip**. **Second-to-last step:** **Founder API Key** input (account-scoped, stored on **Founder account**). **V1:** key is **required** on this step—**Next** is disabled until a valid key is saved (validate/save **TBD**). **Post-v1:** whether the tour may allow deferring the key is **TBD**. **Last step:** startup display name + create first **Project**. Optional later **what's new** tours may include **Skip**; first-run tour does not. The **Founder** cannot reach **Command** without completing the last step. The tour runs **once per Founder account**; later **Projects** are created via the **Project switcher**, not by re-running the full tour.
+A first-run multi-step product tour shown **after sign-in** and **before** the **Project** shell. Centered modal with progress (step dots), **Back**, and **Next** only on first run—**no Skip**. **Second-to-last step:** **Founder API Key** input (account-scoped, stored on **Founder account**). **V1:** key is **required** on this step—**Next** is disabled until a live provider check succeeds. Validation must distinguish invalid credentials from transient provider/network failures and keep the Founder on the step until a successful check/save. **Post-v1:** whether the tour may allow deferring the key is **TBD**. **Last step:** startup display name + create first **Project**. Optional later **what's new** tours may include **Skip**; first-run tour does not. The **Founder** cannot reach **Pitwall** without completing the last step. The tour runs **once per Founder account**; later **Projects** are created via the **Project switcher**, not by re-running the full tour.
 _Avoid_: **Skip** on first-run tour; optional API key on tour in v1; implicit untitled **Project** on login; re-showing the full first-run tour on every new **Project**
 
 **ONBOARDING.md**:
@@ -149,8 +162,8 @@ OpenClaw-style **boot file** seeded into the **active Project** workspace when t
 _Avoid_: A separate onboarding agent or page; hard-coded multi-step forms; platform-only deletion before the agent marks sufficiency; keeping **`ONBOARDING.md`** forever after completion
 
 **Conversational onboarding**:
-Post–**feature tour** dialogue in **Command composer state** for the new **Project**, driven by **`ONBOARDING.md`** and the **same** **Journey Brain** as post-onboarding work (center composer + ChatGPT-style thread)—not a second harness. **Founder API Key** is on the tour **second-to-last step** (first account run). When onboarding completes per **`ONBOARDING.md`** rules, **`ONBOARDING.md`** is removed/archived and **Command** becomes **Command operational state**. **Interview practice Sessions** do **not** substitute for finishing onboarding (**grill Q18**). Additional **Projects** skip the tour and land in **Command composer state** with a fresh **`ONBOARDING.md`**. 
-_Avoid_: Lesson-style forms; operational dashboard before **`ONBOARDING.md`** ritual completes; **Session** reports unlocking operational **Command** early
+Post–**feature tour** dialogue in **Pitwall composer state** for the new **Project**, driven by **`ONBOARDING.md`** and the **same** **Journey Brain** as post-onboarding work (center composer + ChatGPT-style thread)—not a second harness. **Founder API Key** is on the tour **second-to-last step** (first account run). When onboarding completes per **`ONBOARDING.md`** rules, **`ONBOARDING.md`** is removed/archived and **Pitwall** becomes **Pitwall operational state**. **Interview practice Sessions** do **not** substitute for finishing onboarding (**grill Q18**). Additional **Projects** skip the tour and land in **Pitwall composer state** with a fresh **`ONBOARDING.md`**. 
+_Avoid_: Lesson-style forms; operational dashboard before **`ONBOARDING.md`** ritual completes; **Session** reports unlocking operational **Pitwall** early
 
 **Session**:
 A complete spoken **practice** interview in the **Interview practice Node** with a virtual **Customer Persona**, hidden truth, conversational turns, and a **Session Report**—simulator only, **not** a real customer interview.
@@ -201,12 +214,12 @@ The Global Ranking state shown when there is not enough user or population evide
 _Avoid_: Placeholder rank, fake percentile
 
 **Start Practice**:
-The action that immediately begins a new **Session** in the **Interview practice Node** without a pre-session configuration screen. **V1:** available even during **Command composer state** (onboarding chat in progress)—**Interview practice** is **unlocked at Project boot**; **Journey Brain** may nudge "finish context first" but does **not** hard-block **Start Practice**.
-_Avoid_: Configure session, create scenario; gating practice on **Command operational state**
+The action that immediately begins a new **Session** in the **Interview practice Node** without a pre-session configuration screen. **V1:** available even during **Pitwall composer state** (onboarding chat in progress)—**Interview practice** is **unlocked at Project boot**; **Journey Brain** may nudge "finish context first" but does **not** hard-block **Start Practice**.
+_Avoid_: Configure session, create scenario; gating practice on **Pitwall operational state**
 
 **Practice Dashboard**:
-The chrome inside the **Interview practice Node**'s **Active Node surface** (for example **Start Practice**, **Progression**, **Global Ranking**, recent **Session Reports**)—**not** the global **Command** module and **not** the future **Customer interview Node**.
-_Avoid_: Course page, productivity dashboard, lesson plan; treating **Practice Dashboard** as global **Command**; using it for real customer interview workflows
+The chrome inside the **Interview practice Node**'s **Active Node surface** (for example **Start Practice**, **Progression**, **Global Ranking**, recent **Session Reports**)—**not** the global **Pitwall** module and **not** the future **Customer interview Node**.
+_Avoid_: Course page, productivity dashboard, lesson plan; treating **Practice Dashboard** as global **Pitwall**; using it for real customer interview workflows
 
 **Learner**:
 The **Founder** while using the voice **Session** **Node**: the individual practicing customer interview skill in the simulator.
@@ -224,7 +237,7 @@ _Avoid_: Using the display string in provider client metadata, env defaults, or 
 The canonical ASCII identifier `ApexPMF` (matches metadata such as document title and integration defaults).
 
 **Product tagline**:
-The short public marketing line: `Speedrun Product-Market Fit`.
+The short public marketing line: `Your Fastest Path to Product-Market Fit`.
 _Avoid_: Using it as the HTML meta description when a fuller sentence is needed.
 
 **Product description**:
@@ -235,7 +248,7 @@ _Avoid_: Confusing with **Session Report** summaries or **Founder Goal** text.
 Deprecated term; use **Product display name** and **Product app name** instead.
 
 **Founder API Key**:
-The **Founder**-supplied Gemini API credential stored on the **Founder account** (not per **Project**) so the product can run voice **Sessions**, non-live LLM flows, and **Journey Brain** calls for any **Project** under that account. **First run:** required on the **feature tour** **second-to-last step** (before **Project** creation). **Later:** view or update via **account menu** → **Settings**. **Post-v1:** optional/deferred key on tour **TBD**.
+The **Founder**-supplied Gemini API credential stored on the **Founder account** (not per **Project**) so the product can run voice **Sessions**, non-live LLM flows, and **Journey Brain** calls for any **Project** under that account. **First run:** required on the **feature tour** **second-to-last step** (before **Project** creation) with live validation before proceeding. **Later:** view or update via **account menu** → **Settings**. Runtime policy is one shared gate: Gemini-dependent flows must require a valid key and return a typed domain outcome (`missing`, `invalid`, `transient failure`) so shell services can route the Founder to Settings with clear copy. Persist key handle metadata including validation status and last validated timestamp. **Post-v1:** optional/deferred key on tour **TBD**.
 _Avoid_: Per-**Project** API keys in v1; optional tour key in v1; platform-billed **Credits** or subscription entitlements
 
 **Account menu**:
@@ -340,14 +353,14 @@ _Avoid_: Progress bar, trap counter
 
 ## Relationships
 
-- A **Founder account** owns zero or more **Projects**; the **shell** always runs in one **active Project**. **Founder API Key** is account-scoped; **Command**, **Grid**, **Sessions**, **Node Workspaces**, and **Founder context** are **Project**-scoped.
-- **Project switcher** lives in the **Command** top bar (Vercel-style); v1 sidebar inside a **Project** is **Command** and **Grid** only.
-- **Authenticated shell** (v1): **left** nav (**Command**, **Grid**, optional **Pinned Nodes**), **footer** **account menu**; **center** canvas = **Command composer state**, **Command operational state**, **Grid**, or **Active Node surface**; **right** **Agent chat rail** on **Grid**, **Command operational state**, and **Active Node surfaces**—**not** on **Command composer state**.
-- **Grid** is reachable during **Command composer state**; **Journey Brain** may nudge completing onboarding first, then nudge toward **Nodes** after onboarding. **V1 Grid:** **only** shipped **Interview practice** (**unlocked at boot**). **Later:** full catalog visible; each **Node** has **locked** / **unlocked** state (no `pre-journey` code category).
-- **Grid** defaults to the graph map; selecting an **unlocked** **Node** opens its **Active Node surface** (fully interactive). Baseline return-to-map: compact **back** (for example `<`). Sidebar: **Command**, **Grid**, optional **Pinned Nodes** (**not finalized**).
-- **First-run path:** sign up / log in → **feature tour** (… → **Founder API Key** → create **Project**) → seed **`ONBOARDING.md`** in **Project** workspace → `/projects/[projectSlug]/command` **Command composer state** → **`ONBOARDING.md`** ritual completes → remove/archive **`ONBOARDING.md`** → **Command operational state** → **Grid** / **Interview practice** / **Session** (practice may happen during composer—**not** a substitute for finishing onboarding).
-- **Additional Project:** **Project switcher** inline create → new slug → fresh **`ONBOARDING.md`** + **Command composer state** for that startup.
-- **V1** ships a real **Command** and a **Grid** with one **Node** (**Interview practice** simulator only); **Customer interview Node** is **future** **TBD**. The **Interview practice** **Active Node surface** is not read-only. **Journey Brain** ships as a **deepagentsjs** harness with workspace file tools and **Node Skills**; **Command** includes agent chat (direction **B**). Not a full multi-channel OpenClaw clone (no Telegram/bash marketplace day one). Open product choices may stay unresolved until the implementing issue; this file tracks **defaults and resolved forks** only.
+- A **Founder account** owns zero or more **Projects**; the **shell** always runs in one **active Project**. **Founder API Key** is account-scoped; **Pitwall**, **Grid**, **Sessions**, **Node Workspaces**, and **Founder context** are **Project**-scoped.
+- **Project switcher** lives in the **Pitwall** top bar (Vercel-style); v1 sidebar inside a **Project** is **Pitwall** and **Grid** only.
+- **Authenticated shell** (v1): **left** nav (**Pitwall**, **Grid**, optional **Pinned Nodes**), **footer** **account menu**; **center** canvas = **Pitwall composer state**, **Pitwall operational state**, **Grid**, or **Active Node surface**; **right** **Agent chat rail** on **Grid**, **Pitwall operational state**, and **Active Node surfaces**—**not** on **Pitwall composer state**.
+- **Grid** is reachable during **Pitwall composer state**; **Journey Brain** may nudge completing onboarding first, then nudge toward **Nodes** after onboarding. **V1 Grid:** **only** shipped **Interview practice** (**unlocked at boot**). **Later:** full catalog visible; each **Node** has **locked** / **unlocked** state (no `pre-journey` code category).
+- **Grid** defaults to the graph map; selecting an **unlocked** **Node** opens its **Active Node surface** (fully interactive). Baseline return-to-map: compact **back** (for example `<`). Sidebar: **Pitwall**, **Grid**, optional **Pinned Nodes** (**not finalized**).
+- **First-run path:** sign up / log in → **feature tour** (… → **Founder API Key** → create **Project**) → seed **`ONBOARDING.md`** in **Project** workspace → `/projects/[projectSlug]/pitwall` **Pitwall composer state** → **`ONBOARDING.md`** ritual completes → remove/archive **`ONBOARDING.md`** → **Pitwall operational state** → **Grid** / **Interview practice** / **Session** (practice may happen during composer—**not** a substitute for finishing onboarding).
+- **Additional Project:** **Project switcher** inline create → new slug → fresh **`ONBOARDING.md`** + **Pitwall composer state** for that startup.
+- **V1** ships a real **Pitwall** and a **Grid** with one **Node** (**Interview practice** simulator only); **Customer interview Node** is **future** **TBD**. The **Interview practice** **Active Node surface** is not read-only. **Journey Brain** ships as a **deepagentsjs** harness with workspace file tools and **Node Skills**; **Pitwall** includes agent chat (direction **B**). Not a full multi-channel OpenClaw clone (no Telegram/bash marketplace day one). Open product choices may stay unresolved until the implementing issue; this file tracks **defaults and resolved forks** only.
 - The product promise pairs the **prebuilt** PMF **Node** graph with **operating intelligence**: improving the **Founder**'s system (constraints, bottlenecks, pace of validated learning), not only sequencing tools toward PMF.
 - **Node catalog** and **Journey milestone** spine are **TBD**—owned by `platform/registry` when built; informed by first-principles PMF work and references such as [Christian Strunk PMF](https://www.christianstrunk.com/blog/product-market-fit) / [PMF framework](https://www.christianstrunk.com/blog/pmf-framework), not copied wholesale. The former `knowledge-graph/` folder was **removed**; do not reference it in new docs or code.
 - **Coding-agent analogy:** short session (minutes–hours) using plugins (Supabase, Vercel, …) to finish a task; ApexPMF **Journey Brain** uses **Node** **plugins** over a **long horizon** (months to PMF) with **Journey milestone** replanning—not one plan for the entire trip.
@@ -356,7 +369,7 @@ _Avoid_: Progress bar, trap counter
 - **Node Workspace** content is private per **Project** per **Node**; **Platform store** holds what the web app queries directly (sessions, reports, progression scoped to **Project**).
 - The **Journey Brain** operates under **Agent mission** (**configure system prompt**); it uses **Founder context**, validated **Bottleneck**, and **Node artifacts** as steering inputs—not a founder-written **Founder Goal** document.
 - **Journey Brain** is one meta-agent across **Nodes**; each **Node** is a **plugin** (Codex-style) with **Node Runtime**, **Node Skill**, and **Node Workspace**; the brain consumes consolidated **Node artifacts** (database + synced files), not necessarily all raw data on every turn.
-- V1 includes **Landing Page**, authentication, **Command**, **Grid** (**Interview practice Node** only), that **Node**'s **Active Node surface** with **Practice Dashboard** chrome (**Start Practice**, **Profile Settings** and **Ideal Customer Profiles** per **Project**, **Voice Conversation**, **Report Generating State**, **Session Report**, **Progression**, **Achievement Nodes**, **Insufficient Data State**), account-level **Founder API Key** configuration, **Gemini provider**, plus **Journey Brain** and **Node Workspaces**—all under **Project routes**, not legacy top-level shell routes
+- V1 includes **Landing Page**, authentication, **Pitwall**, **Grid** (**Interview practice Node** only), that **Node**'s **Active Node surface** with **Practice Dashboard** chrome (**Start Practice**, **Profile Settings** and **Ideal Customer Profiles** per **Project**, **Voice Conversation**, **Report Generating State**, **Session Report**, **Progression**, **Achievement Nodes**, **Insufficient Data State**), account-level **Founder API Key** configuration, **Gemini provider**, plus **Journey Brain** and **Node Workspaces**—all under **Project routes**, not legacy top-level shell routes
 - V1 **excludes** platform **Credits**, **Free Trial Session**, subscription billing, **Credit Exhaustion**, and all credit-ledger code paths
 - V1 excludes teams, coaches, exact retry, text chat mode for **Sessions** (voice-first interview **Node**), default **Audio Recording**, showing next practice focus outside the **Session Report**, past-weakness personalization, public report sharing, and lesson-style form onboarding
 - V1 includes **conversational onboarding** via **`ONBOARDING.md`** at **Project** boot (same **Journey Brain**) and **Agent mission** (**configure system prompt**, not founder-authored)
@@ -390,9 +403,9 @@ _Avoid_: Progress bar, trap counter
 - The **Landing Page** uses the **Product display name** in visible chrome and the **Product app name** in HTML metadata; it does not require an on-page Mom Test affiliation disclaimer
 - The product should not falsely claim to be an official Mom Test book product, a licensed product, or an endorsed product
 - Landing-page supporting copy is not resolved yet
-- After sign up or log in, a **Founder** with no **Projects** completes the first-run **feature tour** (**Back** / **Next** only; **second-to-last** **Founder API Key**; **last** names startup and creates **Project**). **Founders** with **Projects** land on `/projects/[projectSlug]/command` (**composer** or **operational** by **Project** data). **Conversational onboarding** is **Command composer state**; **Command operational state** follows **finished** onboarding chat only—not **Session** completion
+- After sign up or log in, a **Founder** with no **Projects** completes the first-run **feature tour** (**Back** / **Next** only; **second-to-last** **Founder API Key**; **last** names startup and creates **Project**). **Founders** with **Projects** land on `/projects/[projectSlug]/pitwall` (**composer** or **operational** by **Project** data). **Conversational onboarding** is **Pitwall composer state**; **Pitwall operational state** follows **finished** onboarding chat only—not **Session** completion
 - A user may define an **Ideal Customer Profile** from **Profile Settings** under the **Interview practice Node** (for example `…/nodes/interview-practice/settings`); **Journey Brain** sees **Interview practice** plugin context via **Node Skill**, **Node Workspace**, and **Node artifacts**—separate from the future **Customer interview Node**
-- **Start Practice** requires a configured **Founder API Key** (from feature tour or **account menu**); platform does not run **Sessions** without it. **Start Practice** does **not** require **Command operational state**—**Interview practice** (**unlocked at boot**) may run during composer onboarding
+- **Start Practice** requires a configured **Founder API Key** (from feature tour or **account menu**); platform does not run **Sessions** without it. **Start Practice** does **not** require **Pitwall operational state**—**Interview practice** (**unlocked at boot**) may run during composer onboarding
 - There is no subscription, in-app pricing, or platform **Credits** ledger in the refactor
 - A **Voice Conversation** should not show in-session purchase or billing modals
 - **Voice Failure** should pause, resume if possible, or end gracefully without switching to text chat
@@ -440,7 +453,7 @@ _Avoid_: Progress bar, trap counter
 > **Dev:** "Should every persona response be a Trap?"
 > **Domain expert:** "No — a **Session** should feel like one natural interview. A **Trap** is only a possible test inside that conversation."
 > **Dev:** "What is the v1 product loop?"
-> **Domain expert:** "Landing, auth, **Command**, **Grid** with the interview **Node**, optional ICP settings, voice practice inside that **Node**, report, credits, progression, and ranking placeholder. Leave collaboration, lessons, text fallback, exact retry, and personalization out."
+> **Domain expert:** "Landing, auth, **Pitwall**, **Grid** with the interview **Node**, optional ICP settings, voice practice inside that **Node**, report, credits, progression, and ranking placeholder. Leave collaboration, lessons, text fallback, exact retry, and personalization out."
 > **Dev:** "Are we simulating a whole market?"
 > **Domain expert:** "No — the product may create an **Auto-Generated Persona**, but the user practices one interview with one **Customer Persona** at a time."
 > **Dev:** "Should the user enter the idea they are testing?"
@@ -452,7 +465,7 @@ _Avoid_: Progress bar, trap counter
 > **Dev:** "What happens when the user presses start?"
 > **Domain expert:** "**Start Practice** immediately begins the **Session**. The user may see a short **Opening Context**, but not a setup screen or persona dossier."
 > **Dev:** "Is the home screen a course?"
-> **Domain expert:** "No — **Command** is the default home; the interview **Active Node surface** is centered on starting another practice loop and reviewing progress."
+> **Domain expert:** "No — **Pitwall** is the default home; the interview **Active Node surface** is centered on starting another practice loop and reviewing progress."
 > **Dev:** "Can coaches or teams review reports in v1?"
 > **Domain expert:** "No — v1 is for one **Learner** improving their own interview skill."
 > **Dev:** "Can users share reports publicly?"
@@ -462,7 +475,7 @@ _Avoid_: Progress bar, trap counter
 > **Dev:** "Should the dashboard show next practice focus?"
 > **Domain expert:** "No for v1 — the **Session Report** owns next practice focus to keep the interview **Active Node surface** simple."
 > **Dev:** "Does the authenticated app repeat the landing-page promise?"
-> **Domain expert:** "No — the **Landing Page** handles marketing. After sign up or log in, the user goes to **Command**."
+> **Domain expert:** "No — the **Landing Page** handles marketing. After sign up or log in, the user goes to **Pitwall**."
 > **Dev:** "Is this an official Mom Test book product?"
 > **Domain expert:** "No — use **Product display name** / **Product app name** for ApexPMF, and do not claim official Mom Test licensing or endorsement."
 > **Dev:** "How does the user try the product?"
@@ -522,39 +535,39 @@ _Avoid_: Progress bar, trap counter
 
 - **Node catalog vs agent intelligence** (grill): resolved — **Node catalog** + **Node Skill** are **product-owned**; per-**Node** **locked** / **unlocked** state in code; **Journey Brain** is **intelligent** (unlock, nudges, **Journey milestone** replanning, progressive skill load). Analogous to Codex plugins on a **long-horizon** PMF journey.
 - **Pre-journey in code** (grill): resolved — **conversational label only** for **Nodes** **unlocked at Project boot**; **not** a software category or enum.
-- **Operational Command gate** (grill Q18): resolved — **no** early flip from **Sessions**; onboarding chat must **finish** (required context in agent onboarding **system prompt** only).
+- **Operational Pitwall gate** (grill Q18): resolved — **no** early flip from **Sessions**; onboarding chat must **finish** (required context in agent onboarding **system prompt** only).
 - **Journey milestone spine** (grill Q13): **TBD** — PMF-canvas-style direction (similar to Strunk five components) but redesigned from first principles; catalog lives in **`platform/registry`**, not `knowledge-graph/` (deleted).
 - **V1 Grid map** (grill Q14): resolved — **only** shipped **Nodes** on the map (**Interview practice**); **no** skeleton of locked future **Nodes** until catalog spine exists.
 - **Profile Settings routing** (grill Q15): resolved — under **Interview practice Node** routes; **Journey Brain** retains plugin context (not a silo).
 - **Interview practice vs Customer interview** (grill): resolved — **two different Nodes**; v1 = **Interview practice** (Mom Test simulator) only; **Customer interview** (real interviews) = **future** **TBD**—do not conflate in copy, routes, or catalog.
-- **Agent chat rail on Grid** (grill Q16): resolved — **yes** in v1 (alongside operational **Command** and **Interview practice Active Node surface**); **no** rail on **Command composer state**.
-- **Start Practice during onboarding** (grill Q17): resolved — **yes**; **Interview practice** (**unlocked at boot**) is not gated on **Command operational state**; soft nudges only.
+- **Agent chat rail on Grid** (grill Q16): resolved — **yes** in v1 (alongside operational **Pitwall** and **Interview practice Active Node surface**); **no** rail on **Pitwall composer state**.
+- **Start Practice during onboarding** (grill Q17): resolved — **yes**; **Interview practice** (**unlocked at boot**) is not gated on **Pitwall operational state**; soft nudges only.
 
-- **V1** slice (Q14): resolved — **integrated copilot loop** (not shell-only): **real Command** after at least one **Session**; **Grid** with **one** interview **Node**; fully interactive **Active Node surface**; **Journey Brain** via **deepagentsjs** OpenClaw/Hermes-shaped harness (workspace + file tools + **Node Skills**), not full external-channel clone day one. Defer **Pinned Node** auto-workset and **Node work state** until baseline loop works.
-- **Command agent UX** (grill): direction **B** — **Journey Brain** chat via persistent **Agent chat rail** on authenticated windows (Cursor-for-PMF pattern) plus generative operational UI in **Command**; **no** multi-channel (Telegram, etc.), bash/browser marketplace, or “interview as meta-agent chat” in v1.
+- **V1** slice (Q14): resolved — **integrated copilot loop** (not shell-only): **real Pitwall** after at least one **Session**; **Grid** with **one** interview **Node**; fully interactive **Active Node surface**; **Journey Brain** via **deepagentsjs** OpenClaw/Hermes-shaped harness (workspace + file tools + **Node Skills**), not full external-channel clone day one. Defer **Pinned Node** auto-workset and **Node work state** until baseline loop works.
+- **Pitwall agent UX** (grill): direction **B** — **Journey Brain** chat via persistent **Agent chat rail** on authenticated windows (Cursor-for-PMF pattern) plus generative operational UI in **Pitwall**; **no** multi-channel (Telegram, etc.), bash/browser marketplace, or “interview as meta-agent chat” in v1.
 - **Founder Goal** (grill): **not** founder-authored — use **Agent mission** (**configure system prompt**, content not specified here) + **Founder context** (basics, schema **TBD**); onboarding via **`ONBOARDING.md`** at boot (OpenClaw-style).
 - **Journey Brain** (grill, Deep Agents): **one** `createDeepAgent` per **Project**—**not** a separate onboarding agent; composer vs operational is UI + whether **`ONBOARDING.md`** still exists.
-- **ONBOARDING.md completion** (grill Q8): **A** — **agent** decides sufficiency and removes/archives **`ONBOARDING.md`**; then **Command operational state**.
+- **ONBOARDING.md completion** (grill Q8): **A** — **agent** decides sufficiency and removes/archives **`ONBOARDING.md`**; then **Pitwall operational state**.
 - **ONBOARDING.md template location** (grill Q9): **TBD** — decide in the first brain/onboarding issue (repo path vs skill bundle vs other).
-- **Authenticated shell layout** (grill): **left** sidebar (**Command**, **Grid**, optional **Pinned Nodes**) + **footer** account menu + **center** canvas + **right** **Agent chat rail** on **Grid**, **Command operational state**, and **Active Node surfaces**—**not** on **Command composer state** (center thread only). Rail collapse/mobile **TBD** per issue.
+- **Authenticated shell layout** (grill): **left** sidebar (**Pitwall**, **Grid**, optional **Pinned Nodes**) + **footer** account menu + **center** canvas + **right** **Agent chat rail** on **Grid**, **Pitwall operational state**, and **Active Node surfaces**—**not** on **Pitwall composer state** (center thread only). Rail collapse/mobile **TBD** per issue.
 - **Credits** (v1): resolved — **remove entirely** from product and codebase; **Founder API Key** only.
-- **Progression** (v1, grill): **keep** inside the interview **Node** **Active Node surface** (**Progression** path, **Achievement Nodes**, **Global Ranking** / **Insufficient Data State**)—not moved to **Command** for v1.
+- **Progression** (v1, grill): **keep** inside the interview **Node** **Active Node surface** (**Progression** path, **Achievement Nodes**, **Global Ranking** / **Insufficient Data State**)—not moved to **Pitwall** for v1.
 - **Planning style**: vision/grill/PRD work is **alignment for founders and coding agents**, not a frozen spec—many details stay **TBD until the issue that needs them**; record decisions in `CONTEXT.md` / ADRs as they land during build.
-- Product direction: **Journey Brain**, **Node Workspaces**, **Command**, **Grid**, and **Nodes** are the hero scope; the voice-first **Session** practice is the first **Node**; more **Nodes** follow (for example ICP-to-leads). Many **Relationships** bullets still describe interview-**Node** behavior in detail; align copy as the shell hardens.
+- Product direction: **Journey Brain**, **Node Workspaces**, **Pitwall**, **Grid**, and **Nodes** are the hero scope; the voice-first **Session** practice is the first **Node**; more **Nodes** follow (for example ICP-to-leads). Many **Relationships** bullets still describe interview-**Node** behavior in detail; align copy as the shell hardens.
 - **Journey Brain** implementation direction: LangChain **Deep Agents** harness (planning, virtual filesystem tools, subagents, pluggable backends, LangGraph runtime); **v1 runtime: TypeScript first** via **deepagentsjs** alongside the Next.js app; Python **deepagents** only if a concrete capability gap forces it. Production still uses **Platform store** for contracts and secrets.
 - Durable **Node Workspace** bytes (v1): persist across visits; file backing via **Platform store** and/or LangGraph durable virtual FS (implementation detail); object buckets deferred unless needed.
 - Hybrid storage resolved: **Platform store** = **database** for product UI and structured truth; **Node Workspace** = per-**Node** **plugin** files for the **Journey Brain**; **sync** consolidated summaries from database events into **Node Workspace** after sessions (and similar milestones).
 - **Brain data diet** (Q17): resolved — **sync both**; database is source of truth for UI; **Node Workspace** holds consolidated, searchable agent context; raw data remains available when the brain needs to dig in, via search/tools, not full-context dump every turn.
 - **Founder Goal** gate vs graph: superseded — **Agent mission** is product-owned; **Founder context** is conversational (**TBD** fields). **Node** catalog is **prebuilt**; brain does not spawn novel **Node** types on demand. Gate policy before expensive **Nodes** remains **TBD per issue**.
 - Public promise framing (outcome vs capability language): deferred — **Founder** intent emphasizes *operational velocity* in the sense of how fast-moving builders are praised (constraint focus, iteration speed), not a narrow marketing A/B; refine honest external copy later.
-- **Founder** read access to **Node Workspace**: resolved for v1 — **Founders** should be able to **read** agent-backed artifacts in **Node Workspaces**; the specific UI entry point is **undecided** and is **not** assumed to live only inside **Command**; direct in-UI hand-editing is **not** committed for v1.
-- **Command** / **Dashboard** / **Mission Control**: resolved — spoken and written interchangeably for the **same** global operational sidebar module; **canonical glossary term** is **Command** unless engineering standardizes on another single string in code.
-- **Practice Dashboard** vs **Command**: resolved — **Command** is the global operational module; **Practice Dashboard** is chrome **inside** the **Interview practice Node** only—not **Customer interview Node**.
-- **Command** vs **Grid** (Q8): resolved for v1 — **strict separation** of primary sidebar modules; **Command** = operational / bottleneck / "what now"; **Grid** = PMF **Node** map and entry into **Active Node surfaces**; link across modules, do not duplicate the full map as the main **Command** canvas.
-- Prerequisite / gate **skip** policy (Q9): intentionally deferred — revisit when **Command**/**Grid** shell and **Node** catalog are stable.
+- **Founder** read access to **Node Workspace**: resolved for v1 — **Founders** should be able to **read** agent-backed artifacts in **Node Workspaces**; the specific UI entry point is **undecided** and is **not** assumed to live only inside **Pitwall**; direct in-UI hand-editing is **not** committed for v1.
+- **Pitwall** naming (grill): resolved — **Pitwall** is the sole canonical name for the global operational sidebar module; **Command**, **Dashboard**, and **Mission Control** are retired product terms (see deprecated entries).
+- **Practice Dashboard** vs **Pitwall**: resolved — **Pitwall** is the global operational module; **Practice Dashboard** is chrome **inside** the **Interview practice Node** only—not **Customer interview Node**.
+- **Pitwall** vs **Grid** (Q8): resolved for v1 — **strict separation** of primary sidebar modules; **Pitwall** = operational / bottleneck / "what now"; **Grid** = PMF **Node** map and entry into **Active Node surfaces**; link across modules, do not duplicate the full map as the main **Pitwall** canvas.
+- Prerequisite / gate **skip** policy (Q9): intentionally deferred — revisit when **Pitwall**/**Grid** shell and **Node** catalog are stable.
 - **Grid** → map return (Q11): baseline accepted — compact **`<`-style** control from **Active Node surface**; breadcrumbs and fuller chrome **TBD**.
-- **Pinned Node** behavior (Q12): **vision in flux** — expect **Node work state** + **active workset** (often one bottleneck **Node**, sometimes two parallel) to drive which **Nodes** deserve sidebar prominence; auto-retire pins when focus moves; tie to **Command** "what now"; mix of deterministic state vs agent judgment **not** chosen; coexists with **Founder**-initiated pin sketch until reconciled; cap/overflow rules revisit once auto-surfacing exists.
-- **Command** (global module) vs **Node**-local layouts: resolved linguistically — use **Active Node surface** for the full-panel **Node** UI opened from **Grid**; reserve **Command** for the global sidebar module (_aliases_: **Dashboard**, **Mission Control**).
+- **Pinned Node** behavior (Q12): **vision in flux** — expect **Node work state** + **active workset** (often one bottleneck **Node**, sometimes two parallel) to drive which **Nodes** deserve sidebar prominence; auto-retire pins when focus moves; tie to **Pitwall** "what now"; mix of deterministic state vs agent judgment **not** chosen; coexists with **Founder**-initiated pin sketch until reconciled; cap/overflow rules revisit once auto-surfacing exists.
+- **Pitwall** (global module) vs **Node**-local layouts: resolved linguistically — use **Active Node surface** for the full-panel **Node** UI opened from **Grid**; reserve **Pitwall** for the global sidebar module.
 - "v1 scope" was clarified: keep the core voice practice/report/progression loop and exclude adjacent collaboration, course, sharing, personalization, and fallback surfaces.
 - "googly" was used to mean a possible test inside the conversation; resolved: use **Trap**.
 - "auto" was compared to artificial society products; resolved: use **Auto-Generated Persona** for a simple generated counterpart, not a simulated audience.
@@ -564,16 +577,16 @@ _Avoid_: Progress bar, trap counter
 - "ICP" was clarified: users may manage multiple **Ideal Customer Profiles** and select one **Active Ideal Customer Profile**.
 - "random personas" was clarified: no active ICP uses a **Broad Practice Pool** of realistic discovery contexts.
 - "difficulty" sounded user-selected; resolved: difficulty adapts from **Progression** and **Global Ranking**.
-- "main screen" was clarified: default authenticated home is **Command** (aka **Dashboard** / **Mission Control**); interview practice lives in the interview **Active Node surface** (**Practice Dashboard** chrome), not a course-style surface.
+- "main screen" was clarified: default authenticated home is **Pitwall**; interview practice lives in the interview **Active Node surface** (**Practice Dashboard** chrome), not a course-style surface.
 - "user" was clarified: v1 serves an individual **Learner**, not teams, coaches, or organizations.
 - "report privacy" was clarified: **Session Reports** and **Session Transcripts** are private by default with no sharing in v1.
 - "voice storage" was clarified: no **Audio Recording** by default in v1.
-- "next practice focus" was clarified: keep it in the **Session Report**, not centered on the v1 **Command** module or the interview **Active Node surface** home.
-- "onboarding" was clarified: public **Landing Page** before auth; after auth, **`ONBOARDING.md`** boot ritual in **Command composer state** (same **Journey Brain**)—not lesson-style forms or a second agent.
+- "next practice focus" was clarified: keep it in the **Session Report**, not centered on the v1 **Pitwall** module or the interview **Active Node surface** home.
+- "onboarding" was clarified: public **Landing Page** before auth; after auth, **`ONBOARDING.md`** boot ritual in **Pitwall composer state** (same **Journey Brain**)—not lesson-style forms or a second agent.
 - "**Founder Goal**" was deprecated: founders do not author the agent's objective; **Agent mission** uses **configure system prompt**; founders supply **Founder context** (**TBD**).
 - "product name" was clarified: **Product display name** is `ApexPMF` in UI; **Product app name** is `ApexPMF` for metadata and integrations.
-- "landing copy" was clarified: **Product tagline** is `Speedrun Product-Market Fit`; **Product description** is the AI-agent PMF sentence used in hero and metadata.
-- **Journey Brain** vs **Node Runtime** (interview): resolved for v1 — interview **Node Runtime** runs voice **Sessions** and existing LLM workflows; **Journey Brain** is not in the per-turn voice loop; it learns from **Node artifacts** (reports, progression, summaries) to steer journey and **Command**. **TBD:** exact artifact schema per **Node**; how agentic vs HITL each **Node** becomes over time.
+- "landing copy" was clarified: **Product tagline** is `Your Fastest Path to Product-Market Fit`; **Product description** is the AI-agent PMF sentence used in hero and metadata.
+- **Journey Brain** vs **Node Runtime** (interview): resolved for v1 — interview **Node Runtime** runs voice **Sessions** and existing LLM workflows; **Journey Brain** is not in the per-turn voice loop; it learns from **Node artifacts** (reports, progression, summaries) to steer journey and **Pitwall**. **TBD:** exact artifact schema per **Node**; how agentic vs HITL each **Node** becomes over time.
 - **Gemini provider** (refactor): resolved — remove **OpenRouter**; use **Google Gemini API** for non-live LLM (persona generation, **Hidden Evaluation**, **Journey Brain**) and existing Gemini Live voice paths.
 - **Monetization** (refactor): resolved — **bring your own API key** via **Founder API Key**; no subscription, in-app pricing, **Credits**, **Free Trial Session**, or **Credit Exhaustion** in the refactor. **V1:** one **Google AI Studio / Gemini API key** per **Founder** for all Gemini surfaces (voice + non-live LLM); **required** on feature tour penultimate step. **TBD:** key storage (encryption, rotation UI), quota/error UX when the key fails; **post-v1** whether tour may allow deferring API key.
 - "voice fallback" was clarified: **Voice Failure** should not switch the **Session** to text chat.

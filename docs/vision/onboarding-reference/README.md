@@ -1,6 +1,6 @@
 # Onboarding reference (Factory App–style)
 
-Reference screenshots for the **feature tour** pattern: sign in → skippable stepped modal → **last step** creates **Project** (startup name) → **Command** shell.
+Reference screenshots for the **feature tour** pattern: sign in → skippable stepped modal → **last step** creates **Project** (startup name) → **Pitwall** shell.
 
 | File | Step |
 |------|------|
@@ -14,4 +14,4 @@ Canonical flow is defined in `CONTEXT.md` (**Feature tour**, **Conversational on
 
 **Account menu** (sidebar footer, API key): `Screenshot_2026-05-22_at_10.31.38_AM-*.png`, `Screenshot_2026-05-22_at_10.31.52_AM-*.png`.
 
-**Command composer state** (v0 composer + ChatGPT conversation): `Screenshot_2026-05-22_at_11.32.24_AM-*.png`, `Screenshot_2026-05-22_at_11.35.20_AM-*.png`.
+**Pitwall composer state** (v0 composer + ChatGPT conversation): `Screenshot_2026-05-22_at_11.32.24_AM-*.png`, `Screenshot_2026-05-22_at_11.35.20_AM-*.png`.
